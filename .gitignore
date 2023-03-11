@@ -1,3 +1,5 @@
 result*
 .direnv
 target
+devel
+.history
