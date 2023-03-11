@@ -5,7 +5,7 @@ use std::{
     str::FromStr,
 };
 
-const STORE_PATH: &str = "/myq/store";
+const STORE_PATH: &str = "/miq/store";
 
 #[derive(serde::Deserialize, Debug, Hash)]
 pub struct FOP {
