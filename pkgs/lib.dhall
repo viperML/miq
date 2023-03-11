@@ -1,5 +1,3 @@
-let FOPParams = { url : Text }
+let FOP = { pname : Text, version : Text, url : Text }
 
-in  { mkPkg = λ(input : Bool) → input
-    , mkFOP = λ(params : FOPParams) →  params
-    }
+in  { mkPkg = λ(input : Bool) → input, mkFOP = λ(params : FOP) → params }

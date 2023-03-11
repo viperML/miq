@@ -16,3 +16,4 @@ log = "0.4.17"
 serde = { version = "1.0.154", features = ["derive"] }
 serde_dhall = { version = "0.12.1", default-features = false, features = [
 ] }
+unshare = "0.7.0"

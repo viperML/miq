@@ -1,9 +1,11 @@
-use std::{
-    collections::BTreeMap,
-    fs,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+mod expr;
+mod store;
+
+use std::collections::BTreeMap;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::path::PathBuf;
+use std::str::FromStr;
 
 use log::debug;
 
@@ -19,23 +21,20 @@ fn setup_logging() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[derive(serde::Deserialize, Debug)]
-struct FOP {
-    url: String,
-}
-
 fn main() -> anyhow::Result<()> {
     setup_logging()?;
 
     let file = PathBuf::from_str("/home/ayats/Documents/miq/pkgs/main.dhall")?;
 
-    let test = serde_dhall::from_file(&file).parse::<BTreeMap<String, FOP>>()?;
+    let pkgs = serde_dhall::from_file(&file).parse::<BTreeMap<String, expr::FOP>>()?;
 
-    debug!("{:?}", &test);
+    debug!("{:?}", &pkgs);
 
-    // let main_config = fs::read_to_string(&file)?;
-
-    // debug!("{:?}", main_config);
+    for (k,v) in pkgs {
+        debug!("{:?}", v);
+        let path = expr::pkg_path(&v);
+        debug!("{:?}", path);
+    }
 
     Ok(())
 }
