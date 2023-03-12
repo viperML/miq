@@ -1,12 +1,17 @@
+#![cfg_attr(debug_assertions, allow(dead_code, unused_imports))]
+
+mod cli;
 mod expr;
+mod schema;
 mod store;
 
-use std::collections::BTreeMap;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use clap::Parser;
 use log::debug;
 
 fn setup_logging() -> anyhow::Result<()> {
@@ -24,19 +29,26 @@ fn setup_logging() -> anyhow::Result<()> {
 fn main() -> anyhow::Result<()> {
     setup_logging()?;
 
-    let file = PathBuf::from_str("/home/ayats/Documents/miq/pkgs/main.dhall")?;
+    let parsed = cli::CliParser::parse();
 
-    let pkgs = serde_dhall::from_file(&file).parse::<BTreeMap<String, expr::FOP>>()?;
-
-    debug!("{:?}", &pkgs);
-
-    for (k,v) in pkgs {
-        debug!("{:?}", v);
-        let path = expr::pkg_path(&v);
-        debug!("{:?}", path);
-
-        store::build(v)?;
+    match parsed.command {
+        cli::MiqCommands::Schema => schema::build(),
+        x => todo!("Command {:?} not yet implemented", x),
     }
 
-    Ok(())
+    // let file = PathBuf::from_str("/home/ayats/Documents/miq/pkgs/main.dhall")?;
+
+    // let pkgs = serde_dhall::from_file(&file).parse::<BTreeMap<String, expr::FOP>>()?;
+
+    // debug!("{:?}", &pkgs);
+
+    // for (k,v) in pkgs {
+    //     debug!("{:?}", v);
+    //     let path = expr::pkg_path(&v);
+    //     debug!("{:?}", path);
+
+    //     store::build(v)?;
+    // }
+
+    // Ok(())
 }

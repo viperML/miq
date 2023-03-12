@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Pkg",
+  "type": "object",
+  "required": [
+    "pname"
+  ],
+  "properties": {
+    "pname": {
+      "type": "string"
+    }
+  }
+}
