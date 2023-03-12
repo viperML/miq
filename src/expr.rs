@@ -9,9 +9,9 @@ const STORE_PATH: &str = "/miq/store";
 
 #[derive(serde::Deserialize, Debug, Hash)]
 pub struct FOP {
-    url: String,
-    pname: String,
-    version: String,
+    pub url: String,
+    pub pname: String,
+    pub version: String,
 }
 
 pub fn pkg_path(pkg: &FOP) -> PathBuf {

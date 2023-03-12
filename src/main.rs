@@ -34,6 +34,8 @@ fn main() -> anyhow::Result<()> {
         debug!("{:?}", v);
         let path = expr::pkg_path(&v);
         debug!("{:?}", path);
+
+        store::build(v)?;
     }
 
     Ok(())

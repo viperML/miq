@@ -13,7 +13,13 @@ clap = { version = "4.1.8", features = [
 ] }
 fern = "0.6.1"
 log = "0.4.17"
-serde = { version = "1.0.154", features = ["derive"] }
+reqwest = { version = "0.11.14", default-features = false, features = [
+    "rustls",
+    "blocking",
+] }
+serde = { version = "1.0.154", features = [
+    "derive",
+] }
 serde_dhall = { version = "0.12.1", default-features = false, features = [
 ] }
 unshare = "0.7.0"
