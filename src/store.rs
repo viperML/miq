@@ -1,11 +1,13 @@
 use std::fmt::Debug;
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf, self};
+use std::path::{self, Path, PathBuf};
 use std::{fs, io};
 
 use anyhow::{bail, Context};
 use bytes::Buf;
 use log::debug;
+
+use crate::schema;
 
 #[derive(Debug, clap::Args)]
 pub struct BuildArgs {
@@ -31,14 +33,29 @@ fn mkdir<P: AsRef<Path> + Debug>(p: P) -> Result<(), io::Error> {
     }
 }
 
-pub fn build(args: BuildArgs) -> anyhow::Result<()> {
+pub fn build_spec(args: BuildArgs) -> anyhow::Result<()> {
     debug!("args: {:?}", args);
-    // let path = path::absolute(args.file);
-    let path = std::fs::canonicalize(args.file)?;
-    debug!("{:?}", path);
 
+    let spec = schema::parse(args.file)?;
+    debug!("spec: {:?}", spec);
 
-    
+    for p in spec.pkg {
+        debug!("building pkg: {:?}", p);
+        build_pkg(p)?;
+    }
+
+    Ok(())
+}
+
+pub fn build_pkg(pkg: schema::Pkg) -> anyhow::Result<()> {
+    let builddir = tempfile::Builder::new().prefix("miq-build-").tempfile()?;
+    let builddir_path = builddir.path();
+
+    for fetchable in pkg.fetch {
+        debug!("Fetching: {:?}", fetchable);
+    }
+
+    debug!("{:?}", builddir_path);
     Ok(())
 }
 

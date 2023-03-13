@@ -32,23 +32,7 @@ fn main() -> anyhow::Result<()> {
 
     match parsed.command {
         cli::MiqCommands::Schema => schema::build(),
-        cli::MiqCommands::Build(args) => store::build(args),
+        cli::MiqCommands::Build(args) => store::build_spec(args),
         x => todo!("Command {:?} not yet implemented", x),
     }
-
-    // let file = PathBuf::from_str("/home/ayats/Documents/miq/pkgs/main.dhall")?;
-
-    // let pkgs = serde_dhall::from_file(&file).parse::<BTreeMap<String, expr::FOP>>()?;
-
-    // debug!("{:?}", &pkgs);
-
-    // for (k,v) in pkgs {
-    //     debug!("{:?}", v);
-    //     let path = expr::pkg_path(&v);
-    //     debug!("{:?}", path);
-
-    //     store::build(v)?;
-    // }
-
-    // Ok(())
 }

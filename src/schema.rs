@@ -22,13 +22,13 @@ pub struct Pkg {
 
 #[derive(JsonSchema, Debug, Deserialize)]
 pub struct Fetchable {
-    url: String,
-    hash: String,
+    pub url: String,
+    pub hash: String,
 }
 
 #[derive(JsonSchema, Debug, Deserialize)]
 pub struct PkgSpec {
-    pkg: Vec<Pkg>,
+    pub pkg: Vec<Pkg>,
 }
 
 pub fn build() -> anyhow::Result<()> {
