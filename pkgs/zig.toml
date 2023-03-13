@@ -1,4 +1,4 @@
-#:schema /home/ayats/Documents/miq/pkgs/schema.json
+#:schema ./schema.json
 [[pkg]]
 name = "zig"
 version = "0.11.0"
