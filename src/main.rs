@@ -1,7 +1,6 @@
 #![cfg_attr(debug_assertions, allow(dead_code, unused_imports))]
 
 mod cli;
-mod expr;
 mod schema;
 mod store;
 
@@ -33,6 +32,7 @@ fn main() -> anyhow::Result<()> {
 
     match parsed.command {
         cli::MiqCommands::Schema => schema::build(),
+        cli::MiqCommands::Build(args) => store::build(args),
         x => todo!("Command {:?} not yet implemented", x),
     }
 
