@@ -1,13 +1,63 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Pkg",
+  "title": "PkgSpec",
   "type": "object",
   "required": [
-    "pname"
+    "pkg"
   ],
   "properties": {
-    "pname": {
-      "type": "string"
+    "pkg": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Pkg"
+      }
+    }
+  },
+  "definitions": {
+    "Fetchable": {
+      "type": "object",
+      "required": [
+        "hash",
+        "url"
+      ],
+      "properties": {
+        "hash": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      }
+    },
+    "Pkg": {
+      "type": "object",
+      "required": [
+        "exec",
+        "fetch",
+        "name",
+        "path",
+        "version"
+      ],
+      "properties": {
+        "exec": {
+          "type": "string"
+        },
+        "fetch": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Fetchable"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
     }
   }
 }
