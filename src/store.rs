@@ -19,7 +19,7 @@ pub struct BuildArgs {
 fn mkdir<P: AsRef<Path> + Debug>(p: P) -> Result<(), io::Error> {
     debug!("Creating directory: {:?}", p);
 
-    if let Err(err) = fs::create_dir(p) {
+    if let Err(err) = fs::create_dir_all(p) {
         match err.kind() {
             io::ErrorKind::AlreadyExists => {
                 debug!("Build dir already exists");
@@ -48,15 +48,20 @@ pub fn build_spec(args: BuildArgs) -> anyhow::Result<()> {
 }
 
 pub fn build_pkg(pkg: schema::Pkg) -> anyhow::Result<()> {
-    let builddir = tempfile::Builder::new().prefix("miq-build-").tempfile()?;
-    let builddir_path = builddir.path();
-
-    for fetchable in pkg.fetch {
-        debug!("Fetching: {:?}", fetchable);
-    }
-
-    debug!("{:?}", builddir_path);
+    // for fetchable in pkg.fetch {
+    //     let fch_dir = builddir_path.join("src");
+    //     fetch(fetchable, fch_dir)?;
+    // }
     Ok(())
+}
+
+pub fn fetch<P>(fch: schema::Fetchable, path: P) -> anyhow::Result<()>
+where
+    P: AsRef<Path> + Debug,
+{
+    debug!("Fetching: {:?} into {:?}", fch, &path);
+
+    todo!();
 }
 
 // pub fn build(pkg: expr::FOP) -> anyhow::Result<()> {
