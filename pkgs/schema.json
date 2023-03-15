@@ -30,18 +30,16 @@
       }
     },
     "Pkg": {
+      "description": "Vscode Even Better Toml: Wipe cache with: rm ~/.config/Code/User/globalStorage/tamasfe.even-better-toml/* */",
       "type": "object",
       "required": [
-        "exec",
         "fetch",
         "name",
         "path",
+        "script",
         "version"
       ],
       "properties": {
-        "exec": {
-          "type": "string"
-        },
         "fetch": {
           "type": "array",
           "items": {
@@ -52,6 +50,9 @@
           "type": "string"
         },
         "path": {
+          "type": "string"
+        },
+        "script": {
           "type": "string"
         },
         "version": {

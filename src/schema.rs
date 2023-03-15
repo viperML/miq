@@ -16,7 +16,7 @@ pub struct Pkg {
     pub name: String,
     pub version: String,
     pub fetch: Vec<Fetchable>,
-    pub exec: String,
+    pub script: String,
     pub path: String,
 }
 

@@ -1,11 +1,15 @@
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
+use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{self, Path, PathBuf};
-use std::{fs, io};
+use std::str::FromStr;
+use std::{fs, io, vec};
 
 use anyhow::{bail, Context};
 use bytes::Buf;
 use log::debug;
+use unshare::Command;
 
 use crate::schema;
 
@@ -48,20 +52,71 @@ pub fn build_spec(args: BuildArgs) -> anyhow::Result<()> {
 }
 
 pub fn build_pkg(pkg: schema::Pkg) -> anyhow::Result<()> {
-    // for fetchable in pkg.fetch {
-    //     let fch_dir = builddir_path.join("src");
-    //     fetch(fetchable, fch_dir)?;
-    // }
+    let fetch_paths: Result<Vec<_>, _> =
+        pkg.fetch.iter().map(|fetchable| fetch(fetchable)).collect();
+
+    let fetch_paths = fetch_paths?;
+
+    let mut env: HashMap<&str, &str> = HashMap::new();
+
+    let env_fetch: Vec<_> = fetch_paths
+        .iter()
+        .map(|elem| elem.to_str().expect("Couldn't format fetch_path"))
+        .collect();
+
+    let env_fetch = &env_fetch.join(":");
+
+    env.insert("MIQ_FETCH", env_fetch);
+
+    env.insert("PATH", "/home/ayats/Documents/miq/devel/nix-bootstrap/bin");
+
+    debug!("env: {:?}", env);
+
+
+    // let args: Vec<_> = pkg.script.split(" ").collect();
+    // let sh_args = vec!("-c");
+    // let cmd_args = [ &sh_args[..], &[vec] ].concat();
+    let cmd_args = [
+        "-c",
+        &pkg.script
+    ];
+
+    let mut cmd = Command::new("/bin/sh");
+    cmd.args(&cmd_args);
+    cmd.env_clear();
+    cmd.envs(&env);
+
+    debug!("output: {:?}", &cmd);
+
+    let status = cmd.status();
+    debug!("{:?}", status);
+
     Ok(())
 }
 
-pub fn fetch<P>(fch: schema::Fetchable, path: P) -> anyhow::Result<()>
-where
-    P: AsRef<Path> + Debug,
-{
-    debug!("Fetching: {:?} into {:?}", fch, &path);
+pub fn fetch(fch: &schema::Fetchable) -> anyhow::Result<PathBuf> {
+    let outpath = PathBuf::from_str("/tmp/miq-fetch/fetch1")?;
+
+    let meta = fs::metadata(&outpath)?;
+    if meta.is_file() {
+        return Ok(outpath);
+    }
 
     todo!();
+
+    debug!("Fetching: {:?}", fch);
+    fs::create_dir_all("/tmp/miq-fetch")?;
+    let mut outfile = File::create(&outpath)?;
+    debug!("outfile {:?}", outfile);
+
+    let client = reqwest::blocking::Client::new();
+    let response = client.get(&fch.url).send()?;
+    let mut content = response.bytes()?.reader();
+    std::io::copy(&mut content, &mut outfile)?;
+
+    debug!("Fetch Ok");
+
+    Ok(outpath)
 }
 
 // pub fn build(pkg: expr::FOP) -> anyhow::Result<()> {
@@ -77,12 +132,8 @@ where
 //     debug!("f: {:?}", f);
 
 //     let client = reqwest::blocking::Client::new();
-//     let response = client.get(pkg.url).send()?;
 
-//     let mut content = response.bytes()?.reader();
 //     debug!("Copying file");
-
-//     std::io::copy(&mut content, &mut f)?;
 
 //     Ok(())
 // }

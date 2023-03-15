@@ -2,7 +2,7 @@
 [[pkg]]
 name = "zig"
 version = "0.11.0"
-exec = "/bin/sh --version"
+script = "printenv"
 path = "/miq/store/AAAA-zig-0.11.0"
 [[pkg.fetch]]
 url = "https://ziglang.org/builds/zig-linux-x86_64-0.11.0-dev.1932+c93e0d861.tar.xz"
