@@ -1,12 +1,14 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "PkgSpec",
+  "description": "miq consumes pkg-spec files",
   "type": "object",
   "required": [
     "pkg"
   ],
   "properties": {
     "pkg": {
+      "description": "List of packages to build",
       "type": "array",
       "items": {
         "$ref": "#/definitions/Pkg"
@@ -15,6 +17,7 @@
   },
   "definitions": {
     "Fetchable": {
+      "description": "A fetchable is fetched from the internet and hash-checked",
       "type": "object",
       "required": [
         "hash",
@@ -22,15 +25,17 @@
       ],
       "properties": {
         "hash": {
+          "description": "SRI hash to check for integrity",
           "type": "string"
         },
         "url": {
+          "description": "URL to fetch",
           "type": "string"
         }
       }
     },
     "Pkg": {
-      "description": "Vscode Even Better Toml: Wipe cache with: rm ~/.config/Code/User/globalStorage/tamasfe.even-better-toml/* */",
+      "description": "Vscode Even Better Toml: Wipe cache with: rm ~/.config/Code/User/globalStorage/tamasfe.even-better-toml/* */ Definition of a package. A package the minimum buildable unit",
       "type": "object",
       "required": [
         "fetch",
@@ -41,21 +46,26 @@
       ],
       "properties": {
         "fetch": {
+          "description": "List of fecthables available during build-time",
           "type": "array",
           "items": {
             "$ref": "#/definitions/Fetchable"
           }
         },
         "name": {
+          "description": "Name of the package, normalized",
           "type": "string"
         },
         "path": {
+          "description": "Path that this package produces",
           "type": "string"
         },
         "script": {
+          "description": "POSIX script excuted at build-time",
           "type": "string"
         },
         "version": {
+          "description": "Version of the package, normalized",
           "type": "string"
         }
       }
