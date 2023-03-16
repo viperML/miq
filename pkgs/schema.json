@@ -38,6 +38,7 @@
       "description": "Definition of a package. A package the minimum buildable unit",
       "type": "object",
       "required": [
+        "env",
         "fetch",
         "name",
         "path",
@@ -45,6 +46,13 @@
         "version"
       ],
       "properties": {
+        "env": {
+          "description": "Environment variables present at buildtime",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "fetch": {
           "description": "List of fecthables available during build-time",
           "type": "array",

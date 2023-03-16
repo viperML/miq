@@ -7,5 +7,5 @@ pub struct CliParser {
 #[derive(clap::Subcommand, Debug)]
 pub enum MiqCommands {
     Schema,
-    Build(crate::store::BuildArgs)
+    Build(crate::store::BuildArgs),
 }

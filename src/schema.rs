@@ -1,4 +1,4 @@
-use std::{fs, io, path::Path};
+use std::{fs, io, path::Path, collections::HashMap};
 
 /**
  Vscode Even Better Toml:
@@ -23,6 +23,8 @@ pub struct Pkg {
     pub script: String,
     /// Path that this package produces
     pub path: String,
+    /// Environment variables present at buildtime
+    pub env: HashMap<String, String>,
 }
 
 /// A fetchable is fetched from the internet and hash-checked

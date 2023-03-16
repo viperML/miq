@@ -52,8 +52,7 @@ pub fn build_spec(args: BuildArgs) -> anyhow::Result<()> {
 }
 
 pub fn build_pkg(pkg: schema::Pkg) -> anyhow::Result<()> {
-    let fetch_paths: Result<Vec<_>, _> =
-        pkg.fetch.iter().map(|fetchable| fetch(fetchable)).collect();
+    let fetch_paths: Result<Vec<_>, _> = pkg.fetch.iter().map(fetch).collect();
 
     let fetch_paths = fetch_paths?;
 
@@ -66,20 +65,17 @@ pub fn build_pkg(pkg: schema::Pkg) -> anyhow::Result<()> {
 
     let env_fetch = &env_fetch.join(":");
 
-    env.insert("MIQ_FETCH", env_fetch);
-
-    env.insert("PATH", "/home/ayats/Documents/miq/devel/nix-bootstrap/bin");
+    env.insert("miq_fetch", &env_fetch);
+    env.insert("miq_out", &pkg.path);
 
     debug!("env: {:?}", env);
 
-    // let args: Vec<_> = pkg.script.split(" ").collect();
-    // let sh_args = vec!("-c");
-    // let cmd_args = [ &sh_args[..], &[vec] ].concat();
     let cmd_args = ["-c", &pkg.script];
 
     let mut cmd = Command::new("/bin/sh");
     cmd.args(&cmd_args);
     cmd.env_clear();
+    cmd.envs(&pkg.env);
     cmd.envs(&env);
 
     debug!("output: {:?}", &cmd);

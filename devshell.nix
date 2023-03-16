@@ -26,6 +26,8 @@
           binutils
           coreutils
           # mold
+          gnutar
+          xz
         ];
         pathsToLink = [
           "/bin"
