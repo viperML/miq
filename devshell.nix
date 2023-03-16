@@ -9,9 +9,9 @@
       packages = [
         config.packages.toolchain
         pkgs.rust-analyzer-unwrapped
-        pkgs.dhall
-        pkgs.dhall-json
-        pkgs.dhall-lsp-server
+        pkgs.pkg-config
+        pkgs.diesel-cli
+        pkgs.sqlite-interactive
       ];
     };
   };

@@ -1,0 +1,4 @@
+CREATE TABLE paths (
+  id INTEGER PRIMARY KEY,
+  fs_path VARCHAR NOT NULL
+)

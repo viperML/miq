@@ -3,3 +3,4 @@ result*
 target
 devel
 .history
+*.sqlite

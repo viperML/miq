@@ -6,6 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+diesel = { version = "2.0.3", features = [
+    "sqlite",
+    "without-deprecated",
+] }
 anyhow = "1.0.69"
 bytes = "1.4.0"
 clap = { version = "4.1.8", features = [
