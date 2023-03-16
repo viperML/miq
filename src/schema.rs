@@ -1,15 +1,14 @@
 use std::{fs, io, path::Path};
 
-use anyhow::Context;
-use log::debug;
-use schemars::{schema_for, JsonSchema};
-use serde::Deserialize;
-
 /**
  Vscode Even Better Toml:
  Wipe cache with:
  rm ~/.config/Code/User/globalStorage/tamasfe.even-better-toml/*
 */ */
+use anyhow::Context;
+use log::debug;
+use schemars::{schema_for, JsonSchema};
+use serde::Deserialize;
 
 /// Definition of a package. A package the minimum buildable unit
 #[derive(JsonSchema, Debug, Deserialize)]
