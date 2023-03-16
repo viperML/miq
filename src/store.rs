@@ -72,14 +72,10 @@ pub fn build_pkg(pkg: schema::Pkg) -> anyhow::Result<()> {
 
     debug!("env: {:?}", env);
 
-
     // let args: Vec<_> = pkg.script.split(" ").collect();
     // let sh_args = vec!("-c");
     // let cmd_args = [ &sh_args[..], &[vec] ].concat();
-    let cmd_args = [
-        "-c",
-        &pkg.script
-    ];
+    let cmd_args = ["-c", &pkg.script];
 
     let mut cmd = Command::new("/bin/sh");
     cmd.args(&cmd_args);
@@ -95,16 +91,16 @@ pub fn build_pkg(pkg: schema::Pkg) -> anyhow::Result<()> {
 }
 
 pub fn fetch(fch: &schema::Fetchable) -> anyhow::Result<PathBuf> {
+    debug!("Fetching: {:?}", fch);
     let outpath = PathBuf::from_str("/tmp/miq-fetch/fetch1")?;
 
-    let meta = fs::metadata(&outpath)?;
-    if meta.is_file() {
-        return Ok(outpath);
+    if let Ok(meta) = fs::metadata(&outpath) {
+        if meta.is_file() {
+            debug!("Already exists");
+            return Ok(outpath);
+        }
     }
 
-    todo!();
-
-    debug!("Fetching: {:?}", fch);
     fs::create_dir_all("/tmp/miq-fetch")?;
     let mut outfile = File::create(&outpath)?;
     debug!("outfile {:?}", outfile);
