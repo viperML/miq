@@ -11,7 +11,7 @@
         pkgs.rust-analyzer-unwrapped
         pkgs.pkg-config
         pkgs.diesel-cli
-        pkgs.sqlite-interactive
+        pkgs.sqlite-interactive.dev
       ];
     };
   };

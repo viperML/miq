@@ -1,1 +1,1 @@
-DROP TABLE paths
+DROP TABLE store

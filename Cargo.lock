@@ -470,6 +470,7 @@ dependencies = [
  "clap",
  "diesel",
  "fern",
+ "libsqlite3-sys",
  "log",
  "reqwest",
  "schemars",
