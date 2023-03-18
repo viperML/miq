@@ -39,7 +39,9 @@ pub struct IsPathArgs {
 pub fn cli_dispatch(args: CliArgs) -> anyhow::Result<()> {
     match args.action {
         CliSubcommand::List => list(),
-        CliSubcommand::Add(args) => add(args),
+        CliSubcommand::Add(args) => {
+            add(args.path)
+        },
         CliSubcommand::IsPath(args) => {
             let result = is_db_path(&args.path)?;
             info!("{:?}", result);
@@ -79,10 +81,10 @@ pub fn list() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn add(args: AddArgs) -> anyhow::Result<()> {
+pub fn add<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
     let conn = &mut connect_db()?;
 
-    let path_normalized = fix_path_trailing_slash(&args.path);
+    let path_normalized = fix_path_trailing_slash(path.as_ref());
 
     let path_str: String = path_normalized
         .as_path()

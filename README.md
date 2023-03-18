@@ -5,3 +5,10 @@
   >
   </a>
 </p>
+
+
+## Cheatsheet
+
+```console
+diesel migration redo
+```

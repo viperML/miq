@@ -8,9 +8,10 @@ use std::{fs, io, vec};
 
 use anyhow::{bail, Context};
 use bytes::Buf;
-use log::debug;
+use log::{debug, info};
 use unshare::Command;
 
+use crate::db;
 use crate::pkgs;
 
 #[derive(Debug, clap::Args)]
@@ -56,18 +57,27 @@ fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
 pub fn build_spec(args: BuildArgs) -> anyhow::Result<()> {
     debug!("args: {:?}", args);
 
-    let spec = pkgs::parse(args.file)?;
+    let spec = pkgs::parse(&args.file)?;
     debug!("spec: {:?}", spec);
 
     for p in spec.pkg {
         debug!("building pkg: {:?}", p);
-        build_pkg(p, &args.quiet)?;
+        build_pkg(p, &args)?;
     }
 
     Ok(())
 }
 
-pub fn build_pkg(pkg: pkgs::Pkg, quiet: &bool) -> anyhow::Result<()> {
+pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
+    if db::is_db_path(&pkg.path)? {
+        if build_args.rebuild {
+            todo!("Unregister")
+        } else {
+            debug!("Package was already built");
+            return Ok(())
+        }
+    }
+
     clean_path(&pkg.path)?;
 
     let fetch_paths: Result<Vec<_>, _> = pkg.fetch.iter().map(fetch).collect();
@@ -96,7 +106,7 @@ pub fn build_pkg(pkg: pkgs::Pkg, quiet: &bool) -> anyhow::Result<()> {
     cmd.envs(&pkg.env);
     cmd.envs(&env);
 
-    if *quiet {
+    if build_args.quiet {
         cmd.stdout(unshare::Stdio::Null);
         cmd.stderr(unshare::Stdio::Null);
     }
@@ -105,6 +115,8 @@ pub fn build_pkg(pkg: pkgs::Pkg, quiet: &bool) -> anyhow::Result<()> {
 
     let status = cmd.status();
     debug!("{:?}", status);
+
+    db::add(&pkg.path)?;
 
     Ok(())
 }
@@ -133,4 +145,3 @@ pub fn fetch(fch: &pkgs::Fetchable) -> anyhow::Result<PathBuf> {
 
     Ok(outpath)
 }
-
