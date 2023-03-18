@@ -9,7 +9,7 @@ pub enum MiqCommands {
     /// Generate the package schema
     Schema,
     /// Build a package into the store
-    Build(crate::store::BuildArgs),
+    Build(crate::build::BuildArgs),
     /// Query and operate on the store database
-    Db(crate::db::DbArgs),
+    Db(crate::store::DbArgs),
 }

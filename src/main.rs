@@ -1,10 +1,10 @@
 #![cfg_attr(debug_assertions, allow(dead_code, unused_imports))]
 
 mod cli;
-mod db;
-mod db_schema;
-mod schema;
 mod store;
+mod db_schema;
+mod pkgs_schema;
+mod build;
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
@@ -33,9 +33,9 @@ fn main() -> anyhow::Result<()> {
     let parsed = cli::CliParser::parse();
 
     match parsed.command {
-        cli::MiqCommands::Schema => schema::build(),
-        cli::MiqCommands::Build(args) => store::build_spec(args),
-        cli::MiqCommands::Db(args) => db::cli_dispatch(args),
+        cli::MiqCommands::Schema => pkgs_schema::build(),
+        cli::MiqCommands::Build(args) => build::build_spec(args),
+        cli::MiqCommands::Db(args) => store::cli_dispatch(args),
         x => todo!("Command {:?} not yet implemented", x),
     }
 }
