@@ -5,6 +5,7 @@ use diesel::{prelude::*, sql_types::Integer};
 use log::{debug, info, warn};
 use serde::__private::de;
 
+use crate::build;
 use crate::db_schema::store;
 use crate::db_schema::store::dsl::*;
 
@@ -22,6 +23,8 @@ pub enum CliSubcommand {
     Add(AddArgs),
     /// Check if a path is registered
     IsPath(IsPathArgs),
+    /// Remove a path
+    Remove(AddArgs),
 }
 
 #[derive(Debug, clap::Args)]
@@ -39,13 +42,15 @@ pub struct IsPathArgs {
 pub fn cli_dispatch(args: CliArgs) -> anyhow::Result<()> {
     match args.action {
         CliSubcommand::List => list(),
-        CliSubcommand::Add(args) => {
-            add(args.path)
-        },
+        CliSubcommand::Add(args) => add(args.path),
         CliSubcommand::IsPath(args) => {
             let result = is_db_path(&args.path)?;
             info!("{:?}", result);
             Ok(())
+        }
+        CliSubcommand::Remove(args) => {
+            let path_normalized = fix_path_trailing_slash(&args.path);
+            remove(&path_normalized)
         }
     }
 }
@@ -107,6 +112,23 @@ pub fn add<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
 
         debug!("Result: {:?}", result);
     };
+
+    Ok(())
+}
+
+pub fn remove<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
+    let conn = &mut connect_db()?;
+
+    let path = path.as_ref();
+    build::clean_path(path)?;
+
+    let path_str = path.to_str().unwrap();
+
+    let result = diesel::delete(store)
+        .filter(store_path.is(&path_str))
+        .execute(conn)?;
+
+    debug!("Deletion result: {:?}", result);
 
     Ok(())
 }

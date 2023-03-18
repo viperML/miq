@@ -29,7 +29,7 @@ pub struct BuildArgs {
     rebuild: bool,
 }
 
-fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
+pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
     debug!("Requesting clean path on {:?}", path);
 
     match fs::metadata(&path) {
@@ -71,14 +71,15 @@ pub fn build_spec(args: BuildArgs) -> anyhow::Result<()> {
 pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
     if db::is_db_path(&pkg.path)? {
         if build_args.rebuild {
-            todo!("Unregister")
+            debug!("Rebuilding pkg, unregistering from the store");
+            db::remove(&pkg.path)?;
         } else {
             debug!("Package was already built");
             return Ok(())
         }
     }
 
-    clean_path(&pkg.path)?;
+    // clean_path(&pkg.path)?;
 
     let fetch_paths: Result<Vec<_>, _> = pkg.fetch.iter().map(fetch).collect();
 
