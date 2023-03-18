@@ -11,5 +11,5 @@ pub enum MiqCommands {
     /// Build a package into the store
     Build(crate::build::BuildArgs),
     /// Query and operate on the store database
-    Db(crate::db::DbArgs),
+    Db(crate::db::CliArgs),
 }
