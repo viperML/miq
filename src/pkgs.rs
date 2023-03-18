@@ -43,7 +43,7 @@ pub struct PkgSpec {
     pub pkg: Vec<Pkg>,
 }
 
-pub fn build() -> anyhow::Result<()> {
+pub fn build_schema() -> anyhow::Result<()> {
     let schema = schema_for!(PkgSpec);
     let schema_str = serde_json::to_string_pretty(&schema)?;
 

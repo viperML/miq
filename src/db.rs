@@ -9,7 +9,7 @@ use crate::db_schema::store::dsl::*;
 #[derive(Debug, clap::Args)]
 pub struct DbArgs {
     #[command(subcommand)]
-    pub action: crate::store::DbSubcommand,
+    pub action: crate::db::DbSubcommand,
 }
 
 #[derive(Debug, clap::Subcommand)]

@@ -11,7 +11,7 @@ use bytes::Buf;
 use log::debug;
 use unshare::Command;
 
-use crate::pkgs_schema;
+use crate::pkgs;
 
 #[derive(Debug, clap::Args)]
 pub struct BuildArgs {
@@ -40,7 +40,7 @@ fn mkdir<P: AsRef<Path> + Debug>(p: P) -> Result<(), io::Error> {
 pub fn build_spec(args: BuildArgs) -> anyhow::Result<()> {
     debug!("args: {:?}", args);
 
-    let spec = pkgs_schema::parse(args.file)?;
+    let spec = pkgs::parse(args.file)?;
     debug!("spec: {:?}", spec);
 
     for p in spec.pkg {
@@ -51,7 +51,7 @@ pub fn build_spec(args: BuildArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn build_pkg(pkg: pkgs_schema::Pkg) -> anyhow::Result<()> {
+pub fn build_pkg(pkg: pkgs::Pkg) -> anyhow::Result<()> {
     let fetch_paths: Result<Vec<_>, _> = pkg.fetch.iter().map(fetch).collect();
 
     let fetch_paths = fetch_paths?;
@@ -86,7 +86,7 @@ pub fn build_pkg(pkg: pkgs_schema::Pkg) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn fetch(fch: &pkgs_schema::Fetchable) -> anyhow::Result<PathBuf> {
+pub fn fetch(fch: &pkgs::Fetchable) -> anyhow::Result<PathBuf> {
     debug!("Fetching: {:?}", fch);
     let outpath = PathBuf::from_str("/tmp/miq-fetch/fetch1")?;
 
