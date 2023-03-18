@@ -65,8 +65,10 @@ pub fn list() -> anyhow::Result<()> {
 pub fn add(args: AddArgs) -> anyhow::Result<()> {
     let conn = &mut connect_db()?;
 
-    let path_str: String = args
-        .path
+    // Prevent inconsistency on trailing slashes
+    let path_normalized = args.path.join("");
+
+    let path_str: String = path_normalized
         .as_path()
         .to_str()
         .expect("Couldn't convert path to string")
@@ -77,6 +79,8 @@ pub fn add(args: AddArgs) -> anyhow::Result<()> {
     let input = NewPath {
         store_path: path_str,
     };
+
+    // TODO: check if store path exists
 
     let result = diesel::insert_into(store::table)
         .values(&input)
