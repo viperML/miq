@@ -70,7 +70,7 @@ fn connect_db() -> anyhow::Result<SqliteConnection> {
 pub fn list() -> anyhow::Result<()> {
     let conn = &mut connect_db()?;
 
-    let p = store.limit(5).load::<StorePath>(conn)?;
+    let p: Vec<StorePath> = store.limit(5).load::<StorePath>(conn)?;
 
     for post in p {
         debug!("{:?}", post);
