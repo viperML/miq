@@ -18,22 +18,38 @@ pub struct BuildArgs {
     /// Path of PkgSpec to build
     #[arg()]
     file: PathBuf,
+
+    /// Don't show build output
+    #[arg(long, short)]
+    quiet: bool,
+
+    /// Rebuild path even if it already exists
+    #[arg(long, short)]
+    rebuild: bool,
 }
 
-fn mkdir<P: AsRef<Path> + Debug>(p: P) -> Result<(), io::Error> {
-    debug!("Creating directory: {:?}", p);
+fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
+    debug!("Requesting clean path on {:?}", path);
 
-    if let Err(err) = fs::create_dir_all(p) {
-        match err.kind() {
-            io::ErrorKind::AlreadyExists => {
-                debug!("Build dir already exists");
+    match fs::metadata(&path) {
+        Ok(meta) => {
+            debug!("Elem exists, removing");
+            if meta.is_file() {
+                fs::remove_file(&path)?;
+            } else if meta.is_dir() {
+                fs::remove_dir_all(&path)?;
+            } else {
+                panic!("{:?} Wasn't either a dir or a file", path);
+            }
+            Ok(())
+        }
+        Err(err) => match err.kind() {
+            io::ErrorKind::NotFound => {
+                debug!("Doesn't exist, skipping");
                 Ok(())
             }
             _ => Err(err),
-        }
-    } else {
-        debug!("Create dir: operation successful");
-        Ok(())
+        },
     }
 }
 
@@ -45,13 +61,15 @@ pub fn build_spec(args: BuildArgs) -> anyhow::Result<()> {
 
     for p in spec.pkg {
         debug!("building pkg: {:?}", p);
-        build_pkg(p)?;
+        build_pkg(p, &args.quiet)?;
     }
 
     Ok(())
 }
 
-pub fn build_pkg(pkg: pkgs::Pkg) -> anyhow::Result<()> {
+pub fn build_pkg(pkg: pkgs::Pkg, quiet: &bool) -> anyhow::Result<()> {
+    clean_path(&pkg.path)?;
+
     let fetch_paths: Result<Vec<_>, _> = pkg.fetch.iter().map(fetch).collect();
 
     let fetch_paths = fetch_paths?;
@@ -77,6 +95,11 @@ pub fn build_pkg(pkg: pkgs::Pkg) -> anyhow::Result<()> {
     cmd.env_clear();
     cmd.envs(&pkg.env);
     cmd.envs(&env);
+
+    if *quiet {
+        cmd.stdout(unshare::Stdio::Null);
+        cmd.stderr(unshare::Stdio::Null);
+    }
 
     debug!("output: {:?}", &cmd);
 
@@ -111,21 +134,3 @@ pub fn fetch(fch: &pkgs::Fetchable) -> anyhow::Result<PathBuf> {
     Ok(outpath)
 }
 
-// pub fn build(pkg: expr::FOP) -> anyhow::Result<()> {
-//     // TODO use tempfile
-//     let builddir = Path::new("/tmp/miq-build");
-//     debug!("builddir: {:?}", builddir);
-
-//     mkdir(builddir)?;
-
-//     let tmpf = Path::new("/tmp/miq-download");
-
-//     let mut f = std::fs::File::create(tmpf)?;
-//     debug!("f: {:?}", f);
-
-//     let client = reqwest::blocking::Client::new();
-
-//     debug!("Copying file");
-
-//     Ok(())
-// }
