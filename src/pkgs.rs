@@ -1,4 +1,8 @@
-use std::{fs, io, path::Path, collections::HashMap};
+use std::{
+    collections::HashMap,
+    fs, io,
+    path::{Path, PathBuf},
+};
 
 /**
  Vscode Even Better Toml:
@@ -17,14 +21,19 @@ pub struct Pkg {
     pub name: String,
     /// Version of the package, normalized
     pub version: String,
-    /// List of fecthables available during build-time
-    pub fetch: Vec<Fetchable>,
-    /// POSIX script excuted at build-time
+    /// POSIX script executed at build-time
     pub script: String,
     /// Path that this package produces
-    pub path: String,
-    /// Environment variables present at buildtime
+    pub path: PathBuf,
+    /// Environment variables at build-time
     pub env: HashMap<String, String>,
+
+    /// Build-time deps, for build machine
+    pub bdeps_buildm: Vec<PathBuf>,
+    /// Build-time deps, for target machine
+    pub bdeps_hostm: Vec<PathBuf>,
+    /// Run-time deps, for target machine
+    pub rdeps_hostm: Vec<PathBuf>,
 }
 
 /// A fetchable is fetched from the internet and hash-checked
@@ -34,17 +43,21 @@ pub struct Fetchable {
     pub url: String,
     /// SRI hash to check for integrity
     pub hash: String,
+    /// Produced path in the store
+    pub path: PathBuf,
 }
 
 /// miq consumes pkg-spec files
 #[derive(JsonSchema, Debug, Deserialize)]
-pub struct PkgSpec {
-    /// List of packages to build
+pub struct MiqSpec {
+    /// List of packages
     pub pkg: Vec<Pkg>,
+    /// List of fetchables
+    pub fetch: Vec<Fetchable>,
 }
 
 pub fn build_schema() -> anyhow::Result<()> {
-    let schema = schema_for!(PkgSpec);
+    let schema = schema_for!(MiqSpec);
     let schema_str = serde_json::to_string_pretty(&schema)?;
 
     println!("{}", &schema_str);
@@ -52,7 +65,7 @@ pub fn build_schema() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn parse<P: AsRef<Path>>(path: P) -> anyhow::Result<PkgSpec> {
+pub fn parse<P: AsRef<Path>>(path: P) -> anyhow::Result<MiqSpec> {
     let contents = fs::read_to_string(&path).context("While reading the PkgSpec")?;
     let parsed = toml::from_str(&contents).context("While parsing the PkgSpec")?;
 

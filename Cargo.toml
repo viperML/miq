@@ -33,3 +33,4 @@ libsqlite3-sys = { version = "0.25.2", default-features = false, features = [
     "pkg-config",
     "min_sqlite_version_3_6_8",
 ] }
+tempfile = "3.4.0"

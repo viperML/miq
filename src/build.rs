@@ -9,10 +9,11 @@ use std::{fs, io, vec};
 use anyhow::{bail, Context};
 use bytes::Buf;
 use log::{debug, info};
+use tempfile::tempfile;
 use unshare::Command;
 
 use crate::db;
-use crate::pkgs;
+use crate::pkgs::{self, Fetchable};
 
 #[derive(Debug, clap::Args)]
 pub struct BuildArgs {
@@ -60,14 +61,26 @@ pub fn build_spec(args: BuildArgs) -> anyhow::Result<()> {
     let spec = pkgs::parse(&args.file)?;
     debug!("spec: {:?}", spec);
 
+    // Sequentially process fetches and then buildables
+    // Eventually use a solver to apply any correct ordering between fetches and pkgs
+
+    for fetchable in spec.fetch {
+        fetchable.fetch()?;
+    }
+
     for p in spec.pkg {
-        debug!("building pkg: {:?}", p);
+        debug!("processing: {:?}", p);
         build_pkg(p, &args)?;
     }
 
     Ok(())
 }
 
+pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
+    todo!();
+}
+
+/*
 pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
     if db::is_db_path(&pkg.path)? {
         if build_args.rebuild {
@@ -95,7 +108,7 @@ pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
     let env_fetch = &env_fetch.join(":");
 
     env.insert("miq_fetch", &env_fetch);
-    env.insert("miq_out", &pkg.path);
+    env.insert("miq_out", &pkg.path.to_str().unwrap());
 
     debug!("env: {:?}", env);
 
@@ -122,27 +135,36 @@ pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn fetch(fch: &pkgs::Fetchable) -> anyhow::Result<PathBuf> {
-    debug!("Fetching: {:?}", fch);
-    let outpath = PathBuf::from_str("/tmp/miq-fetch/fetch1")?;
+*/
 
-    if let Ok(meta) = fs::metadata(&outpath) {
-        if meta.is_file() {
-            debug!("Already exists");
-            return Ok(outpath);
+impl Fetchable {
+    fn fetch(&self) -> anyhow::Result<()> {
+        debug!("Fetching: {:?}", self);
+
+        let already_fetched = db::is_db_path(&self.path)?;
+
+        if already_fetched {
+            debug!("Already fetched!");
+            return Ok(());
         }
+
+        let tempfile = &mut tempfile::NamedTempFile::new()?;
+        debug!("tempfile: {:?}", &tempfile);
+
+        let client = reqwest::blocking::Client::new();
+        let response = client.get(&self.url).send()?;
+        let content = &mut response.bytes()?.reader();
+        std::io::copy(content, tempfile)?;
+
+        debug!("Fetch Ok");
+
+        std::fs::copy(&tempfile.path(), &self.path)?;
+        debug!("Move OK");
+        // Make sure we don't drop before
+        drop(tempfile);
+
+        db::add(&self.path)?;
+
+        Ok(())
     }
-
-    fs::create_dir_all("/tmp/miq-fetch")?;
-    let mut outfile = File::create(&outpath)?;
-    debug!("outfile {:?}", outfile);
-
-    let client = reqwest::blocking::Client::new();
-    let response = client.get(&fch.url).send()?;
-    let mut content = response.bytes()?.reader();
-    std::io::copy(&mut content, &mut outfile)?;
-
-    debug!("Fetch Ok");
-
-    Ok(outpath)
 }

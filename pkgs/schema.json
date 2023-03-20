@@ -1,14 +1,22 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "PkgSpec",
+  "title": "MiqSpec",
   "description": "miq consumes pkg-spec files",
   "type": "object",
   "required": [
+    "fetch",
     "pkg"
   ],
   "properties": {
+    "fetch": {
+      "description": "List of fetchables",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Fetchable"
+      }
+    },
     "pkg": {
-      "description": "List of packages to build",
+      "description": "List of packages",
       "type": "array",
       "items": {
         "$ref": "#/definitions/Pkg"
@@ -21,11 +29,16 @@
       "type": "object",
       "required": [
         "hash",
+        "path",
         "url"
       ],
       "properties": {
         "hash": {
           "description": "SRI hash to check for integrity",
+          "type": "string"
+        },
+        "path": {
+          "description": "Produced path in the store",
           "type": "string"
         },
         "url": {
@@ -38,26 +51,35 @@
       "description": "Definition of a package. A package the minimum buildable unit",
       "type": "object",
       "required": [
+        "bdeps_buildm",
+        "bdeps_hostm",
         "env",
-        "fetch",
         "name",
         "path",
+        "rdeps_hostm",
         "script",
         "version"
       ],
       "properties": {
-        "env": {
-          "description": "Environment variables present at buildtime",
-          "type": "object",
-          "additionalProperties": {
+        "bdeps_buildm": {
+          "description": "Build-time deps, for build machine",
+          "type": "array",
+          "items": {
             "type": "string"
           }
         },
-        "fetch": {
-          "description": "List of fecthables available during build-time",
+        "bdeps_hostm": {
+          "description": "Build-time deps, for target machine",
           "type": "array",
           "items": {
-            "$ref": "#/definitions/Fetchable"
+            "type": "string"
+          }
+        },
+        "env": {
+          "description": "Environment variables at build-time",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
           }
         },
         "name": {
@@ -68,8 +90,15 @@
           "description": "Path that this package produces",
           "type": "string"
         },
+        "rdeps_hostm": {
+          "description": "Run-time deps, for target machine",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "script": {
-          "description": "POSIX script excuted at build-time",
+          "description": "POSIX script executed at build-time",
           "type": "string"
         },
         "version": {

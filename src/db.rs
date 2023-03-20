@@ -1,6 +1,7 @@
-use std::path::Path;
+use std::path::{Path, self};
 use std::{any, path::PathBuf};
 
+use anyhow::bail;
 use diesel::{prelude::*, sql_types::Integer};
 use log::{debug, info, warn};
 use serde::__private::de;
@@ -42,14 +43,18 @@ pub struct IsPathArgs {
 pub fn cli_dispatch(args: CliArgs) -> anyhow::Result<()> {
     match args.action {
         CliSubcommand::List => list(),
-        CliSubcommand::Add(args) => add(args.path),
+        CliSubcommand::Add(args) => {
+            let path_normalized = fix_dir_trailing_slash(&args.path);
+            add(path_normalized)
+        }
         CliSubcommand::IsPath(args) => {
-            let result = is_db_path(&args.path)?;
+            let path_normalized = fix_dir_trailing_slash(&args.path);
+            let result = is_db_path(&path_normalized)?;
             info!("{:?}", result);
             Ok(())
         }
         CliSubcommand::Remove(args) => {
-            let path_normalized = fix_path_trailing_slash(&args.path);
+            let path_normalized = fix_dir_trailing_slash(&args.path);
             remove(&path_normalized)
         }
     }
@@ -86,13 +91,11 @@ pub fn list() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn add<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
+pub fn add<P: AsRef<Path> + std::fmt::Debug>(path: P) -> anyhow::Result<()> {
     let conn = &mut connect_db()?;
 
-    let path_normalized = fix_path_trailing_slash(path.as_ref());
-
-    let path_str: String = path_normalized
-        .as_path()
+    let path_str: String = path
+        .as_ref()
         .to_str()
         .expect("Couldn't convert path to string")
         .to_owned();
@@ -103,7 +106,7 @@ pub fn add<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
         store_path: path_str,
     };
 
-    if is_db_path(&path_normalized)? {
+    if is_db_path(&path)? {
         warn!("Path is already on the store");
     } else {
         let result = diesel::insert_into(store::table)
@@ -136,9 +139,7 @@ pub fn remove<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
 pub fn is_db_path<P: AsRef<Path> + std::fmt::Debug>(path: P) -> anyhow::Result<bool> {
     let conn = &mut connect_db()?;
 
-    let path = fix_path_trailing_slash(path.as_ref());
-
-    let path_str = path.to_str().expect("Couldn't convert path to str");
+    let path_str = path.as_ref().to_str().unwrap();
 
     debug!("path_str: {:?}", path_str);
 
@@ -153,7 +154,14 @@ pub fn is_db_path<P: AsRef<Path> + std::fmt::Debug>(path: P) -> anyhow::Result<b
     Ok(!elements.is_empty())
 }
 
-/// Normalize paths coming from user input by adding a trailing slash to folders
-fn fix_path_trailing_slash(path: &Path) -> PathBuf {
-    path.join("")
+/// Remove trailing slashes from directories (coming from user input)
+fn fix_dir_trailing_slash<P: AsRef<Path> + std::fmt::Debug>(path: P) -> PathBuf {
+    let base = &mut PathBuf::from("/");
+
+    for comp in path.as_ref().components() {
+        debug!("{:?}", comp);
+        base.push(comp);
+    }
+
+    base.to_owned()
 }
