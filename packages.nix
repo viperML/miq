@@ -68,6 +68,13 @@ in {
         if v.static
         then "-C target-feature=+crt-static"
         else "";
+
+      nativeBuildInputs = [
+        pkgs.pkg-config
+      ];
+      buildInputs = [
+        pkgs.sqlite
+      ];
     })
   matrix;
 
