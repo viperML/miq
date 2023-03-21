@@ -77,37 +77,18 @@ pub fn build_spec(args: BuildArgs) -> anyhow::Result<()> {
 }
 
 pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
-    todo!();
-}
-
-/*
-pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
     if db::is_db_path(&pkg.path)? {
         if build_args.rebuild {
             debug!("Rebuilding pkg, unregistering from the store");
             db::remove(&pkg.path)?;
         } else {
             debug!("Package was already built");
-            return Ok(())
+            return Ok(());
         }
     }
 
-    // clean_path(&pkg.path)?;
-
-    let fetch_paths: Result<Vec<_>, _> = pkg.fetch.iter().map(fetch).collect();
-
-    let fetch_paths = fetch_paths?;
-
     let mut env: HashMap<&str, &str> = HashMap::new();
 
-    let env_fetch: Vec<_> = fetch_paths
-        .iter()
-        .map(|elem| elem.to_str().expect("Couldn't format fetch_path"))
-        .collect();
-
-    let env_fetch = &env_fetch.join(":");
-
-    env.insert("miq_fetch", &env_fetch);
     env.insert("miq_out", &pkg.path.to_str().unwrap());
 
     debug!("env: {:?}", env);
@@ -135,9 +116,8 @@ pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-*/
-
 impl Fetchable {
+    /// Main function for a fetchable
     fn fetch(&self) -> anyhow::Result<()> {
         debug!("Fetching: {:?}", self);
 
