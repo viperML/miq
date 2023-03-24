@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::Context;
+use libc::{prctl, PR_SET_PDEATHSIG, SIGKILL};
 use log::{debug, info};
 use nix::{
     mount::{mount, MsFlags},
@@ -34,6 +35,8 @@ impl SandBox {
 
         // let newroot = workdir.join("newroot");
         // debug!("newroot={:?}", newroot);
+
+        unsafe { prctl(PR_SET_PDEATHSIG, SIGKILL); }
 
         match unsafe { fork() }? {
             nix::unistd::ForkResult::Parent { child } => {
