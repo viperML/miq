@@ -1,0 +1,18 @@
+#:schema ./schema.json
+fetch = []
+
+[[pkg]]
+name = "test"
+version = "none"
+bdeps_buildm = []
+bdeps_hostm = []
+rdeps_hostm = []
+path = "/miq/store/AAAC-test"
+
+script = '''
+printenv
+id
+'''
+
+[pkg.env]
+PATH = "/home/ayats/Documents/miq/devel/nix-bootstrap/bin"

@@ -10,10 +10,11 @@ use anyhow::{bail, Context};
 use bytes::Buf;
 use log::{debug, info};
 use tempfile::tempfile;
-use unshare::Command;
 
-use crate::db;
+use std::process::Command;
+
 use crate::pkgs::{self, Fetchable};
+use crate::*;
 
 #[derive(Debug, clap::Args)]
 pub struct BuildArgs {
@@ -87,29 +88,23 @@ pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
         }
     }
 
-    let mut env: HashMap<&str, &str> = HashMap::new();
-
-    env.insert("miq_out", &pkg.path.to_str().unwrap());
-
-    debug!("env: {:?}", env);
-
-    let cmd_args = ["-c", &pkg.script];
+    let mut miq_env: HashMap<&str, &str> = HashMap::new();
+    miq_env.insert("miq_out", &pkg.path.to_str().unwrap());
+    debug!("env: {:?}", miq_env);
 
     let mut cmd = Command::new("/bin/sh");
-    cmd.args(&cmd_args);
+    cmd.args(["-c", &pkg.script]);
     cmd.env_clear();
     cmd.envs(&pkg.env);
-    cmd.envs(&env);
+    cmd.envs(&miq_env);
 
-    if build_args.quiet {
-        cmd.stdout(unshare::Stdio::Null);
-        cmd.stderr(unshare::Stdio::Null);
-    }
-
-    debug!("output: {:?}", &cmd);
-
-    let status = cmd.status();
-    debug!("{:?}", status);
+    let sandbox = sandbox::SandBox {};
+    sandbox.run(|| {
+        match cmd.status() {
+            Ok(_) => println!("OK"),
+            Err(err) => println!("Build failed: {:?}", err),
+        };
+    })?;
 
     db::add(&pkg.path)?;
 

@@ -5,6 +5,7 @@ mod db;
 mod db_schema;
 mod pkgs;
 mod build;
+mod sandbox;
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
