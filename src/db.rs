@@ -44,18 +44,18 @@ pub fn cli_dispatch(args: CliArgs) -> anyhow::Result<()> {
     match args.action {
         CliSubcommand::List => list(),
         CliSubcommand::Add(args) => {
-            let path_normalized = fix_dir_trailing_slash(&args.path);
+            let path_normalized = fix_dir_trailing_slash(args.path);
             add(path_normalized)
         }
         CliSubcommand::IsPath(args) => {
-            let path_normalized = fix_dir_trailing_slash(&args.path);
-            let result = is_db_path(&path_normalized)?;
+            let path_normalized = fix_dir_trailing_slash(args.path);
+            let result = is_db_path(path_normalized)?;
             info!("{:?}", result);
             Ok(())
         }
         CliSubcommand::Remove(args) => {
-            let path_normalized = fix_dir_trailing_slash(&args.path);
-            remove(&path_normalized)
+            let path_normalized = fix_dir_trailing_slash(args.path);
+            remove(path_normalized)
         }
     }
 }

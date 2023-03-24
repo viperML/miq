@@ -89,7 +89,7 @@ pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
     }
 
     let mut miq_env: HashMap<&str, &str> = HashMap::new();
-    miq_env.insert("miq_out", &pkg.path.to_str().unwrap());
+    miq_env.insert("miq_out", pkg.path.to_str().unwrap());
     debug!("env: {:?}", miq_env);
 
     let mut cmd = Command::new("/bin/sh");
@@ -133,7 +133,7 @@ impl Fetchable {
 
         debug!("Fetch Ok");
 
-        std::fs::copy(&tempfile.path(), &self.path)?;
+        std::fs::copy(tempfile.path(), &self.path)?;
         debug!("Move OK");
         // Make sure we don't drop before
         drop(tempfile);

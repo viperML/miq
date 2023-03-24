@@ -24,7 +24,7 @@ static NONE_STR: Option<&'static str> = None;
 impl SandBox {
     pub fn run<F>(&self, function: F) -> anyhow::Result<()>
     where
-        F: FnOnce() -> (),
+        F: FnOnce(),
     {
         let (pipe_reader, pipe_writer) = os_pipe::pipe()?;
 
@@ -69,7 +69,7 @@ impl SandBox {
                 // TODO: sandbox
                 // Rebind a lot of folders like /dev into newroot
 
-                std::env::set_current_dir(&workdir)?;
+                std::env::set_current_dir(workdir)?;
 
                 println!("Workdir ready");
 
