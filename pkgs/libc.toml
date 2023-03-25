@@ -1,0 +1,36 @@
+#:schema ./schema.json
+[[fetch]]
+path = "/miq/store/AAAD-musl-1.2.3.tar.gz"
+url = "https://musl.libc.org/releases/musl-1.2.3.tar.gz"
+hash = "FIXME"
+
+
+
+[[pkg]]
+path = "/miq/store/AAAE-musl-1.2.3"
+name = "musl"
+version = "1.2.3"
+script = """
+set -exu
+tar -xvf $miq_fetch --strip-components=1
+
+./configure \
+    --prefix=$miq_out \
+    --disable-static
+
+make -j16
+make install
+"""
+bdeps_buildm = [
+    "/miq/store/AAAD-musl-1.2.3.tar.gz",
+    "/miq/store/AAAA-zig-0.11.0"
+]
+bdeps_hostm = [
+]
+rdeps_hostm = [
+]
+[pkg.env]
+PATH = "/home/ayats/Documents/miq/devel/nix-bootstrap/bin:/miq/store/AAAA-zig-0.11.0"
+miq_fetch = "/miq/store/AAAD-musl-1.2.3.tar.gz"
+CC = "zig cc"
+CFLAGS = "-O2 -pipe"

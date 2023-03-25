@@ -90,6 +90,8 @@ pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
 
     let mut miq_env: HashMap<&str, &str> = HashMap::new();
     miq_env.insert("miq_out", pkg.path.to_str().unwrap());
+    // FIXME
+    miq_env.insert("HOME", "/home/ayats");
     debug!("env: {:?}", miq_env);
 
     let mut cmd = Command::new("/bin/sh");
@@ -99,12 +101,7 @@ pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
     cmd.envs(&miq_env);
 
     let sandbox = sandbox::SandBox {};
-    sandbox.run(|| {
-        match cmd.status() {
-            Ok(_) => println!("OK"),
-            Err(err) => println!("Build failed: {:?}", err),
-        };
-    })?;
+    sandbox.run(&mut cmd)?;
 
     db::add(&pkg.path)?;
 

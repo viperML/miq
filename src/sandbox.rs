@@ -1,17 +1,21 @@
+use core::panic;
 use std::{
     io::{BufRead, BufReader},
-    os::fd::{AsFd, AsRawFd},
+    os::{
+        fd::{AsFd, AsRawFd},
+        unix::process::CommandExt,
+    },
     path::PathBuf,
-    process::exit,
+    process::{exit, Command},
 };
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use libc::{prctl, PR_SET_PDEATHSIG, SIGKILL};
 use log::{debug, info};
 use nix::{
     mount::{mount, MsFlags},
     sched::{unshare, CloneFlags},
-    sys::wait::waitpid,
+    sys::wait::{waitpid, WaitStatus},
     unistd::fork,
 };
 use nix::{unistd::pivot_root, NixPath};
@@ -23,10 +27,7 @@ pub struct SandBox {}
 static NONE_STR: Option<&'static str> = None;
 
 impl SandBox {
-    pub fn run<F>(&self, function: F) -> anyhow::Result<()>
-    where
-        F: FnOnce(),
-    {
+    pub fn run(&self, cmd: &mut Command) -> anyhow::Result<()> {
         let (pipe_reader, pipe_writer) = os_pipe::pipe()?;
 
         let workdir_handle = tempdir()?;
@@ -36,7 +37,9 @@ impl SandBox {
         // let newroot = workdir.join("newroot");
         // debug!("newroot={:?}", newroot);
 
-        unsafe { prctl(PR_SET_PDEATHSIG, SIGKILL); }
+        unsafe {
+            prctl(PR_SET_PDEATHSIG, SIGKILL);
+        }
 
         match unsafe { fork() }? {
             nix::unistd::ForkResult::Parent { child } => {
@@ -49,6 +52,13 @@ impl SandBox {
 
                 let status = waitpid(child, None);
                 info!("Child died: {:?}", status);
+
+                if let Ok(WaitStatus::Exited(_, 0)) = status {
+                    return Ok(());
+                } else {
+                    // TODO make this prettier
+                    bail!("Bad exit: {:?}", status);
+                }
             }
             nix::unistd::ForkResult::Child => {
                 drop(pipe_reader);
@@ -57,35 +67,30 @@ impl SandBox {
 
                 println!("Setting up workdir...");
 
-                unshare(CloneFlags::CLONE_NEWUSER | CloneFlags::CLONE_NEWNS)
-                    .context("While unshare the process")?;
-
-                mount(
-                    Some(workdir),
-                    workdir,
-                    NONE_STR,
-                    MsFlags::MS_PRIVATE | MsFlags::MS_BIND,
-                    NONE_STR,
-                )
-                .context("While re-mounting the workdir")?;
-
                 // TODO: sandbox
                 // Rebind a lot of folders like /dev into newroot
+
+                // unshare(CloneFlags::CLONE_NEWUSER | CloneFlags::CLONE_NEWNS)
+                //     .context("While unshare the process")?;
+
+                // mount(
+                //     Some(workdir),
+                //     workdir,
+                //     NONE_STR,
+                //     MsFlags::MS_PRIVATE | MsFlags::MS_BIND,
+                //     NONE_STR,
+                // )
+                // .context("While re-mounting the workdir")?;
 
                 std::env::set_current_dir(workdir)?;
 
                 println!("Workdir ready");
 
-                function();
+                let result = cmd.exec();
 
-                println!("Sandbox finished. Goodbye");
-
-                exit(0)
+                // Only run if execution is abnormal, otherwise process is transfered
+                bail!(result);
             }
         }
-
-        drop(workdir_handle);
-
-        Ok(())
     }
 }

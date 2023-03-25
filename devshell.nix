@@ -25,9 +25,12 @@
           gnumake
           binutils
           coreutils
-          # mold
+          gnused
+          bash
+
           gnutar
           xz
+          gzip
         ];
         pathsToLink = [
           "/bin"

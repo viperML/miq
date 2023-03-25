@@ -1,22 +1,3 @@
-# {
-#   self,
-#   config,
-#   ...
-# }: let
-# in {
-#   flake.overlayFunc = pkgs: {
-#     miq = pkgs.rustPlatform.buildRustPackage {
-#     };
-#   };
-#   perSystem = {pkgs, ...}: {
-#     packages = {
-#       inherit
-#         (config.flake.overlayFunc pkgs)
-#         miq
-#         ;
-#     };
-#   };
-# }
 {
   pkgs,
   config,
