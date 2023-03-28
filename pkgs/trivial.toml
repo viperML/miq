@@ -1,0 +1,38 @@
+#:schema ./schema.json
+fetch = [
+]
+
+[[pkg]]
+path = "/miq/store/AAAH-trivial"
+name = "trivial"
+version = "none"
+script = """
+set -eux
+tee main.c <<EOF
+#include <stdio.h>
+
+int main() {
+  printf("Hello World");
+  exit(0);
+}
+EOF
+
+$CC -print-prog-name=ld
+
+$CC \
+  -B/miq/store/AAAE-musl-1.2.3/bin \
+  -nostdinc \
+  -isystem /miq/store/AAAE-musl-1.2.3/include \
+  main.c -o $miq_out
+"""
+bdeps_buildm = [
+]
+bdeps_hostm = [
+]
+rdeps_hostm = [
+]
+[pkg.env]
+PATH = "/home/ayats/Documents/miq/devel/nix-bootstrap/bin:/miq/store/AAAA-zig-0.11.0:/miq/store/AAAE-musl-1.2.3/bin"
+CC = "/miq/store/AAAE-musl-1.2.3/bin/musl-clang"
+# CFLAGS = "-O2 -pipe -fPIC -Wl\\,-dynamic-linker=/miq/store/AAAE-musl-1.2.3/bin/ld.musl-clang"
+# LD_FLAGS = "-rpath /miq/store/AAAG-dash-0.5.12/lib -L/miq/store/AAAE-musl-1.2.3/lib -t"

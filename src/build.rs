@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
 use std::fs::File;
@@ -90,6 +91,8 @@ pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
 
     let mut miq_env: HashMap<&str, &str> = HashMap::new();
     miq_env.insert("miq_out", pkg.path.to_str().unwrap());
+
+
     // FIXME
     miq_env.insert("HOME", "/home/ayats");
     debug!("env: {:?}", miq_env);
@@ -121,6 +124,8 @@ impl Fetchable {
         }
 
         let tempfile = &mut tempfile::NamedTempFile::new()?;
+        // FIXME
+        // let tempfile = RefCell::new(tempfile::NamedTempFile::new());
         debug!("tempfile: {:?}", &tempfile);
 
         let client = reqwest::blocking::Client::new();
@@ -132,8 +137,9 @@ impl Fetchable {
 
         std::fs::copy(tempfile.path(), &self.path)?;
         debug!("Move OK");
+
         // Make sure we don't drop before
-        drop(tempfile);
+        // drop(tempfile);
 
         db::add(&self.path)?;
 

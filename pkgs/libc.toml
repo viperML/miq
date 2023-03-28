@@ -16,10 +16,14 @@ tar -xvf $miq_fetch --strip-components=1
 
 ./configure \
     --prefix=$miq_out \
-    --disable-static
+    --disable-static \
+    --enable-wrapper=all \
+    --syslibdir="$miq_out/lib"
 
 make -j16
 make install
+
+ln -s $miq_out/lib/libc.so $miq_out/bin/ldd
 """
 bdeps_buildm = [
     "/miq/store/AAAD-musl-1.2.3.tar.gz",
@@ -32,5 +36,5 @@ rdeps_hostm = [
 [pkg.env]
 PATH = "/home/ayats/Documents/miq/devel/nix-bootstrap/bin:/miq/store/AAAA-zig-0.11.0"
 miq_fetch = "/miq/store/AAAD-musl-1.2.3.tar.gz"
-CC = "zig cc"
+CC = "/miq/store/AAAA-zig-0.11.0/zig cc"
 CFLAGS = "-O2 -pipe"

@@ -47,7 +47,8 @@ impl SandBox {
                 let reader = BufReader::new(pipe_reader);
 
                 for line in reader.lines() {
-                    debug!("sbx: {:?}", line);
+                    let line = line?;
+                    eprintln!("{}", line);
                 }
 
                 let status = waitpid(child, None);

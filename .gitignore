@@ -4,3 +4,4 @@ target
 devel
 .history
 *.sqlite
+*.out

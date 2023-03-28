@@ -1,0 +1,34 @@
+#:schema ./schema.json
+[[fetch]]
+hash = "FIXME"
+url = "http://gondor.apana.org.au/~herbert/dash/files/dash-0.5.12.tar.gz"
+path = "/miq/store/AAAF-dash-0.5.12.tar.gz"
+
+[[pkg]]
+path = "/miq/store/AAAG-dash-0.5.12"
+name = "dash"
+version = "0.5.12"
+script = """
+set -exu
+tar -xvf $miq_fetch --strip-components=1
+
+./configure \
+    --prefix=$miq_out
+
+make -j
+make install
+"""
+bdeps_buildm = [
+    # "/miq/store/AAAD-musl-1.2.3.tar.gz",
+    # "/miq/store/AAAA-zig-0.11.0"
+]
+bdeps_hostm = [
+]
+rdeps_hostm = [
+]
+[pkg.env]
+PATH = "/home/ayats/Documents/miq/devel/nix-bootstrap/bin:/miq/store/AAAA-zig-0.11.0"
+miq_fetch = "/miq/store/AAAF-dash-0.5.12.tar.gz"
+CC = "zig cc"
+CFLAGS = "-O2 -pipe -fPIC"
+LD_FLAGS = "-rpath /miq/store/AAAG-dash-0.5.12/lib -L/miq/store/AAAE-musl-1.2.3/lib -t"
