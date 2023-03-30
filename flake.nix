@@ -42,6 +42,7 @@
         imports = [
           ./devshell.nix
           ./packages.nix
+          ./trivial.nix
         ];
       };
     };

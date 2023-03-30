@@ -26,6 +26,7 @@
         paths = [
           gnumake
           # binutils
+          llvmPackages.clang-unwrapped
           bintools-unwrapped
           coreutils
           gnused
