@@ -1,5 +1,5 @@
 {pkgs, ...}: {
-  packages.trivial = with pkgs;
+  packages.trivial = with pkgs.pkgsMusl;
     stdenv.mkDerivation {
       name = "trivial";
       src = ./pkgs;

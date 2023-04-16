@@ -19,12 +19,14 @@ pub struct CliArgs {
 #[derive(Debug, clap::Subcommand)]
 pub enum CliSubcommand {
     /// List all paths registered
+    #[command(visible_alias("ls"))]
     List,
     /// Manually register a path
     Add(AddArgs),
     /// Check if a path is registered
     IsPath(IsPathArgs),
     /// Remove a path
+    #[command(visible_alias("rm"))]
     Remove(AddArgs),
 }
 

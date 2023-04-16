@@ -37,4 +37,4 @@ rdeps_hostm = [
 PATH = "/home/ayats/Documents/miq/devel/nix-bootstrap/bin"
 miq_fetch = "/miq/store/AAAD-musl-1.2.3.tar.gz"
 CC = "/miq/store/AAAA-zig-0.11.0/zig cc"
-CFLAGS = "-O2 -pipe"
+CFLAGS = "-O2 -pipe -pie -fPIE -fPIC"

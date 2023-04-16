@@ -1,0 +1,33 @@
+#:schema ./schema.json
+[[fetch]]
+path = "/miq/store/AABA-bootstrap-tools.tar.xz"
+# https://github.com/NixOS/nixpkgs/blob/master/pkgs/stdenv/linux/bootstrap-files/x86_64-musl.nix
+url = "https://wdtz.org/files/gywxhjgl70sxippa0pxs0vj5qcgz1wi8-stdenv-bootstrap-tools/on-server/bootstrap-tools.tar.xz"
+hash = "FIXME"
+
+
+
+[[pkg]]
+path = "/miq/store/AABB-bootstrap"
+name = "bootstrap"
+version = "0.1.0"
+script = """
+set -exu
+mkdir -pv $miq_out
+pushd $miq_out
+tar -xvf $miq_fetch --strip-components=1
+
+export out=$miq_out
+export builder=/home/ayats/Documents/miq/devel/nix-bootstrap/bin/busybox
+
+/home/ayats/Documents/miq/pkgs/unpack-bootstrap-tools.sh
+"""
+bdeps_buildm = [
+]
+bdeps_hostm = [
+]
+rdeps_hostm = [
+]
+[pkg.env]
+PATH = "/home/ayats/Documents/miq/devel/nix-bootstrap/bin"
+miq_fetch = "/miq/store/AABA-bootstrap-tools.tar.xz"

@@ -26,7 +26,8 @@
         paths = [
           gnumake
           # binutils
-          llvmPackages.clang-unwrapped
+          gcc-unwrapped
+          gcc-unwrapped.lib
           bintools-unwrapped
           coreutils
           gnused
@@ -38,9 +39,12 @@
           gnutar
           xz
           gzip
+          (busybox.override {enableAppletSymlinks=false;})
         ];
         pathsToLink = [
           "/bin"
+          # "/lib"
+          # "/include"
         ];
       };
   };

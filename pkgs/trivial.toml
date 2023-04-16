@@ -8,43 +8,41 @@ name = "trivial"
 version = "none"
 script = """
 set -eux
+
 tee main.c <<EOF
 #include <stdio.h>
 #include <stdlib.h>
-
 int main() {
   printf("Hello World");
   exit(0);
 }
+
 EOF
 
-tee ld <<EOF
+
+tee ./ld <<EOF
 #!/bin/sh
 echo "Custom LD running!"
-exec /home/ayats/Documents/miq/devel/nix-bootstrap/bin/ld \
-  -z relro \
-  -z now \
-  -dynamic-linker /miq/store/AAAE-musl-1.2.3/lib/ld-musl-x86_64.so.1 \
+exec /miq/store/AABB-bootstrap/bin/ld \
+  -dynamic-linker /miq/store/AABB-bootstrap/lib/ld-musl-x86_64.so.1 \
   "\\${@}" \
-  -L/miq/store/AAAE-musl-1.2.3/lib
+  -rpath /miq/store/AABB-bootstrap/lib \
+  -L/miq/store/AABB-bootstrap/lib
 EOF
 
 chmod +x ld
 export PATH="$PWD:$PATH"
-cat $(command -v ld)
-ld --version
+command -v ld
 
-
+$CC -print-prog-name=ld
 
 $CC \
-  -fPIC \
-  -nostdinc \
-  -Wimplicit-function-declaration \
-  -Werror=implicit-function-declaration \
-  -isystem /miq/store/AAAE-musl-1.2.3/include \
+  $CFLAGS \
+  -Wl,-dynamic-linker=/miq/store/AABB-bootstrap/lib/ld-musl-x86_64.so.1 \
   main.c -o $miq_out \
-  -B/miq/store/AAAE-musl-1.2.3/lib \
-  -idirafter /miq/store/AAAE-musl-1.2.3/include
+  -B/miq/store/AABB-bootstrap/lib \
+  -idirafter /miq/store/AABB-bootstrap/include-libc \
+  -isystem /miq/store/AABB-bootstrap/include-libc
 
 """
 bdeps_buildm = [
@@ -54,7 +52,6 @@ bdeps_hostm = [
 rdeps_hostm = [
 ]
 [pkg.env]
-PATH = "/home/ayats/Documents/miq/devel/nix-bootstrap/bin:/miq/store/AAAE-musl-1.2.3/bin:/miq/store/AAAA-zig-0.11.0/zig"
-CC = "/miq/store/AAAA-zig-0.11.0/zig cc"
-# CFLAGS = "-O2 -pipe -fPIC -Wl\\,-dynamic-linker=/miq/store/AAAE-musl-1.2.3/bin/ld.musl-clang"
-# LD_FLAGS = "-rpath /miq/store/AAAG-dash-0.5.12/lib -L/miq/store/AAAE-musl-1.2.3/lib -t"
+PATH = "/miq/store/AABB-bootstrap/bin"
+CC = "/miq/store/AABB-bootstrap/bin/gcc"
+CFLAGS = "-O2 -pipe -pie -fPIE -fPIC"
