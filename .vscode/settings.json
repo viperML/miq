@@ -1,0 +1,6 @@
+{
+    "python.analysis.typeCheckingMode": "strict",
+    "ruff.path": [
+        "ruff"
+    ]
+}

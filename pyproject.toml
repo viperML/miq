@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "miq"
+requires-python = ">=3.10"
+dependencies = [
+    "click"
+]
+dynamic = ["version"]
+
+# [project.scripts]
+# my-script = "my_package.module:function"
+
+[tool.setuptools.packages.find]
+where = ["eval"]
+
+[tool.ruff]
+ignore = ["F401"]
+
+[tool.pyright]
+reportUnusedImport = "warning"
+reportUnusedVariable = "warning"

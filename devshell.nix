@@ -12,6 +12,15 @@
         pkgs.pkg-config
         pkgs.diesel-cli
         pkgs.sqlite-interactive.dev
+
+        (pkgs.python311.withPackages (p: [
+          p.setuptools
+          p.build
+          p.click
+          p.toml
+        ]))
+        pkgs.black
+        pkgs.ruff
       ];
       NIX_DEBUG = "1";
     };
@@ -39,7 +48,7 @@
           gnutar
           xz
           gzip
-          (busybox.override {enableAppletSymlinks=false;})
+          (busybox.override {enableAppletSymlinks = false;})
         ];
         pathsToLink = [
           "/bin"
