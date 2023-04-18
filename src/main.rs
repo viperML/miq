@@ -16,8 +16,11 @@ use std::str::FromStr;
 use clap::Parser;
 use tracing::debug;
 use tracing_subscriber::prelude::*;
+use color_eyre::Result;
 
-fn setup_logging() -> anyhow::Result<()> {
+fn setup_logging() -> Result<()> {
+    color_eyre::install()?;
+
     let filter_layer =
         tracing_subscriber::EnvFilter::from_default_env().add_directive("debug".parse()?);
 
@@ -35,7 +38,7 @@ fn setup_logging() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<()> {
     setup_logging()?;
 
     let parsed = cli::CliParser::parse();

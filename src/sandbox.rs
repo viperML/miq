@@ -9,7 +9,6 @@ use std::{
     process::{exit, Command},
 };
 
-use anyhow::{bail, Context};
 use libc::{prctl, PR_SET_PDEATHSIG, SIGKILL};
 use tracing::{debug, info};
 use nix::{
@@ -21,13 +20,15 @@ use nix::{
 use nix::{unistd::pivot_root, NixPath};
 use tempfile::tempdir;
 
+use color_eyre::{Result, eyre::bail};
+
 #[derive(Debug)]
 pub struct SandBox {}
 
 static NONE_STR: Option<&'static str> = None;
 
 impl SandBox {
-    pub fn run(&self, cmd: &mut Command) -> anyhow::Result<()> {
+    pub fn run(&self, cmd: &mut Command) -> Result<()> {
         let (pipe_reader, pipe_writer) = os_pipe::pipe()?;
 
         let workdir_handle = tempdir()?;

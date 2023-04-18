@@ -23,6 +23,7 @@
         pkgs.ruff
       ];
       NIX_DEBUG = "1";
+      RUST_BACKTRACE = "full";
     };
   };
 

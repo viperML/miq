@@ -7,7 +7,6 @@ use std::path::{self, Path, PathBuf};
 use std::str::FromStr;
 use std::{fs, io, vec};
 
-use anyhow::{bail, Context};
 use bytes::Buf;
 use tracing::{debug, info};
 use tempfile::tempfile;
@@ -57,7 +56,7 @@ pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
     }
 }
 
-pub fn build_spec(args: BuildArgs) -> anyhow::Result<()> {
+pub fn build_spec(args: BuildArgs) -> Result<()> {
     debug!("args: {:?}", args);
 
     let spec = pkgs::parse(&args.file)?;
@@ -78,7 +77,7 @@ pub fn build_spec(args: BuildArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
+pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> Result<()> {
     if db::is_db_path(&pkg.path)? {
         if build_args.rebuild {
             debug!("Rebuilding pkg, unregistering from the store");
@@ -113,7 +112,7 @@ pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> anyhow::Result<()> {
 
 impl Fetchable {
     /// Main function for a fetchable
-    fn fetch(&self) -> anyhow::Result<()> {
+    fn fetch(&self) -> Result<()> {
         debug!("Fetching: {:?}", self);
 
         let already_fetched = db::is_db_path(&self.path)?;

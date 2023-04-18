@@ -4,15 +4,17 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use color_eyre::Result;
+
 /**
  Vscode Even Better Toml:
  Wipe cache with:
  rm ~/.config/Code/User/globalStorage/tamasfe.even-better-toml/*
 */ */
-use anyhow::Context;
 use tracing::debug;
 use schemars::{schema_for, JsonSchema};
 use serde::Deserialize;
+use color_eyre::eyre::Context;
 
 /// Definition of a package. A package the minimum buildable unit
 #[derive(JsonSchema, Debug, Deserialize)]
@@ -56,7 +58,7 @@ pub struct MiqSpec {
     pub fetch: Vec<Fetchable>,
 }
 
-pub fn build_schema() -> anyhow::Result<()> {
+pub fn build_schema() -> Result<()> {
     let schema = schema_for!(MiqSpec);
     let schema_str = serde_json::to_string_pretty(&schema)?;
 
@@ -65,7 +67,7 @@ pub fn build_schema() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn parse<P: AsRef<Path>>(path: P) -> anyhow::Result<MiqSpec> {
+pub fn parse<P: AsRef<Path>>(path: P) -> Result<MiqSpec> {
     let contents = fs::read_to_string(&path).context("While reading the PkgSpec")?;
     let parsed = toml::from_str(&contents).context("While parsing the PkgSpec")?;
 

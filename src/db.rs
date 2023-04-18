@@ -1,7 +1,6 @@
 use std::path::{Path, self};
 use std::{any, path::PathBuf};
 
-use anyhow::bail;
 use diesel::{prelude::*, sql_types::Integer};
 use tracing::{debug, info, warn};
 use serde::__private::de;
@@ -9,6 +8,7 @@ use serde::__private::de;
 use crate::build;
 use crate::db_schema::store;
 use crate::db_schema::store::dsl::*;
+use color_eyre::Result;
 
 #[derive(Debug, clap::Args)]
 pub struct CliArgs {
@@ -42,7 +42,7 @@ pub struct IsPathArgs {
     path: PathBuf,
 }
 
-pub fn cli_dispatch(args: CliArgs) -> anyhow::Result<()> {
+pub fn cli_dispatch(args: CliArgs) -> Result<()> {
     match args.action {
         CliSubcommand::List => list(),
         CliSubcommand::Add(args) => {
@@ -75,13 +75,13 @@ pub struct NewPath {
     pub store_path: String,
 }
 
-fn connect_db() -> anyhow::Result<SqliteConnection> {
+fn connect_db() -> Result<SqliteConnection> {
     let database_url = std::env::var("DATABASE_URL")?;
     debug!("DATABASE_URL: {:?}", database_url);
     Ok(diesel::SqliteConnection::establish(&database_url)?)
 }
 
-pub fn list() -> anyhow::Result<()> {
+pub fn list() -> Result<()> {
     let conn = &mut connect_db()?;
 
     let p: Vec<StorePath> = store.limit(5).load::<StorePath>(conn)?;
@@ -93,7 +93,7 @@ pub fn list() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn add<P: AsRef<Path> + std::fmt::Debug>(path: P) -> anyhow::Result<()> {
+pub fn add<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<()> {
     let conn = &mut connect_db()?;
 
     let path_str: String = path
@@ -121,7 +121,7 @@ pub fn add<P: AsRef<Path> + std::fmt::Debug>(path: P) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn remove<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
+pub fn remove<P: AsRef<Path>>(path: P) -> Result<()> {
     let conn = &mut connect_db()?;
 
     let path = path.as_ref();
@@ -138,7 +138,7 @@ pub fn remove<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn is_db_path<P: AsRef<Path> + std::fmt::Debug>(path: P) -> anyhow::Result<bool> {
+pub fn is_db_path<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<bool> {
     let conn = &mut connect_db()?;
 
     let path_str = path.as_ref().to_str().unwrap();
