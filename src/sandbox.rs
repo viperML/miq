@@ -11,7 +11,7 @@ use std::{
 
 use anyhow::{bail, Context};
 use libc::{prctl, PR_SET_PDEATHSIG, SIGKILL};
-use log::{debug, info};
+use tracing::{debug, info};
 use nix::{
     mount::{mount, MsFlags},
     sched::{unshare, CloneFlags},

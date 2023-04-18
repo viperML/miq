@@ -1,10 +1,10 @@
 #![cfg_attr(debug_assertions, allow(dead_code, unused_imports))]
 
+mod build;
 mod cli;
 mod db;
 mod db_schema;
 mod pkgs;
-mod build;
 mod sandbox;
 
 use std::collections::hash_map::DefaultHasher;
@@ -14,16 +14,23 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use clap::Parser;
-use log::debug;
+use tracing::debug;
+use tracing_subscriber::prelude::*;
 
 fn setup_logging() -> anyhow::Result<()> {
-    let loglevel = log::LevelFilter::Debug;
+    let filter_layer =
+        tracing_subscriber::EnvFilter::from_default_env().add_directive("debug".parse()?);
 
-    fern::Dispatch::new()
-        .format(|out, message, record| out.finish(format_args!("[{}] {}", record.level(), message)))
-        .level(loglevel)
-        .chain(std::io::stdout())
-        .apply()?;
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        .with_writer(std::io::stderr)
+        .without_time()
+        .with_line_number(true)
+        .compact();
+
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(fmt_layer)
+        .init();
 
     Ok(())
 }

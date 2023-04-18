@@ -9,7 +9,7 @@ use std::{fs, io, vec};
 
 use anyhow::{bail, Context};
 use bytes::Buf;
-use log::{debug, info};
+use tracing::{debug, info};
 use tempfile::tempfile;
 
 use std::process::Command;

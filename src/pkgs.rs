@@ -10,7 +10,7 @@ use std::{
  rm ~/.config/Code/User/globalStorage/tamasfe.even-better-toml/*
 */ */
 use anyhow::Context;
-use log::debug;
+use tracing::debug;
 use schemars::{schema_for, JsonSchema};
 use serde::Deserialize;
 

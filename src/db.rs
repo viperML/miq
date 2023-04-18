@@ -3,7 +3,7 @@ use std::{any, path::PathBuf};
 
 use anyhow::bail;
 use diesel::{prelude::*, sql_types::Integer};
-use log::{debug, info, warn};
+use tracing::{debug, info, warn};
 use serde::__private::de;
 
 use crate::build;
