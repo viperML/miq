@@ -2,5 +2,6 @@
     "python.analysis.typeCheckingMode": "strict",
     "ruff.path": [
         "ruff"
-    ]
+    ],
+    "python.defaultInterpreterPath": ".venv/bin/python3"
 }

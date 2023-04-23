@@ -36,3 +36,4 @@ libc = "0.2.140"
 color-eyre = { version = "0.6.2", features = ["tracing-error"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
+daggy = "0.8.0"

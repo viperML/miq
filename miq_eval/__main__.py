@@ -2,20 +2,17 @@ import click
 
 from miq_eval import pkgs
 from miq_eval.model import Package, Fetch
-import toml
+from typing import Any
 
 
 @click.command()
 @click.argument("buildable")
-def main(buildable: str):
-    target: Package | Fetch = pkgs.__dict__[buildable]
+@click.pass_context
+def main(ctx: click.Context, **kwargs: dict[str, Any]):
+    target: Package | Fetch = pkgs.__dict__[ctx.params["buildable"]]
 
-    print(target.__repr__())
-    print(target.path_hash)
-    print(toml.dumps( target.to_spec()))
-
-
-    pass
+    print(f"{repr(target)=}")
+    print(f"{str(target)}")
 
 
 if __name__ == "__main__":

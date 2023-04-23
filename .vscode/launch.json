@@ -9,7 +9,10 @@
             "type": "python",
             "request": "launch",
             "module": "miq_eval",
-            "justMyCode": true
+            "justMyCode": true,
+            "args": [
+                "bootstrap_source"
+            ]
         }
     ]
 }

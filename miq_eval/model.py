@@ -1,17 +1,22 @@
+import hashlib
+import struct
+import textwrap
+from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from pathlib import Path
-import struct
-import hashlib
+from typing import Any, Callable, Iterable, Iterator, List, Self
 from urllib.parse import urlparse
-from typing import List, Self, Callable, Any, Iterable, Iterator
-import textwrap
+
+import toml
+
+HASHER = hashlib.sha1
 
 
-def pyhash_to_miqhash(n: int) -> str:
-    b = struct.pack("n", n)
-    hasher = hashlib.sha1()
-    hasher.update(b)
-    return hasher.hexdigest()
+# def pyhash_to_miqhash(n: int) -> str:
+#     b = struct.pack("n", n)
+#     hasher = hashlib.sha1()
+#     hasher.update(b)
+#     return hasher.hexdigest()
 
 
 def flatten(L: Iterable[Any]) -> Iterator[Any]:
@@ -22,8 +27,36 @@ def flatten(L: Iterable[Any]) -> Iterator[Any]:
             yield item
 
 
-@dataclass(frozen=True)
-class Fetch:
+@dataclass
+class Unit(ABC):
+    def __post_init__(self):
+        path = Path(f"/miq/eval/{self.eval_name}.toml")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            f.write(toml.dumps(self.to_spec()))
+
+    @property
+    def eval_name(self) -> str:
+        return f"{self.name}-{self.hash}"
+
+    def __str__(self) -> str:
+        return self.eval_name
+
+    @abstractproperty
+    def hash(self) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_spec(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractproperty
+    def name(self) -> str:
+        raise NotImplementedError
+
+
+@dataclass
+class Fetch(Unit):
     url: str
 
     @property
@@ -31,63 +64,74 @@ class Fetch:
         return urlparse(self.url).path.split("/")[-1]
 
     @property
-    def path_hash(self) -> str:
-        return pyhash_to_miqhash(hash(self))
-
-    @property
-    def path(self) -> Path:
-        return Path(f"/miq/store/{self.path_hash}-{self.name}")
+    def hash(self) -> str:
+        h = HASHER()
+        h.update(self.url.encode())
+        return h.hexdigest()
 
     def to_spec(self) -> dict[str, Any]:
-        return {"fetch": [{"path": str(self.path), "url": self.url, "hash": "FIXME"}]}
-
-    def __str__(self) -> str:
-        return str(self.path)
+        return {"url": self.url, "integrity": "FIXME"}
 
 
-@dataclass(frozen=True)
-class Package:
-    name: str
+@dataclass(frozen=False)
+class Package(Unit):
+    pname: str
     version: str
     script_fn: Callable[[Self], str]
     deps: List[Self | Fetch]
     env: dict[str, str]
 
-    def __hash__(self) -> int:
-        hashes = [
-            hash(self.name),
-            hash(self.version),
-            hash(self.script),
-            [hash(child) for child in self.deps],
-            [hash(elem) for elem in self.env.keys()],
-            [hash(elem) for elem in self.env.values()],
+    @property
+    def name(self) -> str:
+        return f"{self.pname}-{self.version}"
+
+    @property
+    def hash(self) -> str:
+        elems = [
+            self.pname,
+            self.version,
+            self.script,
+            *[elem for elem in self.env.keys()],
+            *[elem for elem in self.env.values()],
         ]
 
-        hashes = [h for h in flatten(hashes)]
+        h = HASHER()
+        for elem in elems:
+            elem = elem.encode()
+            h.update(elem)
 
-        return hash(frozenset(hashes))
+        return h.hexdigest()
 
-    @property
-    def path_hash(self) -> str:
-        return pyhash_to_miqhash(hash(self))
-
-    @property
-    def path(self) -> Path:
-        return Path(f"/miq/store/{self.path_hash}-{self.name}-{self.version}")
+    def to_spec(self) -> dict[str, Any]:
+        return {
+            "pname": self.pname,
+            "version": self.version,
+            "script": self.script,
+            "deps": [str(d) for d in self.deps],
+            "env": self.env,
+        }
 
     @property
     def script(self) -> str:
         return textwrap.dedent(self.script_fn(self))
 
-    def __str__(self) -> str:
-        return str(self.path)
+    # def __hash__(self) -> int:
+    #     hashes = [
+    #         hash(self.name),
+    #         hash(self.version),
+    #         hash(self.script),
+    #         [hash(child) for child in self.deps],
+    #         [hash(elem) for elem in self.env.keys()],
+    #         [hash(elem) for elem in self.env.values()],
+    #     ]
+
+    #     hashes = [h for h in flatten(hashes)]
+
+    #     return hash(frozenset(hashes))
 
     # def to_spec(self) -> Tuple[dict[str, Any], List[dict[str, Any]]]:
-
     #     leaves = [x.to_spec() for x in self.deps]
-
     #     pass
-
     #     my_spec: dict[str, Any] = {
     #         "name": self.name,
     #         "path": str(self.path),
@@ -100,9 +144,3 @@ class Package:
     #     }
 
     #     return (my_spec, [])
-    def to_spec(self) -> dict[str, Any]:
-        return {}
-
-
-def dump_package(input: Package) -> str:
-    return "TODO"

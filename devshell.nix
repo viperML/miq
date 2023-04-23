@@ -4,27 +4,39 @@
   ...
 }: {
   devShells = {
-    default = pkgs.mkShell {
-      name = "miq-shell";
-      packages = [
-        config.packages.toolchain
-        pkgs.rust-analyzer-unwrapped
-        pkgs.pkg-config
-        pkgs.diesel-cli
-        pkgs.sqlite-interactive.dev
+    default = let
+      venv = pkgs.buildEnv {
+        name = "python-venv";
+        paths = [
+          (pkgs.python311.withPackages (p: [
+            p.setuptools
+            p.build
+            p.click
+            p.toml
+          ]))
 
-        (pkgs.python311.withPackages (p: [
-          p.setuptools
-          p.build
-          p.click
-          p.toml
-        ]))
-        pkgs.black
-        pkgs.ruff
-      ];
-      NIX_DEBUG = "1";
-      RUST_BACKTRACE = "full";
-    };
+          pkgs.black
+          pkgs.ruff
+        ];
+      };
+    in
+      pkgs.mkShell {
+        name = "miq-shell";
+        packages = [
+          config.packages.toolchain
+          pkgs.rust-analyzer-unwrapped
+          pkgs.pkg-config
+          pkgs.diesel-cli
+          pkgs.sqlite-interactive.dev
+
+          venv
+        ];
+        NIX_DEBUG = "1";
+        RUST_BACKTRACE = "full";
+        shellHook = ''
+          ln -Tsf ${venv} .venv
+        '';
+      };
   };
 
   packages = {
