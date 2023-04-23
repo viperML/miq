@@ -13,7 +13,7 @@ use tempfile::tempfile;
 
 use std::process::Command;
 
-use crate::pkgs::{self, Fetchable};
+use crate::schema_eval::{self, Fetchable};
 use crate::*;
 
 #[derive(Debug, clap::Args)]
@@ -59,7 +59,7 @@ pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
 pub fn build_spec(args: BuildArgs) -> Result<()> {
     debug!("args: {:?}", args);
 
-    let spec = pkgs::parse(&args.file)?;
+    let spec = schema_eval::parse(&args.file)?;
     debug!("spec: {:?}", spec);
 
     // Sequentially process fetches and then buildables
@@ -77,7 +77,7 @@ pub fn build_spec(args: BuildArgs) -> Result<()> {
     Ok(())
 }
 
-pub fn build_pkg(pkg: pkgs::Pkg, build_args: &BuildArgs) -> Result<()> {
+pub fn build_pkg(pkg: schema_eval::Pkg, build_args: &BuildArgs) -> Result<()> {
     if db::is_db_path(&pkg.path)? {
         if build_args.rebuild {
             debug!("Rebuilding pkg, unregistering from the store");

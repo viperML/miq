@@ -6,8 +6,8 @@ use tracing::{debug, info, warn};
 use serde::__private::de;
 
 use crate::build;
-use crate::db_schema::store;
-use crate::db_schema::store::dsl::*;
+use crate::schema_db::store;
+use crate::schema_db::store::dsl::*;
 use color_eyre::Result;
 
 #[derive(Debug, clap::Args)]

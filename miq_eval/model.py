@@ -33,6 +33,7 @@ class Unit(ABC):
         path = Path(f"/miq/eval/{self.eval_name}.toml")
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
+            f.write("#:schema /miq/eval-schema.json\n")
             f.write(toml.dumps(self.to_spec()))
 
     @property
@@ -70,7 +71,7 @@ class Fetch(Unit):
         return h.hexdigest()
 
     def to_spec(self) -> dict[str, Any]:
-        return {"url": self.url, "integrity": "FIXME"}
+        return {"result": self.eval_name, "url": self.url, "integrity": "FIXME"}
 
 
 @dataclass(frozen=False)
@@ -104,6 +105,7 @@ class Package(Unit):
 
     def to_spec(self) -> dict[str, Any]:
         return {
+            "result": self.eval_name,
             "pname": self.pname,
             "version": self.version,
             "script": self.script,

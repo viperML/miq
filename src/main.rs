@@ -3,8 +3,8 @@
 mod build;
 mod cli;
 mod db;
-mod db_schema;
-mod pkgs;
+mod schema_db;
+mod schema_eval;
 mod sandbox;
 
 use std::collections::hash_map::DefaultHasher;
@@ -44,7 +44,7 @@ fn main() -> Result<()> {
     let parsed = cli::CliParser::parse();
 
     match parsed.command {
-        cli::MiqCommands::Schema => pkgs::build_schema(),
+        cli::MiqCommands::Schema(args) => args.main(),
         cli::MiqCommands::Build(args) => build::build_spec(args),
         cli::MiqCommands::Db(args) => db::cli_dispatch(args),
     }
