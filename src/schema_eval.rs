@@ -127,7 +127,7 @@ pub struct Package {
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize, JsonSchema, Default)]
 pub struct Fetch {
-    result: String,
-    url: String,
-    integrity: String,
+    pub result: String,
+    pub url: String,
+    pub integrity: String,
 }

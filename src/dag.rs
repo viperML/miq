@@ -2,12 +2,13 @@ use std::path::Path;
 
 use crate::*;
 use color_eyre::Result;
-use daggy::petgraph::dot::{Dot, Config};
+use daggy::petgraph::dot::{Config, Dot};
 use daggy::petgraph::visit::Topo;
 use daggy::{petgraph, Walker};
 use daggy::{Dag, NodeIndex};
 use schema_eval::Unit;
 use tracing::{info, warn};
+use tracing_subscriber::fmt::format;
 
 #[derive(Debug, Clone)]
 struct UnitNode {
@@ -71,7 +72,18 @@ pub fn evaluate_dag<P: AsRef<Path>>(path: P) -> Result<()> {
         cycle = cycle + 1;
     }
 
-    println!("{:?}", Dot::with_config(&dag, &[Config::EdgeNoLabel],));
+    // println!("{:?}", Dot::with_config(&dag, &[Config::EdgeNoLabel],));
+    let result = Dot::with_attr_getters(
+        // -
+        &dag,
+        &[Config::EdgeNoLabel, Config::NodeNoLabel],
+        &|_, _| String::new(),
+        &|_, (_, weight)| match &weight.inner {
+            Unit::Package(inner) => format!("label = \"{}\"", inner.result),
+            Unit::Fetch(inner) => format!("label = \"{}\"", inner.result),
+        },
+    );
+    println!("{:?}", result);
 
     Ok(())
 }
