@@ -107,21 +107,22 @@ pub enum Unit {
 }
 
 impl Unit {
-    fn from_result<P: AsRef<str>>(r: P) -> std::result::Result<Unit, toml::de::Error> {
+    pub fn from_result<P: AsRef<str>>(r: P) -> Result<Unit> {
         let r = r.as_ref();
         let filename = format!("/miq/eval/{}.toml", r);
-        toml::from_str(filename.as_str())
+        let contents = std::fs::read_to_string(filename)?;
+        Ok(toml::from_str(contents.as_str())?)
     }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Default)]
 pub struct Package {
-    result: String,
-    pname: String,
-    version: String,
-    deps: Vec<Unit>,
-    script: String,
-    env: HashMap<String, String>,
+    pub result: String,
+    pub pname: String,
+    pub version: String,
+    pub deps: Vec<String>,
+    pub script: String,
+    pub env: HashMap<String, String>,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize, JsonSchema, Default)]

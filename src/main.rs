@@ -6,6 +6,7 @@ mod db;
 mod schema_db;
 mod schema_eval;
 mod sandbox;
+mod dag;
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
@@ -47,5 +48,7 @@ fn main() -> Result<()> {
         cli::MiqCommands::Schema(args) => args.main(),
         cli::MiqCommands::Build(args) => build::build_spec(args),
         cli::MiqCommands::Db(args) => db::cli_dispatch(args),
+        cli::MiqCommands::Eval(args) => args.main(),
+
     }
 }

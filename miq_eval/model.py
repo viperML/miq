@@ -33,7 +33,7 @@ class Unit(ABC):
         path = Path(f"/miq/eval/{self.eval_name}.toml")
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
-            f.write("#:schema /miq/eval-schema.json\n")
+            # f.write("#:schema /miq/eval-schema.json\n")
             f.write(toml.dumps(self.to_spec()))
 
     @property
