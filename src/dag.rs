@@ -11,7 +11,7 @@ use tracing::{info, warn};
 use tracing_subscriber::fmt::format;
 
 #[derive(Debug, Clone)]
-struct UnitNode {
+pub struct UnitNode {
     inner: Unit,
     visited: bool,
 }
@@ -29,24 +29,45 @@ impl UnitNode {
     }
 }
 
-type UnitDag = Dag<UnitNode, ()>;
+type UnitNodeDag = Dag<UnitNode, ()>;
+type UnitDag = Dag<Unit, ()>;
 
 #[derive(Debug, clap::Args)]
 pub struct Args {
     path: PathBuf,
+    /// Write the resulting graph to this file
+    #[arg(short, long)]
+    output_file: Option<PathBuf>,
 }
 
 impl Args {
     pub fn main(&self) -> Result<()> {
-        evaluate_dag(&self.path)?;
+        let dag = evaluate_dag(&self.path)?;
+
+        let dot = Dot::with_attr_getters(
+            // -
+            &dag,
+            &[Config::EdgeNoLabel, Config::NodeNoLabel],
+            &|_, _| String::new(),
+            &|_, (_, weight)| match weight {
+                Unit::Package(inner) => format!("label = \"{}\" ", inner.result),
+                Unit::Fetch(inner) => format!("label = \"{}\" ", inner.result),
+            },
+        );
+        println!("{:?}", dot);
+
+        if let Some(path) = &self.output_file {
+            std::fs::write(path, format!("{:?}", dot))?;
+        }
+
         Ok(())
     }
 }
 
-pub fn evaluate_dag<P: AsRef<Path>>(path: P) -> Result<()> {
+pub fn evaluate_dag<P: AsRef<Path>>(path: P) -> Result<UnitDag> {
     let path = path.as_ref();
 
-    let mut dag = UnitDag::new();
+    let mut dag = UnitNodeDag::new();
     let root_n_weight: Unit = toml::from_str(&std::fs::read_to_string(path)?)?;
     let root_n_weight = UnitNode::new(root_n_weight);
     let root_n = dag.add_node(root_n_weight);
@@ -72,23 +93,16 @@ pub fn evaluate_dag<P: AsRef<Path>>(path: P) -> Result<()> {
         cycle = cycle + 1;
     }
 
-    // println!("{:?}", Dot::with_config(&dag, &[Config::EdgeNoLabel],));
-    let result = Dot::with_attr_getters(
+    let result = dag.map(
         // -
-        &dag,
-        &[Config::EdgeNoLabel, Config::NodeNoLabel],
-        &|_, _| String::new(),
-        &|_, (_, weight)| match &weight.inner {
-            Unit::Package(inner) => format!("label = \"{}\"", inner.result),
-            Unit::Fetch(inner) => format!("label = \"{}\"", inner.result),
-        },
+        |_, unit_node| unit_node.inner.to_owned(),
+        |_, _| (),
     );
-    println!("{:?}", result);
 
-    Ok(())
+    Ok(result)
 }
 
-fn cycle_dag(dag: &mut UnitDag, node: NodeIndex) -> Result<()> {
+fn cycle_dag(dag: &mut UnitNodeDag, node: NodeIndex) -> Result<()> {
     let old_dag = dag.clone();
     info!("Cycling at node {:?}", old_dag[node]);
     let node_weight = old_dag.node_weight(node).unwrap();

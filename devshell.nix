@@ -28,6 +28,7 @@
           pkgs.pkg-config
           pkgs.diesel-cli
           pkgs.sqlite-interactive.dev
+          pkgs.graph-easy
 
           venv
         ];

@@ -47,7 +47,7 @@ fn main() -> Result<()> {
     match parsed.command {
         cli::MiqCommands::Schema(args) => args.main(),
         cli::MiqCommands::Build(args) => build::build_spec(args),
-        cli::MiqCommands::Db(args) => db::cli_dispatch(args),
+        cli::MiqCommands::Store(args) => db::cli_dispatch(args),
         cli::MiqCommands::Eval(args) => args.main(),
 
     }
