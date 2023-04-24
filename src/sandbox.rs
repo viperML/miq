@@ -56,7 +56,7 @@ impl SandBox {
                 info!("Child died: {:?}", status);
 
                 if let Ok(WaitStatus::Exited(_, 0)) = status {
-                    return Ok(());
+                    Ok(())
                 } else {
                     // TODO make this prettier
                     bail!("Bad exit: {:?}", status);

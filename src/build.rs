@@ -74,7 +74,7 @@ impl Args {
         info!(?result);
 
         for unit in result {
-            build_unit(unit, &self)?;
+            build_unit(unit, self)?;
         }
 
         Ok(())
@@ -83,7 +83,7 @@ impl Args {
 
 fn build_unit(unit: &Unit, args: &Args) -> Result<()> {
     match unit {
-        Unit::Package(inner) => build_package(inner, &args),
+        Unit::Package(inner) => build_package(inner, args),
         Unit::Fetch(inner) => build_fetch(inner),
     }?;
 

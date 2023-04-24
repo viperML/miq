@@ -90,7 +90,7 @@ pub fn evaluate_dag<P: AsRef<Path>>(path: P) -> Result<UnitDag> {
 
         debug!(?size);
 
-        cycle = cycle + 1;
+        cycle += 1;
     }
 
     let result = dag.map(
