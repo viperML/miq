@@ -50,8 +50,8 @@ impl Args {
             &[Config::EdgeNoLabel, Config::NodeNoLabel],
             &|_, _| String::new(),
             &|_, (_, weight)| match weight {
-                Unit::Package(inner) => format!("label = \"{}\" ", inner.result),
-                Unit::Fetch(inner) => format!("label = \"{}\" ", inner.result),
+                Unit::Package(inner) => format!("label = \"{}-{}\" ", inner.name, inner.version),
+                Unit::Fetch(inner) => format!("label = \"{}\" ", inner.name),
             },
         );
         println!("{:?}", dot);
@@ -72,7 +72,7 @@ pub fn evaluate_dag<P: AsRef<Path>>(path: P) -> Result<UnitDag> {
     let root_n_weight = UnitNode::new(root_n_weight);
     let root_n = dag.add_node(root_n_weight);
 
-    info!(?dag);
+    debug!(?dag);
 
     let max_cycles = 10;
     let mut cycle = 0;
@@ -88,7 +88,7 @@ pub fn evaluate_dag<P: AsRef<Path>>(path: P) -> Result<UnitDag> {
             .iter(&old_dag)
             .fold(0, |acc, n| if !old_dag[n].visited { acc + 1 } else { acc });
 
-        info!(?size);
+        debug!(?size);
 
         cycle = cycle + 1;
     }
@@ -104,7 +104,7 @@ pub fn evaluate_dag<P: AsRef<Path>>(path: P) -> Result<UnitDag> {
 
 fn cycle_dag(dag: &mut UnitNodeDag, node: NodeIndex) -> Result<()> {
     let old_dag = dag.clone();
-    info!("Cycling at node {:?}", old_dag[node]);
+    debug!("Cycling at node {:?}", old_dag[node]);
     let node_weight = old_dag.node_weight(node).unwrap();
 
     if !dag[node].visited {
@@ -113,13 +113,13 @@ fn cycle_dag(dag: &mut UnitNodeDag, node: NodeIndex) -> Result<()> {
         match &node_weight.inner {
             Unit::Package(inner) => {
                 for elem in &inner.deps {
-                    info!("I want to create {:?}", elem);
+                    debug!("I want to create {:?}", elem);
 
                     let target = Unit::from_result(elem)?;
 
                     for parent in Topo::new(&old_dag).iter(&old_dag) {
                         let p = &old_dag[parent].inner;
-                        warn!("Examining G component {:?}", p);
+                        debug!("Examining G component {:?}", p);
 
                         if p == &target.clone() {
                             dag.add_edge(parent, node, ())?;

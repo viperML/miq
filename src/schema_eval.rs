@@ -118,7 +118,7 @@ impl Unit {
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Default)]
 pub struct Package {
     pub result: String,
-    pub pname: String,
+    pub name: String,
     pub version: String,
     pub deps: Vec<String>,
     pub script: String,
@@ -128,6 +128,7 @@ pub struct Package {
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize, JsonSchema, Default)]
 pub struct Fetch {
     pub result: String,
+    pub name: String,
     pub url: String,
     pub integrity: String,
 }
