@@ -8,17 +8,20 @@ use std::str::FromStr;
 use std::{fs, io, vec};
 
 use bytes::Buf;
-use tracing::{debug, info};
+use color_eyre::eyre::bail;
+use daggy::petgraph;
 use tempfile::tempfile;
+use tracing::{debug, info, warn};
+use tracing_subscriber::fmt::format;
 
 use std::process::Command;
 
-use crate::schema_eval::{self, Fetchable};
+use crate::schema_eval::{self, Fetch, Package, Unit};
 use crate::*;
 
 #[derive(Debug, clap::Args)]
-pub struct BuildArgs {
-    /// Path of PkgSpec to build
+pub struct Args {
+    /// Path of the buildable
     #[arg()]
     file: PathBuf,
 
@@ -56,32 +59,78 @@ pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
     }
 }
 
-pub fn build_spec(args: BuildArgs) -> Result<()> {
-    debug!("args: {:?}", args);
+impl Args {
+    pub fn main(&self) -> Result<()> {
+        let result_dag = dag::evaluate_dag(&self.file)?;
 
-    let spec = schema_eval::parse(&args.file)?;
-    debug!("spec: {:?}", spec);
+        info!(?result_dag);
 
-    // Sequentially process fetches and then buildables
-    // Eventually use a solver to apply any correct ordering between fetches and pkgs
+        let result = petgraph::algo::toposort(&result_dag, None)
+            .expect("DAG was not acyclic!")
+            .iter()
+            .map(|&node| result_dag.node_weight(node).expect("Couldn't get node"))
+            .collect::<Vec<_>>();
 
-    for fetchable in spec.fetch {
-        fetchable.fetch()?;
+        info!(?result);
+
+        for unit in result {
+            build_unit(unit, &self)?;
+        }
+
+        Ok(())
     }
+}
 
-    for p in spec.pkg {
-        debug!("processing: {:?}", p);
-        build_pkg(p, &args)?;
-    }
+fn build_unit(unit: &Unit, args: &Args) -> Result<()> {
+    match unit {
+        Unit::Package(inner) => build_package(inner, &args),
+        Unit::Fetch(inner) => build_fetch(inner),
+    }?;
 
     Ok(())
 }
 
-pub fn build_pkg(pkg: schema_eval::Pkg, build_args: &BuildArgs) -> Result<()> {
-    if db::is_db_path(&pkg.path)? {
+fn build_fetch(input: &Fetch) -> Result<()> {
+    // debug!("Fetching: {:?}", input);
+    let path = format!("/miq/store/{}", input.result);
+
+    let already_fetched = db::is_db_path(&path)?;
+
+    if already_fetched {
+        debug!("Already fetched!");
+        return Ok(());
+    }
+
+    let tempfile = &mut tempfile::NamedTempFile::new()?;
+    // FIXME
+    // let tempfile = RefCell::new(tempfile::NamedTempFile::new());
+    debug!("tempfile: {:?}", &tempfile);
+
+    let client = reqwest::blocking::Client::new();
+    let response = client.get(&input.url).send()?;
+    let content = &mut response.bytes()?.reader();
+    std::io::copy(content, tempfile)?;
+
+    debug!("Fetch Ok");
+
+    std::fs::copy(tempfile.path(), &path)?;
+    debug!("Move OK");
+
+    // Make sure we don't drop before
+    // drop(tempfile);
+
+    db::add(&path)?;
+
+    Ok(())
+}
+
+fn build_package(input: &Package, build_args: &Args) -> Result<()> {
+    let path = format!("/miq/store/{}", input.result);
+
+    if db::is_db_path(&path)? {
         if build_args.rebuild {
             debug!("Rebuilding pkg, unregistering from the store");
-            db::remove(&pkg.path)?;
+            db::remove(&path)?;
         } else {
             debug!("Package was already built");
             return Ok(());
@@ -89,59 +138,22 @@ pub fn build_pkg(pkg: schema_eval::Pkg, build_args: &BuildArgs) -> Result<()> {
     }
 
     let mut miq_env: HashMap<&str, &str> = HashMap::new();
-    miq_env.insert("miq_out", pkg.path.to_str().unwrap());
-
+    miq_env.insert("miq_out", &path);
 
     // FIXME
     miq_env.insert("HOME", "/home/ayats");
     debug!("env: {:?}", miq_env);
 
     let mut cmd = Command::new("/bin/sh");
-    cmd.args(["-c", &pkg.script]);
+    cmd.args(["-c", &input.script]);
     cmd.env_clear();
-    cmd.envs(&pkg.env);
+    cmd.envs(&input.env);
     cmd.envs(&miq_env);
 
     let sandbox = sandbox::SandBox {};
     sandbox.run(&mut cmd)?;
 
-    db::add(&pkg.path)?;
+    db::add(&path)?;
 
     Ok(())
-}
-
-impl Fetchable {
-    /// Main function for a fetchable
-    fn fetch(&self) -> Result<()> {
-        debug!("Fetching: {:?}", self);
-
-        let already_fetched = db::is_db_path(&self.path)?;
-
-        if already_fetched {
-            debug!("Already fetched!");
-            return Ok(());
-        }
-
-        let tempfile = &mut tempfile::NamedTempFile::new()?;
-        // FIXME
-        // let tempfile = RefCell::new(tempfile::NamedTempFile::new());
-        debug!("tempfile: {:?}", &tempfile);
-
-        let client = reqwest::blocking::Client::new();
-        let response = client.get(&self.url).send()?;
-        let content = &mut response.bytes()?.reader();
-        std::io::copy(content, tempfile)?;
-
-        debug!("Fetch Ok");
-
-        std::fs::copy(tempfile.path(), &self.path)?;
-        debug!("Move OK");
-
-        // Make sure we don't drop before
-        // drop(tempfile);
-
-        db::add(&self.path)?;
-
-        Ok(())
-    }
 }

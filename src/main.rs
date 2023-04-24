@@ -2,11 +2,11 @@
 
 mod build;
 mod cli;
+mod dag;
 mod db;
+mod sandbox;
 mod schema_db;
 mod schema_eval;
-mod sandbox;
-mod dag;
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
@@ -15,9 +15,9 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use clap::Parser;
+use color_eyre::Result;
 use tracing::debug;
 use tracing_subscriber::prelude::*;
-use color_eyre::Result;
 
 fn setup_logging() -> Result<()> {
     color_eyre::install()?;
@@ -46,9 +46,8 @@ fn main() -> Result<()> {
 
     match parsed.command {
         cli::MiqCommands::Schema(args) => args.main(),
-        cli::MiqCommands::Build(args) => build::build_spec(args),
+        cli::MiqCommands::Build(args) => args.main(),
         cli::MiqCommands::Store(args) => db::cli_dispatch(args),
         cli::MiqCommands::Eval(args) => args.main(),
-
     }
 }

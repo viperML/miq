@@ -10,7 +10,6 @@ use std::{
 };
 
 use libc::{prctl, PR_SET_PDEATHSIG, SIGKILL};
-use tracing::{debug, info};
 use nix::{
     mount::{mount, MsFlags},
     sched::{unshare, CloneFlags},
@@ -19,8 +18,9 @@ use nix::{
 };
 use nix::{unistd::pivot_root, NixPath};
 use tempfile::tempdir;
+use tracing::{debug, info};
 
-use color_eyre::{Result, eyre::bail};
+use color_eyre::{eyre::bail, Result};
 
 #[derive(Debug)]
 pub struct SandBox {}

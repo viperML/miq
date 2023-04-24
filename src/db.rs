@@ -1,9 +1,9 @@
-use std::path::{Path, self};
+use std::path::{self, Path};
 use std::{any, path::PathBuf};
 
 use diesel::{prelude::*, sql_types::Integer};
-use tracing::{debug, info, warn};
 use serde::__private::de;
+use tracing::{debug, info, warn};
 
 use crate::build;
 use crate::schema_db::store;
