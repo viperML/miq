@@ -1,4 +1,6 @@
 #![cfg_attr(debug_assertions, allow(dead_code, unused_imports))]
+#[macro_use] extern crate educe;
+
 
 mod build;
 mod cli;
@@ -22,18 +24,19 @@ use tracing_subscriber::prelude::*;
 fn setup_logging() -> Result<()> {
     color_eyre::install()?;
 
-    let filter_layer =
-        tracing_subscriber::EnvFilter::from_default_env().add_directive("debug".parse()?);
+    let layer_filter = tracing_subscriber::EnvFilter::from_default_env()
+        .add_directive("info".parse()?)
+        .add_directive("miq=trace".parse()?);
 
-    let fmt_layer = tracing_subscriber::fmt::layer()
+    let layer_fmt = tracing_subscriber::fmt::layer()
         .with_writer(std::io::stderr)
         .without_time()
         .with_line_number(true)
         .compact();
 
     tracing_subscriber::registry()
-        .with(filter_layer)
-        .with(fmt_layer)
+        .with(layer_filter)
+        .with(layer_fmt)
         .init();
 
     Ok(())

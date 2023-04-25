@@ -11,7 +11,7 @@ use bytes::Buf;
 use color_eyre::eyre::bail;
 use daggy::petgraph;
 use tempfile::tempfile;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, trace, warn};
 use tracing_subscriber::fmt::format;
 
 use std::process::Command;
@@ -35,11 +35,11 @@ pub struct Args {
 }
 
 pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
-    debug!("Requesting clean path on {:?}", path);
+    trace!("Requesting clean path on {:?}", path);
 
     match fs::metadata(&path) {
         Ok(meta) => {
-            debug!("Elem exists, removing");
+            trace!("Elem exists, removing");
             if meta.is_file() {
                 fs::remove_file(&path)?;
             } else if meta.is_dir() {
@@ -51,7 +51,7 @@ pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
         }
         Err(err) => match err.kind() {
             io::ErrorKind::NotFound => {
-                debug!("Doesn't exist, skipping");
+                trace!("Doesn't exist, skipping");
                 Ok(())
             }
             _ => Err(err),
@@ -63,76 +63,63 @@ impl Args {
     pub fn main(&self) -> Result<()> {
         let result_dag = dag::evaluate_dag(&self.file)?;
 
-        info!(?result_dag);
-
-        let result = petgraph::algo::toposort(&result_dag, None)
+        let sorted_dag = petgraph::algo::toposort(&result_dag, None)
             .expect("DAG was not acyclic!")
             .iter()
             .map(|&node| result_dag.node_weight(node).expect("Couldn't get node"))
             .collect::<Vec<_>>();
 
-        info!(?result);
+        trace!(?sorted_dag);
 
-        for unit in result {
-            build_unit(unit, self)?;
+        // Only build last package in the chain
+        let n_units = sorted_dag.len();
+        for (i, unit) in sorted_dag.iter().enumerate() {
+            let rebuild = self.rebuild && i == n_units - 1;
+            match unit {
+                Unit::PackageUnit(inner) => build_package(inner, self, rebuild),
+                Unit::FetchUnit(inner) => build_fetch(inner, self, rebuild),
+            }?;
         }
 
         Ok(())
     }
 }
 
-fn build_unit(unit: &Unit, args: &Args) -> Result<()> {
-    match unit {
-        Unit::Package(inner) => build_package(inner, args),
-        Unit::Fetch(inner) => build_fetch(inner),
-    }?;
-
-    Ok(())
-}
-
-fn build_fetch(input: &Fetch) -> Result<()> {
-    // debug!("Fetching: {:?}", input);
+#[tracing::instrument(skip(build_args), ret, level = "info")]
+fn build_fetch(input: &Fetch, build_args: &Args, rebuild: bool) -> Result<()> {
     let path = format!("/miq/store/{}", input.result);
 
-    let already_fetched = db::is_db_path(&path)?;
-
-    if already_fetched {
-        debug!("Already fetched!");
-        return Ok(());
+    if db::is_db_path(&path)? {
+        if rebuild {
+            db::remove(&path)?;
+        } else {
+            return Ok(());
+        }
     }
 
     let tempfile = &mut tempfile::NamedTempFile::new()?;
-    // FIXME
-    // let tempfile = RefCell::new(tempfile::NamedTempFile::new());
-    debug!("tempfile: {:?}", &tempfile);
+    debug!(?tempfile);
 
     let client = reqwest::blocking::Client::new();
     let response = client.get(&input.url).send()?;
     let content = &mut response.bytes()?.reader();
     std::io::copy(content, tempfile)?;
 
-    debug!("Fetch Ok");
-
     std::fs::copy(tempfile.path(), &path)?;
-    debug!("Move OK");
-
-    // Make sure we don't drop before
-    // drop(tempfile);
 
     db::add(&path)?;
 
     Ok(())
 }
 
-fn build_package(input: &Package, build_args: &Args) -> Result<()> {
+#[tracing::instrument(skip(build_args), ret, level = "info")]
+fn build_package(input: &Package, build_args: &Args, rebuild: bool) -> Result<()> {
     let path = format!("/miq/store/{}", input.result);
 
     if db::is_db_path(&path)? {
-        if build_args.rebuild {
-            debug!("Rebuilding pkg, unregistering from the store");
+        if rebuild {
             db::remove(&path)?;
         } else {
-            debug!("Package was already built");
             return Ok(());
         }
     }
@@ -142,7 +129,7 @@ fn build_package(input: &Package, build_args: &Args) -> Result<()> {
 
     // FIXME
     miq_env.insert("HOME", "/home/ayats");
-    debug!("env: {:?}", miq_env);
+    debug!(?miq_env);
 
     let mut cmd = Command::new("/bin/sh");
     cmd.args(["-c", &input.script]);

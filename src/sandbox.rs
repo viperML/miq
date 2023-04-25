@@ -33,7 +33,7 @@ impl SandBox {
 
         let workdir_handle = tempdir()?;
         let workdir = workdir_handle.path();
-        debug!("workdir={:?}", workdir_handle);
+        debug!(?workdir);
 
         // let newroot = workdir.join("newroot");
         // debug!("newroot={:?}", newroot);
@@ -52,14 +52,14 @@ impl SandBox {
                     eprintln!("{}", line);
                 }
 
-                let status = waitpid(child, None);
-                info!("Child died: {:?}", status);
+                let child_status = waitpid(child, None);
 
-                if let Ok(WaitStatus::Exited(_, 0)) = status {
+                if let Ok(WaitStatus::Exited(_, 0)) = child_status {
+                    info!(?child_status, "Build successful");
                     Ok(())
                 } else {
                     // TODO make this prettier
-                    bail!("Bad exit: {:?}", status);
+                    bail!("Bad exit: {:?}", child_status);
                 }
             }
             nix::unistd::ForkResult::Child => {

@@ -41,7 +41,7 @@ impl Args {
             info!("Reset VS code with: rm ~/.config/Code/User/globalStorage/tamasfe.even-better-toml/*");
             std::fs::write(p, schema_str)?;
         } else {
-            let dummy = Unit::Package(Package::default());
+            let dummy = Unit::PackageUnit(Package::default());
             let s = toml::to_string_pretty(&dummy)?;
             println!("{}", s);
         }
@@ -50,11 +50,14 @@ impl Args {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema)]
+#[educe(Debug)]
 #[serde(untagged)]
 pub enum Unit {
-    Package(Package),
-    Fetch(Fetch),
+    #[educe(Debug(name = false))]
+    PackageUnit(Package),
+    #[educe(Debug(name = false))]
+    FetchUnit(Fetch),
 }
 
 impl Unit {
@@ -66,20 +69,30 @@ impl Unit {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[educe(Debug)]
 pub struct Package {
+    #[educe(Debug(ignore))]
     pub result: String,
     pub name: String,
+    #[educe(Debug(ignore))]
     pub version: String,
+    #[educe(Debug(ignore))]
     pub deps: Vec<String>,
+    #[educe(Debug(ignore))]
     pub script: String,
+    #[educe(Debug(ignore))]
     pub env: HashMap<String, String>,
 }
 
-#[derive(Debug, PartialEq, Clone, Deserialize, Serialize, JsonSchema, Default)]
+#[derive(Educe, PartialEq, Clone, Deserialize, Serialize, JsonSchema, Default)]
+#[educe(Debug)]
 pub struct Fetch {
+    #[educe(Debug(ignore))]
     pub result: String,
     pub name: String,
+    #[educe(Debug(ignore))]
     pub url: String,
+    #[educe(Debug(ignore))]
     pub integrity: String,
 }

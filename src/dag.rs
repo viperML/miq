@@ -7,7 +7,7 @@ use daggy::petgraph::visit::Topo;
 use daggy::{petgraph, Walker};
 use daggy::{Dag, NodeIndex};
 use schema_eval::Unit;
-use tracing::{info, warn};
+use tracing::{trace};
 use tracing_subscriber::fmt::format;
 
 #[derive(Debug, Clone)]
@@ -50,8 +50,8 @@ impl Args {
             &[Config::EdgeNoLabel, Config::NodeNoLabel],
             &|_, _| String::new(),
             &|_, (_, weight)| match weight {
-                Unit::Package(inner) => format!("label = \"{}-{}\" ", inner.name, inner.version),
-                Unit::Fetch(inner) => format!("label = \"{}\" ", inner.name),
+                Unit::PackageUnit(inner) => format!("label = \"{}-{}\" ", inner.name, inner.version),
+                Unit::FetchUnit(inner) => format!("label = \"{}\" ", inner.name),
             },
         );
         println!("{:?}", dot);
@@ -64,15 +64,14 @@ impl Args {
     }
 }
 
-pub fn evaluate_dag<P: AsRef<Path>>(path: P) -> Result<UnitDag> {
+#[tracing::instrument(skip_all, ret, level = "debug")]
+pub fn evaluate_dag<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<UnitDag> {
     let path = path.as_ref();
 
     let mut dag = UnitNodeDag::new();
     let root_n_weight: Unit = toml::from_str(&std::fs::read_to_string(path)?)?;
     let root_n_weight = UnitNode::new(root_n_weight);
     let root_n = dag.add_node(root_n_weight);
-
-    debug!(?dag);
 
     let max_cycles = 10;
     let mut cycle = 0;
@@ -88,7 +87,7 @@ pub fn evaluate_dag<P: AsRef<Path>>(path: P) -> Result<UnitDag> {
             .iter(&old_dag)
             .fold(0, |acc, n| if !old_dag[n].visited { acc + 1 } else { acc });
 
-        debug!(?size);
+        trace!(?size);
 
         cycle += 1;
     }
@@ -104,22 +103,22 @@ pub fn evaluate_dag<P: AsRef<Path>>(path: P) -> Result<UnitDag> {
 
 fn cycle_dag(dag: &mut UnitNodeDag, node: NodeIndex) -> Result<()> {
     let old_dag = dag.clone();
-    debug!("Cycling at node {:?}", old_dag[node]);
+    trace!("Cycling at node {:?}", old_dag[node]);
     let node_weight = old_dag.node_weight(node).unwrap();
 
     if !dag[node].visited {
         dag[node].visit();
 
         match &node_weight.inner {
-            Unit::Package(inner) => {
+            Unit::PackageUnit(inner) => {
                 for elem in &inner.deps {
-                    debug!("I want to create {:?}", elem);
+                    trace!("I want to create {:?}", elem);
 
                     let target = Unit::from_result(elem)?;
 
                     for parent in Topo::new(&old_dag).iter(&old_dag) {
                         let p = &old_dag[parent].inner;
-                        debug!("Examining G component {:?}", p);
+                        trace!("Examining G component {:?}", p);
 
                         if p == &target.clone() {
                             dag.add_edge(parent, node, ())?;
@@ -138,7 +137,7 @@ fn cycle_dag(dag: &mut UnitNodeDag, node: NodeIndex) -> Result<()> {
                     );
                 }
             }
-            Unit::Fetch(_inner) => {}
+            Unit::FetchUnit(_inner) => {}
         }
     }
 

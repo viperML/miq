@@ -3,7 +3,7 @@ use std::{any, path::PathBuf};
 
 use diesel::{prelude::*, sql_types::Integer};
 use serde::__private::de;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, trace, warn};
 
 use crate::build;
 use crate::schema_db::store;
@@ -77,7 +77,7 @@ pub struct NewPath {
 
 fn connect_db() -> Result<SqliteConnection> {
     let database_url = std::env::var("DATABASE_URL")?;
-    debug!("DATABASE_URL: {:?}", database_url);
+    trace!("DATABASE_URL: {:?}", database_url);
     Ok(diesel::SqliteConnection::establish(&database_url)?)
 }
 
@@ -111,11 +111,11 @@ pub fn add<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<()> {
     if is_db_path(&path)? {
         warn!("Path is already on the store");
     } else {
-        let result = diesel::insert_into(store::table)
+        let db_response = diesel::insert_into(store::table)
             .values(&input)
-            .execute(conn);
+            .execute(conn)?;
 
-        debug!("Result: {:?}", result);
+        trace!(?db_response);
     };
 
     Ok(())
@@ -129,29 +129,24 @@ pub fn remove<P: AsRef<Path>>(path: P) -> Result<()> {
 
     let path_str = path.to_str().unwrap();
 
-    let result = diesel::delete(store)
+    let db_response = diesel::delete(store)
         .filter(store_path.is(&path_str))
         .execute(conn)?;
 
-    debug!("Deletion result: {:?}", result);
+    trace!(?db_response);
 
     Ok(())
 }
 
+#[tracing::instrument(ret, level = "trace")]
 pub fn is_db_path<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<bool> {
     let conn = &mut connect_db()?;
 
     let path_str = path.as_ref().to_str().unwrap();
 
-    debug!("path_str: {:?}", path_str);
-
     let elements: Vec<StorePath> = store
         .filter(store_path.is(path_str))
         .load::<StorePath>(conn)?;
-
-    for elem in &elements {
-        debug!("found elem {:?}", elem);
-    }
 
     Ok(!elements.is_empty())
 }
