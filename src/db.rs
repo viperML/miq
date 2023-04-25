@@ -1,12 +1,17 @@
 use std::path::{Path, PathBuf};
 
+use color_eyre::eyre::bail;
 use color_eyre::Result;
+use diesel::migration::MigrationVersion;
 use diesel::prelude::*;
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use tracing::{debug, info, trace, warn};
 
 use crate::build;
 use crate::schema_db::store;
 use crate::schema_db::store::dsl::*;
+
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[derive(Debug, clap::Args)]
 pub struct CliArgs {
@@ -76,7 +81,18 @@ pub struct NewPath {
 fn connect_db() -> Result<SqliteConnection> {
     let database_url = std::env::var("DATABASE_URL")?;
     trace!("DATABASE_URL: {:?}", database_url);
-    Ok(diesel::SqliteConnection::establish(&database_url)?)
+    let mut conn = diesel::SqliteConnection::establish(&database_url)?;
+
+    match conn.run_pending_migrations(MIGRATIONS) {
+        Ok::<Vec<MigrationVersion>, _>(migrations) => {
+            if !migrations.is_empty() {
+                info!(?migrations, "Ran DB migrations")
+            }
+        }
+        Err(e) => bail!(e),
+    };
+
+    Ok(conn)
 }
 
 pub fn list() -> Result<()> {
