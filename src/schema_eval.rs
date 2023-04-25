@@ -1,4 +1,5 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 use color_eyre::Result;
 use schemars::{schema_for, JsonSchema};

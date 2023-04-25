@@ -1,18 +1,13 @@
-use std::{
-    io::{BufRead, BufReader},
-    os::{
-        fd::{AsFd, AsRawFd},
-        unix::process::CommandExt,
-    },
-    process::Command,
-};
+use std::io::{BufRead, BufReader};
+use std::os::fd::{AsFd, AsRawFd};
+use std::os::unix::process::CommandExt;
+use std::process::Command;
 
-use color_eyre::{eyre::bail, Result};
+use color_eyre::eyre::bail;
+use color_eyre::Result;
 use libc::{prctl, PR_SET_PDEATHSIG, SIGKILL};
-use nix::{
-    sys::wait::{waitpid, WaitStatus},
-    unistd::fork,
-};
+use nix::sys::wait::{waitpid, WaitStatus};
+use nix::unistd::fork;
 use tempfile::tempdir;
 use tracing::{debug, info};
 

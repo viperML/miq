@@ -3,8 +3,7 @@ use std::path::Path;
 use color_eyre::Result;
 use daggy::petgraph::dot::{Config, Dot};
 use daggy::petgraph::visit::Topo;
-use daggy::{petgraph, Walker};
-use daggy::{Dag, NodeIndex};
+use daggy::{petgraph, Dag, NodeIndex, Walker};
 use schema_eval::Unit;
 use tracing::trace;
 
