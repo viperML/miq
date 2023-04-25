@@ -1,14 +1,14 @@
+/**
+ Vscode Even Better Toml:
+ Wipe cache with:
+ rm ~/.config/Code/User/globalStorage/tamasfe.even-better-toml/*
+*/ */
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 use color_eyre::Result;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
-/**
- Vscode Even Better Toml:
- Wipe cache with:
- rm ~/.config/Code/User/globalStorage/tamasfe.even-better-toml/*
-*/ */
 use tracing::info;
 
 #[derive(Debug, clap::Args)]
