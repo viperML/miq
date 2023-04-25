@@ -1,6 +1,6 @@
 #![cfg_attr(debug_assertions, allow(dead_code, unused_imports))]
-#[macro_use] extern crate educe;
-
+#[macro_use]
+extern crate educe;
 
 mod build;
 mod cli;
@@ -10,15 +10,10 @@ mod sandbox;
 mod schema_db;
 mod schema_eval;
 
-use std::collections::hash_map::DefaultHasher;
-use std::collections::BTreeMap;
-use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use clap::Parser;
 use color_eyre::Result;
-use tracing::debug;
 use tracing_subscriber::prelude::*;
 
 fn setup_logging() -> Result<()> {

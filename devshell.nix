@@ -23,7 +23,8 @@
       pkgs.mkShell {
         name = "miq-shell";
         packages = [
-          config.packages.toolchain
+          config.packages.toolchain'
+          pkgs.rust-bin.nightly.latest.rustfmt
           pkgs.rust-analyzer-unwrapped
           pkgs.pkg-config
           pkgs.diesel-cli
@@ -41,6 +42,12 @@
   };
 
   packages = {
+    toolchain' = with config.packages;
+      pkgs.symlinkJoin {
+        inherit (toolchain) name;
+        paths = [toolchain];
+        postBuild = "rm $out/bin/rustfmt";
+      };
     toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
     # nix build ~/Documents/miq#bootstrap --out-link ~/Documents/miq/devel/nix-bootstrap
     bootstrap = with pkgs;

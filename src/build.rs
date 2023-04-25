@@ -1,22 +1,14 @@
-use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::fmt::Debug;
-use std::fs::File;
-use std::io::{Read, Write};
-use std::path::{self, Path, PathBuf};
-use std::str::FromStr;
-use std::{fs, io, vec};
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::{fs, io};
 
 use bytes::Buf;
-use color_eyre::eyre::bail;
 use daggy::petgraph;
-use tempfile::tempfile;
-use tracing::{debug, info, trace, warn};
-use tracing_subscriber::fmt::format;
+use tracing::{debug, trace};
 
-use std::process::Command;
-
-use crate::schema_eval::{self, Fetch, Package, Unit};
+use crate::schema_eval::{Fetch, Package, Unit};
 use crate::*;
 
 #[derive(Debug, clap::Args)]

@@ -1,14 +1,13 @@
-use std::path::{self, Path};
-use std::{any, path::PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 
-use diesel::{prelude::*, sql_types::Integer};
-use serde::__private::de;
+use color_eyre::Result;
+use diesel::prelude::*;
 use tracing::{debug, info, trace, warn};
 
 use crate::build;
 use crate::schema_db::store;
 use crate::schema_db::store::dsl::*;
-use color_eyre::Result;
 
 #[derive(Debug, clap::Args)]
 pub struct CliArgs {

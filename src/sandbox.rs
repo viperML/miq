@@ -1,26 +1,20 @@
-use core::panic;
 use std::{
     io::{BufRead, BufReader},
     os::{
         fd::{AsFd, AsRawFd},
         unix::process::CommandExt,
     },
-    path::PathBuf,
-    process::{exit, Command},
+    process::Command,
 };
 
+use color_eyre::{eyre::bail, Result};
 use libc::{prctl, PR_SET_PDEATHSIG, SIGKILL};
 use nix::{
-    mount::{mount, MsFlags},
-    sched::{unshare, CloneFlags},
     sys::wait::{waitpid, WaitStatus},
     unistd::fork,
 };
-use nix::{unistd::pivot_root, NixPath};
 use tempfile::tempdir;
 use tracing::{debug, info};
-
-use color_eyre::{eyre::bail, Result};
 
 #[derive(Debug)]
 pub struct SandBox {}

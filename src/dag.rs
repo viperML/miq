@@ -1,14 +1,14 @@
 use std::path::Path;
 
-use crate::*;
 use color_eyre::Result;
 use daggy::petgraph::dot::{Config, Dot};
 use daggy::petgraph::visit::Topo;
 use daggy::{petgraph, Walker};
 use daggy::{Dag, NodeIndex};
 use schema_eval::Unit;
-use tracing::{trace};
-use tracing_subscriber::fmt::format;
+use tracing::trace;
+
+use crate::*;
 
 #[derive(Debug, Clone)]
 pub struct UnitNode {
@@ -50,7 +50,9 @@ impl Args {
             &[Config::EdgeNoLabel, Config::NodeNoLabel],
             &|_, _| String::new(),
             &|_, (_, weight)| match weight {
-                Unit::PackageUnit(inner) => format!("label = \"{}-{}\" ", inner.name, inner.version),
+                Unit::PackageUnit(inner) => {
+                    format!("label = \"{}-{}\" ", inner.name, inner.version)
+                }
                 Unit::FetchUnit(inner) => format!("label = \"{}\" ", inner.name),
             },
         );

@@ -1,12 +1,6 @@
-use std::{
-    collections::HashMap,
-    fs, io,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, path::PathBuf};
 
 use color_eyre::Result;
-
-use color_eyre::eyre::Context;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 /**
@@ -14,7 +8,7 @@ use serde::{Deserialize, Serialize};
  Wipe cache with:
  rm ~/.config/Code/User/globalStorage/tamasfe.even-better-toml/*
 */ */
-use tracing::{debug, info};
+use tracing::info;
 
 #[derive(Debug, clap::Args)]
 pub struct Args {

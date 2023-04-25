@@ -1,6 +1,6 @@
 [toolchain]
 channel = "stable"
 components = [
-    "rustfmt",
+    # "rustfmt",
     "rust-src",
 ]
