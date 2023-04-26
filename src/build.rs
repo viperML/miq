@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::fs::File;
+use std::os::unix::prelude::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{fs, io};
@@ -101,6 +103,14 @@ fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<()> {
     std::io::copy(content, tempfile)?;
 
     std::fs::copy(tempfile.path(), &path)?;
+
+    if input.executable {
+        // FIXME
+        debug!("Setting exec bit");
+        std::process::Command::new("chmod")
+            .args(&["+x", &path])
+            .output()?;
+    }
 
     db::add(&path)?;
 

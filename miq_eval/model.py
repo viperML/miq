@@ -34,7 +34,7 @@ class Unit(ABC):
         raise NotImplementedError
 
     def __str__(self) -> str:
-        return self.result
+        return f"/miq/store/{self.result}"
 
     @abstractproperty
     def hash(self) -> str:
@@ -48,6 +48,7 @@ class Unit(ABC):
 @dataclass(init=False)
 class Fetch(Unit):
     url: str
+    executable: bool = False
 
     @property
     def name(self) -> str:
@@ -68,6 +69,7 @@ class Fetch(Unit):
             "result": self.result,
             "name": self.name,
             "url": self.url,
+            "executable": self.executable,
             "integrity": "FIXME",
         }
 
@@ -108,7 +110,7 @@ class Package(Unit):
             "name": self.name,
             "version": self.version,
             "script": self.script,
-            "deps": [str(d) for d in self.deps],
+            "deps": [d.result for d in self.deps],
             "env": self.env,
         }
 

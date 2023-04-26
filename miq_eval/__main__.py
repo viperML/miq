@@ -13,7 +13,7 @@ def main(ctx: click.Context, **kwargs: dict[str, Any]):
     unit: Package | Fetch = pkgs.__dict__[ctx.params["unit"]]()
 
     print(f"{repr(unit)=}", file=stderr)
-    print(f"{str(unit)}")
+    print(f"{unit.result}")
 
 
 if __name__ == "__main__":

@@ -90,4 +90,6 @@ pub struct Fetch {
     pub url: String,
     #[educe(Debug(ignore))]
     pub integrity: String,
+    #[educe(Debug(ignore))]
+    pub executable: bool,
 }
