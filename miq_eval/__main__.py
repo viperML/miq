@@ -3,17 +3,17 @@ import click
 from miq_eval import pkgs
 from miq_eval.model import Package, Fetch
 from typing import Any
-import sys
+from sys import stderr
 
 
 @click.command()
-@click.argument("buildable")
+@click.argument("unit")
 @click.pass_context
 def main(ctx: click.Context, **kwargs: dict[str, Any]):
-    target: Package | Fetch = pkgs.__dict__[ctx.params["buildable"]]
+    unit: Package | Fetch = pkgs.__dict__[ctx.params["unit"]]()
 
-    print(f"{repr(target)=}", file=sys.stderr)
-    print(f"{str(target)}")
+    print(f"{repr(unit)=}", file=stderr)
+    print(f"{str(unit)}")
 
 
 if __name__ == "__main__":

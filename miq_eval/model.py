@@ -12,13 +12,6 @@ import toml
 HASHER = hashlib.sha1
 
 
-# def pyhash_to_miqhash(n: int) -> str:
-#     b = struct.pack("n", n)
-#     hasher = hashlib.sha1()
-#     hasher.update(b)
-#     return hasher.hexdigest()
-
-
 def flatten(L: Iterable[Any]) -> Iterator[Any]:
     for item in L:
         try:
@@ -27,9 +20,9 @@ def flatten(L: Iterable[Any]) -> Iterator[Any]:
             yield item
 
 
-@dataclass
+@dataclass(init=False)
 class Unit(ABC):
-    def __post_init__(self):
+    def __init__(self):
         path = Path(f"/miq/eval/{self.result}.toml")
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
@@ -52,7 +45,7 @@ class Unit(ABC):
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(init=False)
 class Fetch(Unit):
     url: str
 
@@ -79,7 +72,7 @@ class Fetch(Unit):
         }
 
 
-@dataclass(frozen=False)
+@dataclass(init=False)
 class Package(Unit):
     name: str
     version: str
@@ -99,7 +92,10 @@ class Package(Unit):
             self.script,
             *[elem for elem in self.env.keys()],
             *[elem for elem in self.env.values()],
+            *[elem.hash for elem in self.deps],
         ]
+
+        print(f"{elems=}")
 
         h = HASHER()
         for elem in elems:
@@ -120,4 +116,4 @@ class Package(Unit):
 
     @property
     def script(self) -> str:
-        return textwrap.dedent(self.script_fn(self))
+        return textwrap.dedent(self.script_fn()) # type: ignore
