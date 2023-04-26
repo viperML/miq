@@ -13,15 +13,15 @@ use crate::*;
 
 #[derive(Debug, clap::Args)]
 pub struct Args {
-    /// Path of the buildable
+    /// Unitref to build
     #[arg()]
-    file: PathBuf,
+    unit_ref: String,
 
     /// Don't show build output
     #[arg(long, short)]
     quiet: bool,
 
-    /// Rebuild path even if it already exists
+    /// Rebuild even if it already exists
     #[arg(long, short)]
     rebuild: bool,
 }
@@ -53,7 +53,8 @@ pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
 
 impl Args {
     pub fn main(&self) -> Result<()> {
-        let result_dag = eval::evaluate_dag(&self.file)?;
+        // let result_dag = eval::evaluate_dag(&self.unit)?;
+        let result_dag = eval::dag(eval::reference(&self.unit_ref)?)?;
 
         let sorted_dag = petgraph::algo::toposort(&result_dag, None)
             .expect("DAG was not acyclic!")
@@ -93,6 +94,7 @@ fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<()> {
     debug!(?tempfile);
 
     let client = reqwest::blocking::Client::new();
+    trace!("Fetching file, please wait");
     let response = client.get(&input.url).send()?;
     let content = &mut response.bytes()?.reader();
     std::io::copy(content, tempfile)?;

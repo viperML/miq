@@ -33,8 +33,8 @@ type UnitDag = Dag<Unit, ()>;
 
 #[derive(Debug, clap::Args)]
 pub struct Args {
-    /// Either Unit.toml or name to evaluate
-    target: String,
+    /// Unitref to evaluate
+    unit_ref: String,
     /// Write the resulting graph to this file
     #[arg(short, long)]
     output_file: Option<PathBuf>,
@@ -42,13 +42,7 @@ pub struct Args {
 
 impl Args {
     pub fn main(&self) -> Result<()> {
-        let unit_path = if self.target.starts_with("/miq/eval") {
-            PathBuf::from(&self.target)
-        } else {
-            ffi::eval(&self.target)?
-        };
-
-        let dag = evaluate_dag(unit_path)?;
+        let dag = dag(reference(&self.unit_ref)?)?;
 
         let dot = Dot::with_attr_getters(
             // -
@@ -72,8 +66,20 @@ impl Args {
     }
 }
 
+pub fn reference<S: AsRef<str>>(input: S) -> Result<PathBuf> {
+    let input = input.as_ref();
+
+    let result = if input.starts_with("/miq/eval") {
+        PathBuf::from(input)
+    } else {
+        ffi::eval(input)?
+    };
+
+    Ok(result)
+}
+
 #[tracing::instrument(skip_all, ret, level = "debug")]
-pub fn evaluate_dag<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<UnitDag> {
+pub fn dag<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<UnitDag> {
     let path = path.as_ref();
 
     let mut dag = UnitNodeDag::new();

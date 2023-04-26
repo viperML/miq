@@ -100,8 +100,8 @@ pub fn list() -> Result<()> {
 
     let p: Vec<StorePath> = store.limit(5).load::<StorePath>(conn)?;
 
-    for post in p {
-        debug!("{:?}", post);
+    for elem in p {
+        info!(?elem);
     }
 
     Ok(())

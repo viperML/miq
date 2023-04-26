@@ -6,12 +6,12 @@ pub struct CliParser {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum MiqCommands {
-    /// Generate the package schema
+    /// Generate the unit schema
     Schema(crate::schema_eval::Args),
-    /// Build a package into the store
+    /// Build a unit into the store
     Build(crate::build::Args),
     /// Query and operate on the store database
     Store(crate::db::CliArgs),
-    /// Evaluate a unit graph
+    /// Evaluate a unit
     Eval(crate::eval::Args),
 }
