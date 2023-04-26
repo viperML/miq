@@ -56,8 +56,8 @@ class bootstrap(Package):
 
 
 class test(Package):
-    name = "bootstrap"
-    version = "none"
+    name = "test"
+    version = "0.0.0"
     deps = [
         bootstrap(),
     ]
