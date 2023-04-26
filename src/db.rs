@@ -11,7 +11,7 @@ use crate::build;
 use crate::schema_db::store;
 use crate::schema_db::store::dsl::*;
 
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[derive(Debug, clap::Args)]
 pub struct CliArgs {

@@ -34,6 +34,7 @@
             "Cargo.toml"
             "Cargo.lock"
             "build.rs"
+            "migrations"
           ];
         };
 
