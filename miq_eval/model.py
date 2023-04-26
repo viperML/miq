@@ -95,8 +95,6 @@ class Package(Unit):
             *[elem.hash for elem in self.deps],
         ]
 
-        print(f"{elems=}")
-
         h = HASHER()
         for elem in elems:
             elem = elem.encode()
