@@ -28,7 +28,7 @@ pub enum CliSubcommand {
     Add(AddArgs),
     /// Check if a path is registered
     IsPath(IsPathArgs),
-    /// Remove a path
+    /// Manually remove a path
     #[command(visible_alias("rm"))]
     Remove(AddArgs),
 }

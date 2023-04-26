@@ -5,6 +5,7 @@ pub struct CliParser {
 }
 
 #[derive(clap::Subcommand, Debug)]
+#[clap(disable_help_subcommand(true))]
 pub enum MiqCommands {
     /// Generate the unit schema
     Schema(crate::schema_eval::Args),
