@@ -77,8 +77,8 @@ impl Args {
     }
 }
 
-#[tracing::instrument(skip(build_args), ret, level = "info")]
-fn build_fetch(input: &Fetch, build_args: &Args, rebuild: bool) -> Result<()> {
+#[tracing::instrument(skip(_build_args), ret, level = "info")]
+fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<()> {
     let path = format!("/miq/store/{}", input.result);
 
     if db::is_db_path(&path)? {
@@ -104,8 +104,8 @@ fn build_fetch(input: &Fetch, build_args: &Args, rebuild: bool) -> Result<()> {
     Ok(())
 }
 
-#[tracing::instrument(skip(build_args), ret, level = "info")]
-fn build_package(input: &Package, build_args: &Args, rebuild: bool) -> Result<()> {
+#[tracing::instrument(skip(_build_args), ret, level = "info")]
+fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<()> {
     let path = format!("/miq/store/{}", input.result);
 
     if db::is_db_path(&path)? {
