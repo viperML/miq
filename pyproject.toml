@@ -9,6 +9,7 @@ dependencies = [
     "click"
 ]
 dynamic = ["version"]
+scripts.miq_eval = "miq_eval:miq_eval"
 
 # [project.scripts]
 # my-script = "my_package.module:function"
