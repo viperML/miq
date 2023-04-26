@@ -13,5 +13,5 @@ pub enum MiqCommands {
     /// Query and operate on the store database
     Store(crate::db::CliArgs),
     /// Evaluate a unit graph
-    Eval(crate::dag::Args),
+    Eval(crate::eval::Args),
 }

@@ -33,7 +33,8 @@ type UnitDag = Dag<Unit, ()>;
 
 #[derive(Debug, clap::Args)]
 pub struct Args {
-    path: PathBuf,
+    /// Either Unit.toml or name to evaluate
+    target: String,
     /// Write the resulting graph to this file
     #[arg(short, long)]
     output_file: Option<PathBuf>,
@@ -41,7 +42,13 @@ pub struct Args {
 
 impl Args {
     pub fn main(&self) -> Result<()> {
-        let dag = evaluate_dag(&self.path)?;
+        let unit_path = if self.target.starts_with("/miq/eval") {
+            PathBuf::from(&self.target)
+        } else {
+            ffi::eval(&self.target)?
+        };
+
+        let dag = evaluate_dag(unit_path)?;
 
         let dot = Dot::with_attr_getters(
             // -

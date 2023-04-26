@@ -4,8 +4,9 @@ extern crate educe;
 
 mod build;
 mod cli;
-mod dag;
 mod db;
+mod eval;
+mod ffi;
 mod sandbox;
 mod schema_db;
 mod schema_eval;
