@@ -114,4 +114,4 @@ class Package(Unit):
 
     @property
     def script(self) -> str:
-        return textwrap.dedent(self.script_fn()) # type: ignore
+        return textwrap.dedent(self.script_fn())  # type: ignore
