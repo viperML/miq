@@ -38,7 +38,7 @@ impl SandBox {
 
                 for line in reader.lines() {
                     let line = line?;
-                    eprintln!("{}", line);
+                    eprintln!(":: {}", line);
                 }
 
                 let child_status = waitpid(child, None);
@@ -77,7 +77,7 @@ impl SandBox {
 
                 println!("Workdir ready");
 
-                let result = cmd.exec();
+                let result = cmd.env("HOME", &workdir) .exec();
 
                 // Only run if execution is abnormal, otherwise process is transfered
                 bail!(result);

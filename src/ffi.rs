@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::{Command, Stdio, Output};
 
 use color_eyre::Result;
 use tracing::{info, trace};
@@ -17,6 +17,10 @@ pub fn eval<S: AsRef<str> + std::fmt::Debug>(name: S) -> Result<PathBuf> {
         .output()?;
 
     trace!(?output);
+
+    // match output {
+    //     Output { status: ExitStatus}
+    // }
 
     let s = std::str::from_utf8(&output.stdout)?.trim();
 

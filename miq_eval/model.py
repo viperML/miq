@@ -57,11 +57,13 @@ class Fetch(Unit):
     @property
     def result(self) -> str:
         return f"{self.name}-{self.hash}"
+        # return f"{self.hash}-{self.name}"
 
     @property
     def hash(self) -> str:
         h = HASHER()
         h.update(self.url.encode())
+        h.update(bytes(self.executable))
         return h.hexdigest()
 
     def to_spec(self) -> dict[str, Any]:

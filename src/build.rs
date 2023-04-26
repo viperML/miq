@@ -72,9 +72,13 @@ impl Args {
         for (i, unit) in sorted_dag.iter().enumerate() {
             let rebuild = self.rebuild && i == n_units - 1;
             match unit {
-                Unit::PackageUnit(inner) => build_package(inner, self, rebuild),
-                Unit::FetchUnit(inner) => build_fetch(inner, self, rebuild),
-            }?;
+                Unit::PackageUnit(inner) => {
+                    build_package(inner, self, rebuild)?;
+                }
+                Unit::FetchUnit(inner) => {
+                    build_fetch(inner, self, rebuild)?;
+                }
+            };
         }
 
         Ok(())
@@ -82,14 +86,14 @@ impl Args {
 }
 
 #[tracing::instrument(skip(_build_args), ret, level = "info")]
-fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<()> {
-    let path = format!("/miq/store/{}", input.result);
+fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<PathBuf> {
+    let path = PathBuf::from(format!("/miq/store/{}", input.result));
 
     if db::is_db_path(&path)? {
         if rebuild {
             db::remove(&path)?;
         } else {
-            return Ok(());
+            return Ok(path.to_owned());
         }
     }
 
@@ -108,24 +112,24 @@ fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<()> {
         // FIXME
         debug!("Setting exec bit");
         std::process::Command::new("chmod")
-            .args(&["+x", &path])
+            .args(&["+x", &path.to_str().unwrap()])
             .output()?;
     }
 
     db::add(&path)?;
 
-    Ok(())
+    Ok(path.to_owned())
 }
 
 #[tracing::instrument(skip(_build_args), ret, err, level = "info")]
-fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<()> {
+fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<PathBuf> {
     let path = PathBuf::from(format!("/miq/store/{}", input.result));
 
     if db::is_db_path(&path)? {
         if rebuild {
             db::remove(&path)?;
         } else {
-            return Ok(());
+            return Ok(path.to_owned());
         }
     }
 
@@ -133,7 +137,8 @@ fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<(
     miq_env.insert("miq_out", &path.to_str().unwrap());
 
     // FIXME
-    miq_env.insert("HOME", "/home/ayats");
+    // miq_env.insert("HOME", "/home/ayats");
+    // miq_env.insert("PATH", "/var/empty");
     debug!(?miq_env);
 
     let mut cmd = Command::new("/bin/sh");
@@ -153,5 +158,5 @@ fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<(
 
     db::add(&path)?;
 
-    Ok(())
+    Ok(path.to_owned())
 }
