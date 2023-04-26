@@ -5,6 +5,7 @@ use std::process::Command;
 use std::{fs, io};
 
 use bytes::Buf;
+use color_eyre::eyre::{bail, Context};
 use daggy::petgraph;
 use tracing::{debug, trace};
 
@@ -106,9 +107,9 @@ fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<()> {
     Ok(())
 }
 
-#[tracing::instrument(skip(_build_args), ret, level = "info")]
+#[tracing::instrument(skip(_build_args), ret, err, level = "info")]
 fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<()> {
-    let path = format!("/miq/store/{}", input.result);
+    let path = PathBuf::from(format!("/miq/store/{}", input.result));
 
     if db::is_db_path(&path)? {
         if rebuild {
@@ -119,7 +120,7 @@ fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<(
     }
 
     let mut miq_env: HashMap<&str, &str> = HashMap::new();
-    miq_env.insert("miq_out", &path);
+    miq_env.insert("miq_out", &path.to_str().unwrap());
 
     // FIXME
     miq_env.insert("HOME", "/home/ayats");
@@ -133,6 +134,12 @@ fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<(
 
     let sandbox = sandbox::SandBox {};
     sandbox.run(&mut cmd)?;
+
+    match path.try_exists().wrap_err("Failed to produce an output") {
+        Ok(true) => {}
+        Ok(false) => bail!("Output path doesn't exist: {:?}", path),
+        Err(e) => bail!(e),
+    }
 
     db::add(&path)?;
 
