@@ -53,7 +53,10 @@ class Unit(ABC):
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
             # f.write("#:schema /miq/eval-schema.json\n")
-            f.write(toml.dumps(self.to_spec()))
+            dump = toml.dumps(self.to_spec())
+            if MGC in dump:
+                raise Exception("Found magic string in result, it shouldn't be there")
+            f.write(dump)
 
     @property
     def result(self) -> str:
@@ -123,7 +126,7 @@ class Package(Unit):
             self.script,
             *[elem for elem in self._env.keys()],
             *[elem for elem in self._env.values()],
-            *self._deps
+            *self._deps,
         }
 
         h = HASHER()
