@@ -5,14 +5,22 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Module",
+            "name": "Python: miq_eval",
             "type": "python",
             "request": "launch",
             "module": "miq_eval",
             "justMyCode": true,
             "args": [
-                "bootstrap_source"
+                "bootstrap"
             ]
+        },
+        {
+            "name": "Python: miq_eval.model",
+            "type": "python",
+            "request": "launch",
+            "module": "miq_eval.model",
+            "justMyCode": true,
+            "args": []
         }
     ]
 }

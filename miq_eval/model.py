@@ -1,15 +1,41 @@
+from copy import deepcopy
 import hashlib
-import struct
 import textwrap
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, List, Self
+from typing import Any, Callable, Iterable, Iterator, List, Self, Set
 from urllib.parse import urlparse
+import re
 
 import toml
 
 HASHER = hashlib.sha1
+
+# Magic character for string interpolation
+MGC = "ᛈ"
+PATTERN = re.compile(r"(?<=ᛈ>).*?(?=<ᛈ)")
+
+
+def eval_string(input: str) -> tuple[str, List[str]]:
+    mgc_len = len(MGC)
+    extra_deps: set[str] = set()
+
+    while elems := [e for e in re.finditer(PATTERN, input)]:
+        elem = elems[0]
+        result = elem.group()
+        extra_deps.add(result)
+
+        start = elem.start() - mgc_len - 1
+        end = elem.end() + mgc_len + 1
+
+        input = input[:start] + f"/miq/store/{result}" + input[end:]
+
+    return (input, list(extra_deps))
+
+
+if __name__ == "__main__":
+    print(eval_string("Helᛈᛈoᛈᛈ World"))
 
 
 def flatten(L: Iterable[Any]) -> Iterator[Any]:
@@ -34,7 +60,8 @@ class Unit(ABC):
         raise NotImplementedError
 
     def __str__(self) -> str:
-        return f"/miq/store/{self.result}"
+        # return f"/miq/store/{self.result}"
+        return f"{MGC}>{self.result}<{MGC}"
 
     @abstractproperty
     def hash(self) -> str:
@@ -90,14 +117,14 @@ class Package(Unit):
 
     @property
     def hash(self) -> str:
-        elems = [
+        elems = {
             self.name,
             self.version,
             self.script,
-            *[elem for elem in self.env.keys()],
-            *[elem for elem in self.env.values()],
-            *[elem.hash for elem in self.deps],
-        ]
+            *[elem for elem in self._env.keys()],
+            *[elem for elem in self._env.values()],
+            *self._deps
+        }
 
         h = HASHER()
         for elem in elems:
@@ -106,16 +133,39 @@ class Package(Unit):
 
         return h.hexdigest()
 
+    @property
+    def _deps(self) -> List[str]:
+        result: Set[str] = set()
+        for d in self.deps:
+            if isinstance(d, str):
+                result.add(d)
+            else:
+                result.add(d.result)
+        return list(result)
+
+    @property
+    def _env(self) -> dict[str, str]:
+        result: dict[str, str] = {}
+        for k, v in self.env.items():
+            text, extra_deps = eval_string(v)
+            result[k] = text
+            self.deps.extend(extra_deps)  # type:ignore
+        return result
+
     def to_spec(self) -> dict[str, Any]:
         return {
             "result": self.result,
             "name": self.name,
             "version": self.version,
             "script": self.script,
-            "deps": [d.result for d in self.deps],
-            "env": self.env,
+            "env": self._env,
+            # last
+            "deps": self._deps,
         }
 
     @property
     def script(self) -> str:
-        return textwrap.dedent(self.script_fn())  # type: ignore
+        text: str = self.script_fn()  # type: ignore
+        final_text, extra_deps = eval_string(text)  # type: ignore
+        self.deps.extend(extra_deps)  # type: ignore
+        return textwrap.dedent(final_text)  # type: ignore

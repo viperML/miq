@@ -24,12 +24,7 @@ class unpack_bootstrap_tools(Fetch):
 class bootstrap(Package):
     name = "bootstrap"
     version = "0.1.0"
-    deps = [
-        bootstrap_source(),
-        toybox(),
-        busybox(),
-        unpack_bootstrap_tools(),
-    ]
+    deps = []
     env = {}
 
     def script_fn(self):
@@ -58,9 +53,7 @@ class bootstrap(Package):
 class test(Package):
     name = "test"
     version = "0.0.0"
-    deps = [
-        bootstrap(),
-    ]
+    deps = []
     env = {"PATH": f"{bootstrap()}/bin"}
 
     def script_fn(self):
