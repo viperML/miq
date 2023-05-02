@@ -39,3 +39,7 @@ tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 daggy = "0.8.0"
 educe = "0.4.21"
 diesel_migrations = { version = "2.0.0", features = ["sqlite"] }
+mlua = { version = "0.8.8", features = ["serialize", "lua54", "vendored", "macros"] }
+sha2 = "0.10.6"
+fnv = "1.0.7"
+url = { version = "2.3.1", features = ["serde"] }

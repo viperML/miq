@@ -7,6 +7,7 @@ mod cli;
 mod db;
 mod eval;
 mod ffi;
+mod lua;
 mod sandbox;
 mod schema_db;
 mod schema_eval;
@@ -48,5 +49,6 @@ fn main() -> Result<()> {
         cli::MiqCommands::Build(args) => args.main(),
         cli::MiqCommands::Store(args) => db::cli_dispatch(args),
         cli::MiqCommands::Eval(args) => args.main(),
+        cli::MiqCommands::Lua(args) => args.main(),
     }
 }
