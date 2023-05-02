@@ -93,7 +93,7 @@ fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<PathB
         if rebuild {
             db::remove(&path)?;
         } else {
-            return Ok(path.to_owned());
+            return Ok(path);
         }
     }
 
@@ -112,13 +112,13 @@ fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<PathB
         // FIXME
         debug!("Setting exec bit");
         std::process::Command::new("chmod")
-            .args(&["+x", &path.to_str().unwrap()])
+            .args(["+x", (path.to_str().unwrap())])
             .output()?;
     }
 
     db::add(&path)?;
 
-    Ok(path.to_owned())
+    Ok(path)
 }
 
 #[tracing::instrument(skip(_build_args), ret, err, level = "info")]
@@ -129,12 +129,12 @@ fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<P
         if rebuild {
             db::remove(&path)?;
         } else {
-            return Ok(path.to_owned());
+            return Ok(path);
         }
     }
 
     let mut miq_env: HashMap<&str, &str> = HashMap::new();
-    miq_env.insert("miq_out", &path.to_str().unwrap());
+    miq_env.insert("miq_out", path.to_str().unwrap());
 
     // FIXME
     // miq_env.insert("HOME", "/home/ayats");
@@ -158,5 +158,5 @@ fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<P
 
     db::add(&path)?;
 
-    Ok(path.to_owned())
+    Ok(path)
 }

@@ -77,7 +77,7 @@ impl SandBox {
 
                 println!("Workdir ready");
 
-                let result = cmd.env("HOME", &workdir) .exec();
+                let result = cmd.env("HOME", workdir) .exec();
 
                 // Only run if execution is abnormal, otherwise process is transfered
                 bail!(result);

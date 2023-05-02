@@ -10,7 +10,7 @@ pub fn eval<S: AsRef<str> + std::fmt::Debug>(name: S) -> Result<PathBuf> {
     let name = name.as_ref();
 
     let output = Command::new("python3")
-        .args(&["-m", "miq_eval", name])
+        .args(["-m", "miq_eval", name])
         .stdin(Stdio::null())
         .stderr(Stdio::inherit())
         .stdout(Stdio::piped())
