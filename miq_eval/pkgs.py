@@ -50,10 +50,26 @@ class bootstrap(Package):
         """
 
 
-class test(Package):
-    name = "test"
+class test1(Package):
+    name = "test1"
     version = "0.0.0"
-    deps = []
+    deps = [
+        toybox()
+    ]
+    env = {"PATH": f"{bootstrap()}/bin"}
+
+    def script_fn(self):
+        return """
+            set -eux
+            printenv > $miq_out
+        """
+
+class test2(Package):
+    name = "test2"
+    version = "0.0.0"
+    deps = [
+        test1()
+    ]
     env = {"PATH": f"{bootstrap()}/bin"}
 
     def script_fn(self):

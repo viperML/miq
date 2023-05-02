@@ -1,11 +1,12 @@
 use std::path::Path;
 
 use color_eyre::Result;
+use daggy::petgraph::algo::toposort;
 use daggy::petgraph::dot::{Config, Dot};
 use daggy::petgraph::visit::Topo;
 use daggy::{petgraph, Dag, NodeIndex, Walker};
 use schema_eval::Unit;
-use tracing::trace;
+use tracing::{info, trace};
 
 use crate::*;
 
@@ -61,6 +62,10 @@ impl Args {
         if let Some(path) = &self.output_file {
             std::fs::write(path, format!("{:?}", dot))?;
         }
+
+        let schedule = toposort(&dag, None).expect("Couldn't sort dag");
+        let schedule: Vec<_> = schedule.iter().map(|&n| dag.node_weight(n).unwrap()).collect();
+        info!(?schedule);
 
         Ok(())
     }
