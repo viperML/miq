@@ -3,5 +3,8 @@
     "ruff.path": [
         "ruff"
     ],
-    "python.defaultInterpreterPath": ".venv/bin/python3"
+    "python.defaultInterpreterPath": ".venv/bin/python3",
+    "files.exclude": {
+        "miq/store/**": true,
+    }
 }
