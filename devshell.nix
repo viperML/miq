@@ -30,6 +30,7 @@
           pkgs.diesel-cli
           pkgs.sqlite-interactive.dev
           pkgs.graph-easy
+          pkgs.lua5_4
 
           venv
         ];

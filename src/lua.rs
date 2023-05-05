@@ -7,7 +7,7 @@ use color_eyre::eyre::bail;
 use color_eyre::Result;
 use mlua::prelude::*;
 use mlua::serde::de;
-use mlua::{chunk, Table, Value};
+use mlua::{chunk, StdLib, Table, Value};
 use serde::{Deserialize, Serialize};
 use sha2::digest::Update;
 use sha2::{Digest, Sha256};
@@ -47,13 +47,27 @@ pub fn get_or_create_module<'lua>(lua: &'lua Lua, name: &str) -> Result<mlua::Ta
 #[tracing::instrument(level = "trace")]
 fn trace_table(t: Table) {
     for (key, value) in t.pairs::<LuaValue, LuaValue>().flatten() {
-        trace!(?key, ?value);
+        if let Value::String(key) = key {
+            let key = key.to_str().unwrap();
+            trace!(?key, ?value);
+        } else {
+            trace!(?key, ?value);
+        }
     }
 }
 
+static LUA_INSPECT: &'static str = std::include_str!("inspect.lua");
+
 impl Args {
     pub fn main(&self) -> Result<()> {
-        let lua = Lua::new();
+        let lua = unsafe {
+            Lua::unsafe_new_with(
+                // Needed for f-string shenanigans
+                StdLib::ALL_SAFE | StdLib::DEBUG,
+                LuaOptions::new().catch_rust_panics(false),
+            )
+        };
+
         let globals = lua.globals();
 
         let module = get_or_create_module(&lua, "miq")?;
@@ -66,13 +80,7 @@ impl Args {
             })?,
         )?;
 
-        // lua.load()
-        let input_contents = std::fs::read_to_string(&self.path)?;
-        trace!(?input_contents);
-
-        let eval_result: Table = lua.load(&input_contents).eval()?;
-
-        // globals.set("print_table", lua_print_table)?;
+        globals.set("inspect", lua.load(LUA_INSPECT).eval::<Value>()?)?;
 
         module.set(
             "fetch",
@@ -87,52 +95,65 @@ impl Args {
             })?,
         )?;
 
-        // let lua_mk_package = lua.create_function(|ctx, input: LuaValue| {
-        //     // -
-        //     let deser = ctx.from_value::<PackageInput>(input)?;
-        //     let deser = compute_package(deser);
-        //     let deser = deser.expect("FATAL");
+        // module.set("f", lua.create_function(lua_f_string)?)?;
+        lua.load(chunk! {
 
-        //     trace!(?deser);
+function copy(t)
+  if type(t) == "table" then
+    local ans = {}
+    for k,v in next,t do ans[ k ] = v end
+    return ans
+  end
+  return t
+end
 
-        //     Ok(deser)
-        // })?;
+function f(s)
+  local env = copy(_ENV)
+  local i,k,v,fmt = 0
+  repeat
+    i = i + 1
+    k,v = debug.getlocal(2,i)
+    if k ~= nil then env[k] = v end
+  until k == nil
+  print(inspect(env))
+end
 
-        // lua.load(chunk! {
-        //     mqf = {
-        //         mk_fetch = $lua_mk_fetch,
-        //         mk_package = $lua_mk_package,
-        //     }
-        // })
-        // .exec()?;
+        }).exec()?;
 
-        // lua.load(chunk! {
-        //     // pkgs.lua
-        //     local mqf = require "miq"
-        //     local mk_fetch = mqf.mk_fetch
-        //     local mk_package = mqf.mk_package
-
-        //     pkg_test = mk_fetch {
-        //         url = "https://wdtz.org/files/gywxhjgl70sxippa0pxs0vj5qcgz1wi8-stdenv-bootstrap-tools/on-server/bootstrap-tools.tar.xz"
-        //     }
-
-        //     busybox = mk_fetch {
-        //         url = "https://wdtz.org/files/gywxhjgl70sxippa0pxs0vj5qcgz1wi8-stdenv-bootstrap-tools/on-server/busybox",
-        //         executable = true,
-        //     }
-
-        //     bootstrap = mk_package {
-        //         name = "bootstrap",
-        //         version = "0.1.0",
-        //     }
-
-        //     print(pkg_test)
-        // })
-        // .exec()?;
+        let eval_result: Table = lua.load(&std::fs::read_to_string(&self.path)?).eval()?;
+        trace!(?eval_result);
 
         Ok(())
     }
 }
+
+// #[tracing::instrument(level = "debug", ret, err)]
+// fn lua_f_string(ctx: &Lua, input: LuaString) -> Result<LuaNumber, LuaError> {
+//     let globals = ctx.globals();
+
+//     ctx.load(chunk! {
+// function copy(t)
+//   if type(t) == "table" then
+//     local ans = {}
+//     for k,v in next,t do ans[ k ] = v end
+//     return ans
+//   end
+//   return t
+// end
+
+// local env = copy(_ENV)
+//   local i,k,v,fmt = 0
+//   repeat
+//     i = i + 1
+//     k,v = debug.getlocal(2,i)
+//     if k ~= nil then env[k] = v end
+//   until k == nil
+
+//   print(inspect(env))
+//     }).exec()?;
+
+//     Ok(0.0)
+// }
 
 #[derive(Debug, Serialize, Deserialize, Hash)]
 struct FetchInput {
@@ -148,6 +169,14 @@ struct PackageInput {
     script: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Hash)]
+struct DepsString {
+    value: String,
+    deps: Vec<String>,
+}
+
+impl LuaUserData for DepsString {}
+
 fn hash_string<H: Hash>(input: &H) -> String {
     let mut hasher = fnv::FnvHasher::default();
     input.hash(&mut hasher);
@@ -156,6 +185,7 @@ fn hash_string<H: Hash>(input: &H) -> String {
     s
 }
 
+#[tracing::instrument(level = "trace", ret, err)]
 fn compute_fetch(input: FetchInput) -> Result<Unit> {
     let name = input
         .url
@@ -184,6 +214,7 @@ fn compute_fetch(input: FetchInput) -> Result<Unit> {
     Ok(Unit::FetchUnit(result))
 }
 
+#[tracing::instrument(level = "trace", ret, err)]
 fn compute_package(input: PackageInput) -> Result<Unit> {
     let hash = hash_string(&input);
     let result = format!("{}-{}", input.name, hash);

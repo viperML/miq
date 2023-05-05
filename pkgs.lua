@@ -1,8 +1,29 @@
 local miq = require "miq"
+local fetch = miq.fetch
+-- local f = miq.f
 
-return {
-    bootstrap = miq.fetch {
-        url = "https://wdtz.org/files/gywxhjgl70sxippa0pxs0vj5qcgz1wi8-stdenv-bootstrap-tools/on-server/bootstrap-tools.tar.xz"
-    },
-    b2 = bootstrap
+local pkgs = {}
+
+pkgs.bootstrap_tools = fetch {
+    url = "https://wdtz.org/files/gywxhjgl70sxippa0pxs0vj5qcgz1wi8-stdenv-bootstrap-tools/on-server/bootstrap-tools.tar.xz"
 }
+
+pkgs.busybox = fetch {
+    url = "https://wdtz.org/files/gywxhjgl70sxippa0pxs0vj5qcgz1wi8-stdenv-bootstrap-tools/on-server/busybox",
+    executable = true
+}
+
+pkgs.toybox = fetch {
+    -- FIXME use static url
+    url = "http://landley.net/toybox/bin/toybox-x86_64",
+    executable = true
+}
+
+pkgs.unpack_bootstrap_tools = fetch {
+    url = "https://raw.githubusercontent.com/NixOS/nixpkgs/d6b863fd9b7bb962e6f9fdf292419a775e772891/pkgs/stdenv/linux/bootstrap-tools-musl/scripts/unpack-bootstrap-tools.sh",
+    executable = true
+}
+
+pkgs.test = f"Hello World"
+
+return pkgs
