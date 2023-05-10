@@ -3,7 +3,7 @@ use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::ptr::hash;
 
-use color_eyre::eyre::bail;
+use color_eyre::eyre::{bail, Context};
 use color_eyre::Result;
 use mlua::prelude::*;
 use mlua::serde::de;
@@ -58,6 +58,19 @@ fn trace_table(t: Table) {
 
 static LUA_INSPECT: &'static str = std::include_str!("inspect.lua");
 
+/// Add some utility modules to be require-able
+fn preload_modules(lua: &Lua) -> LuaResult<()> {
+    let globals = lua.globals();
+
+    let package: Table = globals.get("package")?;
+    let loaded: Table = package.get("loaded")?;
+
+    let inspect: Value = lua.load(LUA_INSPECT).eval()?;
+    loaded.set("inspect", inspect)?;
+
+    Ok(())
+}
+
 impl Args {
     pub fn main(&self) -> Result<()> {
         let lua = unsafe {
@@ -69,6 +82,7 @@ impl Args {
         };
 
         let globals = lua.globals();
+        preload_modules(&lua)?;
 
         let module = get_or_create_module(&lua, "miq")?;
 
@@ -80,48 +94,63 @@ impl Args {
             })?,
         )?;
 
-        globals.set("inspect", lua.load(LUA_INSPECT).eval::<Value>()?)?;
-
         module.set(
             "fetch",
-            lua.create_function(|ctx, input: LuaValue| {
+            lua.create_function(|ctx, input: Value| {
                 let deser = ctx.from_value::<FetchInput>(input)?;
-                let deser = compute_fetch(deser);
-                let deser = deser.expect("FATAL");
-
-                trace!(?deser);
-
+                let deser = Unit::try_from(deser)?;
                 Ok(deser)
             })?,
         )?;
 
+        module.set(
+            "package",
+            lua.create_function(|ctx, input: Value| {
+                let deser: PackageInput = ctx.from_value(input)?;
+                let unit = Unit::try_from(deser)?;
+                Ok(unit)
+            })?,
+        )?;
+
         // module.set("f", lua.create_function(lua_f_string)?)?;
-        lua.load(chunk! {
+        // lua.load(chunk! {
+        //     local inspect = require "inspect"
 
-function copy(t)
-  if type(t) == "table" then
-    local ans = {}
-    for k,v in next,t do ans[ k ] = v end
-    return ans
-  end
-  return t
-end
+        // function copy(t)
+        //   if type(t) == "table" then
+        //     local ans = {}
+        //     for k,v in next,t do ans[ k ] = v end
+        //     return ans
+        //   end
+        //   return t
+        // end
 
-function f(s)
-  local env = copy(_ENV)
-  local i,k,v,fmt = 0
-  repeat
-    i = i + 1
-    k,v = debug.getlocal(2,i)
-    if k ~= nil then env[k] = v end
-  until k == nil
-  print(inspect(env))
-end
+        // function f(s)
+        //   local env = copy(_ENV)
+        //   local i,k,v,fmt = 0
+        //   repeat
+        //     i = i + 1
+        //     k,v = debug.getlocal(2,i)
+        //     if k ~= nil then env[k] = v end
+        //   until k == nil
+        //   print(inspect(env))
+        // end
 
-        }).exec()?;
+        //         })
+        // .exec()?;
 
         let eval_result: Table = lua.load(&std::fs::read_to_string(&self.path)?).eval()?;
-        trace!(?eval_result);
+
+        let inspection = lua
+            .load(chunk! {
+                local inspect = require "inspect"
+                return inspect($eval_result)
+            })
+            .eval::<LuaString>()?
+            .to_str()?
+            .to_owned();
+
+        info!("{}", inspection);
 
         Ok(())
     }
@@ -185,55 +214,63 @@ fn hash_string<H: Hash>(input: &H) -> String {
     s
 }
 
-#[tracing::instrument(level = "trace", ret, err)]
-fn compute_fetch(input: FetchInput) -> Result<Unit> {
-    let name = input
-        .url
-        .path_segments()
-        .expect("URL doesn't have segments")
-        .last()
-        .unwrap()
-        .to_owned();
-
-    let hash = hash_string(&input);
-    let result = format!("{}-{}", name, hash);
-    let path = format!("/miq/eval/{}.toml", result);
-    trace!(?path);
-
-    let result = Fetch {
-        result,
-        name,
-        url: input.url.to_string(),
-        integrity: String::from("FIXME"),
-        executable: input.executable.unwrap_or_default(),
-    };
-
-    let serialized = toml::to_string_pretty(&result)?;
-    std::fs::write(path, serialized)?;
-
-    Ok(Unit::FetchUnit(result))
-}
-
-#[tracing::instrument(level = "trace", ret, err)]
-fn compute_package(input: PackageInput) -> Result<Unit> {
-    let hash = hash_string(&input);
-    let result = format!("{}-{}", input.name, hash);
-    let path = format!("/miq/eval/{}.toml", result);
-    trace!(?path);
-
-    let result = Package {
-        result,
-        name: input.name,
-        version: input.version.unwrap_or_default(),
-        deps: input.deps.unwrap_or_default(),
-        script: input.script.unwrap_or_default(),
-        env: HashMap::new(),
-    };
-
-    let serialized = toml::to_string_pretty(&result)?;
-    std::fs::write(path, serialized)?;
-
-    Ok(Unit::PackageUnit(result))
-}
-
 impl LuaUserData for Unit {}
+
+impl TryFrom<FetchInput> for Unit {
+    type Error = LuaError;
+
+    #[tracing::instrument(level = "trace", ret, err)]
+    fn try_from(value: FetchInput) -> std::result::Result<Self, Self::Error> {
+        let name = value
+            .url
+            .path_segments()
+            .expect("URL doesn't have segments")
+            .last()
+            .unwrap()
+            .to_owned();
+
+        let hash = hash_string(&value);
+        let result = format!("{}-{}", name, hash);
+        // let path = format!("/miq/eval/{}.toml", result);
+        // trace!(?path);
+
+        let result = Fetch {
+            result,
+            name,
+            url: value.url.to_string(),
+            integrity: String::from("FIXME"),
+            executable: value.executable.unwrap_or_default(),
+        };
+
+        // let serialized = toml::to_string_pretty(&result)?;
+        // std::fs::write(path, serialized)?;
+
+        Ok(Unit::FetchUnit(result))
+    }
+}
+
+impl TryFrom<PackageInput> for Unit {
+    type Error = LuaError;
+
+    #[tracing::instrument(level = "trace", ret, err)]
+    fn try_from(value: PackageInput) -> std::result::Result<Self, Self::Error> {
+        let hash = hash_string(&value);
+        let result = format!("{}-{}", value.name, hash);
+        // let path = format!("/miq/eval/{}.toml", result);
+        // trace!(?path);
+
+        let result = Package {
+            result,
+            name: value.name,
+            version: value.version.unwrap_or_default(),
+            deps: value.deps.unwrap_or_default(),
+            script: value.script.unwrap_or_default(),
+            env: HashMap::new(),
+        };
+
+        // let serialized = toml::to_string_pretty(&result)?;
+        // std::fs::write(path, serialized)?;
+
+        Ok(Unit::PackageUnit(result))
+    }
+}

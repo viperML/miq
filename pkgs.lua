@@ -1,6 +1,7 @@
 local miq = require "miq"
+local inspect = require "inspect"
 local fetch = miq.fetch
--- local f = miq.f
+local package = miq.package
 
 local pkgs = {}
 
@@ -24,6 +25,12 @@ pkgs.unpack_bootstrap_tools = fetch {
     executable = true
 }
 
-pkgs.test = f"Hello World"
+pkgs.foo = package {
+    name = "foo",
+    version = "1.0",
+    deps = {},
+    script = ""
+}
+
 
 return pkgs
