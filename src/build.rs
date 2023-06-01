@@ -57,7 +57,7 @@ pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
 impl Args {
     pub fn main(&self) -> Result<()> {
         // let result_dag = eval::evaluate_dag(&self.unit)?;
-        let result_dag = eval::dag(eval::reference(&self.unit_ref)?)?;
+        let result_dag: daggy::Dag<Unit, ()> = todo!();
 
         let sorted_dag = petgraph::algo::toposort(&result_dag, None)
             .expect("DAG was not acyclic!")

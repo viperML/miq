@@ -62,6 +62,13 @@ impl Unit {
         let contents = std::fs::read_to_string(filename)?;
         Ok(toml::from_str(contents.as_str())?)
     }
+
+    pub fn result(self) -> String {
+        match self {
+            Unit::PackageUnit(inner) => inner.result,
+            Unit::FetchUnit(inner) => inner.result,
+        }
+    }
 }
 
 #[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Default, Hash)]

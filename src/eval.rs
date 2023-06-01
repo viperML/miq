@@ -1,6 +1,8 @@
 use std::path::Path;
+use std::str::FromStr;
 
-use color_eyre::Result;
+use color_eyre::eyre::{bail, ContextCompat};
+use color_eyre::{Report, Result};
 use daggy::petgraph::algo::toposort;
 use daggy::petgraph::dot::{Config, Dot};
 use daggy::petgraph::visit::Topo;
@@ -35,15 +37,79 @@ type UnitDag = Dag<Unit, ()>;
 #[derive(Debug, clap::Args)]
 pub struct Args {
     /// Unitref to evaluate
-    unit_ref: String,
+    #[clap(value_parser = clap::value_parser!(UnitRef))]
+    unit_ref: UnitRef,
     /// Write the resulting graph to this file
     #[arg(short, long)]
     output_file: Option<PathBuf>,
 }
 
+#[derive(Debug, Clone)]
+pub enum UnitRef {
+    /// Already evaluated unit.toml
+    Serialized(PathBuf),
+    /// Dispatch to the internal evaluator
+    Lua(LuaRef),
+}
+
+impl FromStr for UnitRef {
+    type Err = Report;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let components: Vec<_> = s.split('#').collect();
+
+        let result = match &*components {
+            &[path] => {
+                if path.starts_with("/miq/eval") {
+                    Self::Serialized(path.into())
+                } else {
+                    bail!("Input is not a valid UnitRef")
+                }
+            }
+            &[path, element] => Self::Lua(LuaRef {
+                root: path.into(),
+                element: element.into(),
+            }),
+            _ => bail!("Input is not a valid UnitRef"),
+        };
+        Ok(result)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LuaRef {
+    root: PathBuf,
+    element: String,
+}
+
+pub fn dispatch(unit_ref: &UnitRef) -> Result<String> {
+    let result: String = match unit_ref {
+        UnitRef::Serialized(inner) => inner
+            .to_str()
+            .unwrap()
+            .replace("/miq/eval/", "")
+            .replace(".toml", ""),
+
+        // Dispatch to inner lua evaluator
+        UnitRef::Lua(inner) => {
+            let toplevel = crate::lua::evaluate(&inner.root)?;
+            let selected_unit = toplevel
+                .get(&inner.element)
+                .context("Unit wasn't found")?
+                .clone();
+            selected_unit.result()
+        }
+    };
+
+    Ok(result)
+}
+
 impl Args {
     pub fn main(&self) -> Result<()> {
-        let dag = dag(reference(&self.unit_ref)?)?;
+        let result = dispatch(&self.unit_ref)?;
+        info!(?result);
+
+        let dag = dag(result)?;
 
         let dot = Dot::with_attr_getters(
             // -
@@ -64,28 +130,19 @@ impl Args {
         }
 
         let schedule = toposort(&dag, None).expect("Couldn't sort dag");
-        let schedule: Vec<_> = schedule.iter().map(|&n| dag.node_weight(n).unwrap()).collect();
+        let schedule: Vec<_> = schedule
+            .iter()
+            .map(|&n| dag.node_weight(n).unwrap())
+            .collect();
         info!(?schedule);
 
         Ok(())
     }
 }
 
-pub fn reference<S: AsRef<str>>(input: S) -> Result<PathBuf> {
-    let input = input.as_ref();
-
-    let result = if input.starts_with("/miq/eval") {
-        PathBuf::from(input)
-    } else {
-        ffi::eval(input)?
-    };
-
-    Ok(result)
-}
-
 #[tracing::instrument(skip_all, ret, level = "debug")]
-pub fn dag<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<UnitDag> {
-    let path = path.as_ref();
+pub fn dag<P: AsRef<str> + std::fmt::Debug>(input: P) -> Result<UnitDag> {
+    let path = format!("/miq/eval/{}.toml", input.as_ref());
 
     let mut dag = UnitNodeDag::new();
     let root_n_weight: Unit = toml::from_str(&std::fs::read_to_string(path)?)?;

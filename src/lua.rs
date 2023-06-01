@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 use std::hash::{Hash, Hasher};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::ptr::hash;
 
 use color_eyre::eyre::{bail, Context};
@@ -78,78 +78,84 @@ fn preload_modules(lua: &Lua) -> LuaResult<()> {
 
 impl Args {
     pub fn main(&self) -> Result<()> {
-        info!("Loading {:?}", self.path);
-
-        let lua = unsafe {
-            Lua::unsafe_new_with(
-                // Needed for f-string shenanigans
-                StdLib::ALL_SAFE | StdLib::DEBUG,
-                LuaOptions::new().catch_rust_panics(false),
-            )
-        };
-
-        let globals = lua.globals();
-        preload_modules(&lua)?;
-
-        let module = get_or_create_module(&lua, "miq")?;
-
-        module.set(
-            "hello",
-            lua.create_function(|_, _: Value| {
-                println!("Hello from rust! 🦀");
-                Ok(())
-            })?,
-        )?;
-
-        module.set(
-            "fetch",
-            lua.create_function(|ctx, input: Value| {
-                let user_input = ctx.from_value::<FetchInput>(input)?;
-                let result_unit = Unit::try_from(user_input)?;
-                let internal_repr = ctx.create_ser_userdata(result_unit)?;
-                Ok(internal_repr)
-            })?,
-        )?;
-
-        module.set(
-            "package",
-            lua.create_function(|ctx, input: Value| {
-                let user_input: PackageInput = ctx.from_value(input)?;
-                let result_unit = Unit::try_from(user_input)?;
-                let internal_repr = ctx.create_ser_userdata(result_unit)?;
-                Ok(internal_repr)
-            })?,
-        )?;
-
-        let toplevel_export_lua: Table = lua.load(&std::fs::read_to_string(&self.path)?).eval()?;
-
-        let mut toplevel_export: BTreeMap<String, Unit> = BTreeMap::new();
-
-        for pair in toplevel_export_lua.pairs::<LuaString, Value>() {
-            let (k, v) = pair?;
-            let k = k.to_str()?.to_owned();
-            let v: Unit = lua.from_value(v)?;
-
-            toplevel_export.insert(k, v);
-        }
-
-        debug!(?toplevel_export);
-
-        for (name, elem) in toplevel_export {
-            let result = match &elem {
-                Unit::PackageUnit(inner) => &inner.result,
-                Unit::FetchUnit(inner) => &inner.result,
-            };
-
-            let path = format!("/miq/eval/{}.toml", result);
-            trace!(?path);
-
-            let serialized = toml::to_string_pretty(&elem)?;
-            std::fs::write(path, serialized)?;
-        }
-
+        evaluate(&self.path);
         Ok(())
     }
+}
+
+pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
+    let path = path.as_ref();
+    info!("Loading {:?}", path);
+
+    let lua = unsafe {
+        Lua::unsafe_new_with(
+            // Needed for f-string shenanigans
+            StdLib::ALL_SAFE | StdLib::DEBUG,
+            LuaOptions::new().catch_rust_panics(false),
+        )
+    };
+
+    let globals = lua.globals();
+    preload_modules(&lua)?;
+
+    let module = get_or_create_module(&lua, "miq")?;
+
+    module.set(
+        "hello",
+        lua.create_function(|_, _: Value| {
+            println!("Hello from rust! 🦀");
+            Ok(())
+        })?,
+    )?;
+
+    module.set(
+        "fetch",
+        lua.create_function(|ctx, input: Value| {
+            let user_input = ctx.from_value::<FetchInput>(input)?;
+            let result_unit = Unit::try_from(user_input)?;
+            let internal_repr = ctx.create_ser_userdata(result_unit)?;
+            Ok(internal_repr)
+        })?,
+    )?;
+
+    module.set(
+        "package",
+        lua.create_function(|ctx, input: Value| {
+            let user_input: PackageInput = ctx.from_value(input)?;
+            let result_unit = Unit::try_from(user_input)?;
+            let internal_repr = ctx.create_ser_userdata(result_unit)?;
+            Ok(internal_repr)
+        })?,
+    )?;
+
+    let toplevel_export_lua: Table = lua.load(&std::fs::read_to_string(path)?).eval()?;
+
+    let mut toplevel_export: BTreeMap<String, Unit> = BTreeMap::new();
+
+    for pair in toplevel_export_lua.pairs::<LuaString, Value>() {
+        let (k, v) = pair?;
+        let k = k.to_str()?.to_owned();
+        let v: Unit = lua.from_value(v)?;
+
+        toplevel_export.insert(k, v);
+    }
+
+    debug!(?toplevel_export);
+
+    for (name, elem) in &toplevel_export {
+        let result = match &elem {
+            Unit::PackageUnit(inner) => &inner.result,
+            Unit::FetchUnit(inner) => &inner.result,
+        };
+
+        let path = format!("/miq/eval/{}.toml", result);
+        trace!(?path);
+
+        let serialized = toml::to_string_pretty(&elem)?;
+        std::fs::write(path, serialized)?;
+    }
+
+    Ok(toplevel_export)
 }
 
 /// Input to the lua fetch function, which will transform it into a proper Fetch
@@ -218,17 +224,16 @@ impl TryFrom<PackageInput> for Unit {
         let result = format!("{}-{}", value.name, hash);
 
         let deps = value
-                .deps
-                .unwrap_or_default()
-                .iter()
-                .map(|elem| match elem {
-                    Unit::PackageUnit(inner) => inner.result.clone(),
-                    Unit::FetchUnit(inner) => inner.result.clone(),
-                })
-                .collect::<Vec<_>>();
+            .deps
+            .unwrap_or_default()
+            .iter()
+            .map(|elem| match elem {
+                Unit::PackageUnit(inner) => inner.result.clone(),
+                Unit::FetchUnit(inner) => inner.result.clone(),
+            })
+            .collect::<Vec<_>>();
 
         trace!(?deps);
-
 
         let result = Package {
             result,
