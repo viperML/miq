@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::ptr::hash;
@@ -18,8 +18,12 @@ use crate::schema_eval::{Fetch, Package, Unit};
 
 #[derive(Debug, clap::Args)]
 pub struct Args {
-    #[clap(default_value = "pkgs.lua")]
+    /// Toplevel lua file to evaluate
+    #[clap(short, long, default_value = "pkgs.lua")]
     path: PathBuf,
+    /// Name of the table key to evaluate
+    #[clap(short, long)]
+    unit: Option<String>,
 }
 
 pub fn get_or_create_module<'lua>(lua: &'lua Lua, name: &str) -> Result<mlua::Table<'lua>> {
@@ -116,14 +120,19 @@ impl Args {
             })?,
         )?;
 
-        let toplevel_export: Table = lua.load(&std::fs::read_to_string(&self.path)?).eval()?;
+        let toplevel_export_lua: Table = lua.load(&std::fs::read_to_string(&self.path)?).eval()?;
 
-        for pair in toplevel_export.pairs::<LuaString, Value>() {
+        let mut toplevel_export: BTreeMap<String, Unit> = BTreeMap::new();
+
+        for pair in toplevel_export_lua.pairs::<LuaString, Value>() {
             let (k, v) = pair?;
-            let k = k.to_str()?;
+            let k = k.to_str()?.to_owned();
             let v: Unit = lua.from_value(v)?;
-            debug!(?k, ?v);
+
+            toplevel_export.insert(k, v);
         }
+
+        debug!(?toplevel_export);
 
         Ok(())
     }
@@ -144,6 +153,7 @@ struct PackageInput {
     version: Option<String>,
     script: Option<String>,
     deps: Option<Vec<Unit>>,
+    env: Option<BTreeMap<String, String>>,
 }
 
 fn hash_string<H: Hash>(input: &H) -> String {
@@ -203,10 +213,9 @@ impl TryFrom<PackageInput> for Unit {
             result,
             name: value.name,
             version: value.version.unwrap_or_default(),
-            // deps: value.deps.unwrap_or_default(),
+            deps: value.deps.unwrap_or_default(),
             script: value.script.unwrap_or_default(),
-            // env: ,
-            ..Default::default()
+            env: value.env.unwrap_or_default(),
         };
 
         // let serialized = toml::to_string_pretty(&result)?;

@@ -35,7 +35,11 @@ pkgs.foo = package {
     script = [[
         set -x
         echo "Hello world"
-    ]]
+    ]],
+    env = {
+        FOO = "bar",
+        FOOO = "baar",
+    }
 }
 
 
