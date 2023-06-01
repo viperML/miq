@@ -133,9 +133,7 @@ fn cycle_dag(dag: &mut UnitNodeDag, node: NodeIndex) -> Result<()> {
                 for elem in &inner.deps {
                     trace!("I want to create {:?}", elem);
 
-                    // FIXME weird
-                    // let target = Unit::from_result(elem)?;
-                    let target = elem.clone();
+                    let target = Unit::from_result(elem)?;
 
                     for parent in Topo::new(&old_dag).iter(&old_dag) {
                         let p = &old_dag[parent].inner;

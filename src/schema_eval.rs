@@ -73,7 +73,7 @@ pub struct Package {
     #[educe(Debug(ignore))]
     pub version: String,
     #[educe(Debug(ignore))]
-    pub deps: Vec<Unit>,
+    pub deps: Vec<String>,
     #[educe(Debug(ignore))]
     pub script: String,
     #[educe(Debug(ignore))]

@@ -42,5 +42,12 @@ pkgs.foo = package {
     }
 }
 
+pkgs.bar = package {
+    name = "bar",
+    deps = {
+        pkgs.foo
+    }
+}
+
 
 return pkgs

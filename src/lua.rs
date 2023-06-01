@@ -134,9 +134,23 @@ impl Args {
 
         debug!(?toplevel_export);
 
+        for (name, elem) in toplevel_export {
+            let result = match &elem {
+                Unit::PackageUnit(inner) => &inner.result,
+                Unit::FetchUnit(inner) => &inner.result,
+            };
+
+            let path = format!("/miq/eval/{}.toml", result);
+            trace!(?path);
+
+            let serialized = toml::to_string_pretty(&elem)?;
+            std::fs::write(path, serialized)?;
+        }
+
         Ok(())
     }
 }
+
 /// Input to the lua fetch function, which will transform it into a proper Fetch
 #[derive(Educe, Serialize, Deserialize, Hash)]
 #[educe(Debug)]
@@ -181,8 +195,6 @@ impl TryFrom<FetchInput> for Unit {
 
         let hash = hash_string(&value);
         let result = format!("{}-{}", name, hash);
-        // let path = format!("/miq/eval/{}.toml", result);
-        // trace!(?path);
 
         let result = Fetch {
             result,
@@ -191,9 +203,6 @@ impl TryFrom<FetchInput> for Unit {
             integrity: String::from("FIXME"),
             executable: value.executable.unwrap_or_default(),
         };
-
-        // let serialized = toml::to_string_pretty(&result)?;
-        // std::fs::write(path, serialized)?;
 
         Ok(Unit::FetchUnit(result))
     }
@@ -206,20 +215,27 @@ impl TryFrom<PackageInput> for Unit {
     fn try_from(value: PackageInput) -> std::result::Result<Self, Self::Error> {
         let hash = hash_string(&value);
         let result = format!("{}-{}", value.name, hash);
-        // let path = format!("/miq/eval/{}.toml", result);
-        // trace!(?path);
+
+        let deps = value
+                .deps
+                .unwrap_or_default()
+                .iter()
+                .map(|elem| match elem {
+                    Unit::PackageUnit(inner) => inner.result.clone(),
+                    Unit::FetchUnit(inner) => inner.result.clone(),
+                })
+                .collect::<Vec<_>>();
+
+        trace!(?deps);
 
         let result = Package {
             result,
             name: value.name,
             version: value.version.unwrap_or_default(),
-            deps: value.deps.unwrap_or_default(),
             script: value.script.unwrap_or_default(),
             env: value.env.unwrap_or_default(),
+            deps,
         };
-
-        // let serialized = toml::to_string_pretty(&result)?;
-        // std::fs::write(path, serialized)?;
 
         Ok(Unit::PackageUnit(result))
     }
