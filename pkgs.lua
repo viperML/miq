@@ -28,8 +28,14 @@ pkgs.unpack_bootstrap_tools = fetch {
 pkgs.foo = package {
     name = "foo",
     version = "1.0",
-    deps = {},
-    script = ""
+    deps = {
+        pkgs.bootstrap_tools,
+        pkgs.toybox
+    },
+    script = [[
+        set -x
+        echo "Hello world"
+    ]]
 }
 
 

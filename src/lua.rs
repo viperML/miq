@@ -11,7 +11,7 @@ use mlua::{chunk, StdLib, Table, Value};
 use serde::{Deserialize, Serialize};
 use sha2::digest::Update;
 use sha2::{Digest, Sha256};
-use tracing::{debug, info, trace};
+use tracing::{debug, info, trace, warn};
 use url::Url;
 
 use crate::schema_eval::{Fetch, Package, Unit};
@@ -73,6 +73,8 @@ fn preload_modules(lua: &Lua) -> LuaResult<()> {
 
 impl Args {
     pub fn main(&self) -> Result<()> {
+        info!("Loading {:?}", self.path);
+
         let lua = unsafe {
             Lua::unsafe_new_with(
                 // Needed for f-string shenanigans
@@ -97,114 +99,52 @@ impl Args {
         module.set(
             "fetch",
             lua.create_function(|ctx, input: Value| {
-                let deser = ctx.from_value::<FetchInput>(input)?;
-                let deser = Unit::try_from(deser)?;
-                Ok(deser)
+                let user_input = ctx.from_value::<FetchInput>(input)?;
+                let result_unit = Unit::try_from(user_input)?;
+                let internal_repr = ctx.create_ser_userdata(result_unit)?;
+                Ok(internal_repr)
             })?,
         )?;
 
         module.set(
             "package",
             lua.create_function(|ctx, input: Value| {
-                let deser: PackageInput = ctx.from_value(input)?;
-                let unit = Unit::try_from(deser)?;
-                Ok(unit)
+                let user_input: PackageInput = ctx.from_value(input)?;
+                let result_unit = Unit::try_from(user_input)?;
+                let internal_repr = ctx.create_ser_userdata(result_unit)?;
+                Ok(internal_repr)
             })?,
         )?;
 
-        // module.set("f", lua.create_function(lua_f_string)?)?;
-        // lua.load(chunk! {
-        //     local inspect = require "inspect"
+        let toplevel_export: Table = lua.load(&std::fs::read_to_string(&self.path)?).eval()?;
 
-        // function copy(t)
-        //   if type(t) == "table" then
-        //     local ans = {}
-        //     for k,v in next,t do ans[ k ] = v end
-        //     return ans
-        //   end
-        //   return t
-        // end
-
-        // function f(s)
-        //   local env = copy(_ENV)
-        //   local i,k,v,fmt = 0
-        //   repeat
-        //     i = i + 1
-        //     k,v = debug.getlocal(2,i)
-        //     if k ~= nil then env[k] = v end
-        //   until k == nil
-        //   print(inspect(env))
-        // end
-
-        //         })
-        // .exec()?;
-
-        let eval_result: Table = lua.load(&std::fs::read_to_string(&self.path)?).eval()?;
-
-        let inspection = lua
-            .load(chunk! {
-                local inspect = require "inspect"
-                return inspect($eval_result)
-            })
-            .eval::<LuaString>()?
-            .to_str()?
-            .to_owned();
-
-        info!("{}", inspection);
+        for pair in toplevel_export.pairs::<LuaString, Value>() {
+            let (k, v) = pair?;
+            let k = k.to_str()?;
+            let v: Unit = lua.from_value(v)?;
+            debug!(?k, ?v);
+        }
 
         Ok(())
     }
 }
-
-// #[tracing::instrument(level = "debug", ret, err)]
-// fn lua_f_string(ctx: &Lua, input: LuaString) -> Result<LuaNumber, LuaError> {
-//     let globals = ctx.globals();
-
-//     ctx.load(chunk! {
-// function copy(t)
-//   if type(t) == "table" then
-//     local ans = {}
-//     for k,v in next,t do ans[ k ] = v end
-//     return ans
-//   end
-//   return t
-// end
-
-// local env = copy(_ENV)
-//   local i,k,v,fmt = 0
-//   repeat
-//     i = i + 1
-//     k,v = debug.getlocal(2,i)
-//     if k ~= nil then env[k] = v end
-//   until k == nil
-
-//   print(inspect(env))
-//     }).exec()?;
-
-//     Ok(0.0)
-// }
-
-#[derive(Debug, Serialize, Deserialize, Hash)]
+/// Input to the lua fetch function, which will transform it into a proper Fetch
+#[derive(Educe, Serialize, Deserialize, Hash)]
+#[educe(Debug)]
 struct FetchInput {
+    #[educe(Debug(trait = "std::fmt::Display"))]
     url: Url,
     executable: Option<bool>,
 }
 
+/// Input to the lua package function, which will transform it into a proper Package
 #[derive(Debug, Serialize, Deserialize, Hash)]
 struct PackageInput {
     name: String,
     version: Option<String>,
-    deps: Option<Vec<String>>,
     script: Option<String>,
+    deps: Option<Vec<Unit>>,
 }
-
-#[derive(Debug, Serialize, Deserialize, Hash)]
-struct DepsString {
-    value: String,
-    deps: Vec<String>,
-}
-
-impl LuaUserData for DepsString {}
 
 fn hash_string<H: Hash>(input: &H) -> String {
     let mut hasher = fnv::FnvHasher::default();
@@ -263,9 +203,10 @@ impl TryFrom<PackageInput> for Unit {
             result,
             name: value.name,
             version: value.version.unwrap_or_default(),
-            deps: value.deps.unwrap_or_default(),
+            // deps: value.deps.unwrap_or_default(),
             script: value.script.unwrap_or_default(),
-            env: HashMap::new(),
+            // env: ,
+            ..Default::default()
         };
 
         // let serialized = toml::to_string_pretty(&result)?;
@@ -274,3 +215,58 @@ impl TryFrom<PackageInput> for Unit {
         Ok(Unit::PackageUnit(result))
     }
 }
+
+// module.set("f", lua.create_function(lua_f_string)?)?;
+// lua.load(chunk! {
+//     local inspect = require "inspect"
+
+// function copy(t)
+//   if type(t) == "table" then
+//     local ans = {}
+//     for k,v in next,t do ans[ k ] = v end
+//     return ans
+//   end
+//   return t
+// end
+
+// function f(s)
+//   local env = copy(_ENV)
+//   local i,k,v,fmt = 0
+//   repeat
+//     i = i + 1
+//     k,v = debug.getlocal(2,i)
+//     if k ~= nil then env[k] = v end
+//   until k == nil
+//   print(inspect(env))
+// end
+
+//         })
+// .exec()?;
+
+// #[tracing::instrument(level = "debug", ret, err)]
+// fn lua_f_string(ctx: &Lua, input: LuaString) -> Result<LuaNumber, LuaError> {
+//     let globals = ctx.globals();
+
+//     ctx.load(chunk! {
+// function copy(t)
+//   if type(t) == "table" then
+//     local ans = {}
+//     for k,v in next,t do ans[ k ] = v end
+//     return ans
+//   end
+//   return t
+// end
+
+// local env = copy(_ENV)
+//   local i,k,v,fmt = 0
+//   repeat
+//     i = i + 1
+//     k,v = debug.getlocal(2,i)
+//     if k ~= nil then env[k] = v end
+//   until k == nil
+
+//   print(inspect(env))
+//     }).exec()?;
+
+//     Ok(0.0)
+// }

@@ -3,7 +3,7 @@
  Wipe cache with:
  rm ~/.config/Code/User/globalStorage/tamasfe.even-better-toml/*
 */ */
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 use std::path::PathBuf;
 
 use color_eyre::Result;
@@ -45,7 +45,7 @@ impl Args {
     }
 }
 
-#[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Hash)]
 #[educe(Debug)]
 #[serde(untagged)]
 pub enum Unit {
@@ -64,7 +64,7 @@ impl Unit {
     }
 }
 
-#[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Default, Hash)]
 #[educe(Debug)]
 pub struct Package {
     #[educe(Debug(ignore))]
@@ -77,10 +77,10 @@ pub struct Package {
     #[educe(Debug(ignore))]
     pub script: String,
     #[educe(Debug(ignore))]
-    pub env: HashMap<String, String>,
+    pub env: BTreeMap<String, String>,
 }
 
-#[derive(Educe, PartialEq, Clone, Deserialize, Serialize, JsonSchema, Default)]
+#[derive(Educe, PartialEq, Clone, Deserialize, Serialize, JsonSchema, Default, Hash)]
 #[educe(Debug)]
 pub struct Fetch {
     #[educe(Debug(ignore))]

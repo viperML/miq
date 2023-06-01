@@ -47,7 +47,8 @@ educe = "0.4.21"
 diesel_migrations = { version = "2.0.0", features = [
     "sqlite",
 ] }
-mlua = { version = "0.8.8", features = [
+# FIXME mlua 0.9 release need https://github.com/khvzak/mlua/issues/240
+mlua = { git = "https://github.com/khvzak/mlua", tag = "v0.9.0-beta.2", features = [
     "serialize",
     "lua54",
     "vendored",

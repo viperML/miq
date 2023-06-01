@@ -33,6 +33,7 @@
           pkgs.lua5_4
 
           venv
+          pkgs.lua-language-server
         ];
         NIX_DEBUG = "1";
         RUST_BACKTRACE = "full";
