@@ -11,6 +11,7 @@ use mlua::{chunk, StdLib, Table, Value};
 use serde::{Deserialize, Serialize};
 use sha2::digest::Update;
 use sha2::{Digest, Sha256};
+use textwrap::dedent;
 use tracing::{debug, info, trace, warn};
 use url::Url;
 
@@ -228,11 +229,12 @@ impl TryFrom<PackageInput> for Unit {
 
         trace!(?deps);
 
+
         let result = Package {
             result,
             name: value.name,
             version: value.version.unwrap_or_default(),
-            script: value.script.unwrap_or_default(),
+            script: dedent(&value.script.unwrap_or_default()),
             env: value.env.unwrap_or_default(),
             deps,
         };
