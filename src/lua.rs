@@ -27,7 +27,10 @@ pub struct Args {
     unit: Option<String>,
 }
 
-pub fn get_or_create_module<'lua>(lua: &'lua Lua, name: &str) -> Result<mlua::Table<'lua>> {
+pub fn get_or_create_module<'lua, 'module>(lua: &'lua Lua, name: &str) -> Result<Table<'module>>
+where
+    'lua: 'module,
+{
     let globals = lua.globals();
     let package: Table = globals.get("package")?;
     let loaded: Table = package.get("loaded")?;
@@ -78,15 +81,12 @@ fn preload_modules(lua: &Lua) -> LuaResult<()> {
 
 impl Args {
     pub fn main(&self) -> Result<()> {
-        evaluate(&self.path);
+        evaluate(&self.path)?;
         Ok(())
     }
 }
 
-pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
-    let path = path.as_ref();
-    info!("Loading {:?}", path);
-
+fn create_lua_env() -> Result<Lua> {
     let lua = unsafe {
         Lua::unsafe_new_with(
             // Needed for f-string shenanigans
@@ -95,7 +95,6 @@ pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
         )
     };
 
-    let globals = lua.globals();
     preload_modules(&lua)?;
 
     let module = get_or_create_module(&lua, "miq")?;
@@ -108,25 +107,98 @@ pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
         })?,
     )?;
 
+    module.set("fetch", lua.create_function(lua_env_fetch)?)?;
+    module.set("package", lua.create_function(lua_env_package)?)?;
+    module.set("f", lua.create_function(lua_env_f)?)?;
     module.set(
-        "fetch",
+        "trace",
         lua.create_function(|ctx, input: Value| {
-            let user_input = ctx.from_value::<FetchInput>(input)?;
-            let result_unit = Unit::try_from(user_input)?;
-            let internal_repr = ctx.create_ser_userdata(result_unit)?;
-            Ok(internal_repr)
+            let inspect: LuaTable = ctx
+                .load(chunk! {
+                    local inspect = require("inspect")
+                    return inspect
+                })
+                .eval()?;
+
+            let inspected: LuaString = inspect.call(input)?;
+            let s = inspected.to_str()?;
+            trace!("lua trace: {}", s);
+
+            Ok(())
         })?,
     )?;
 
-    module.set(
-        "package",
-        lua.create_function(|ctx, input: Value| {
-            let user_input: PackageInput = ctx.from_value(input)?;
-            let result_unit = Unit::try_from(user_input)?;
-            let internal_repr = ctx.create_ser_userdata(result_unit)?;
-            Ok(internal_repr)
-        })?,
-    )?;
+    module.set("parse_metatext", lua.create_function(|ctx, input: Value| {
+        let res: MetaTextInput = ctx.from_value(input)?;
+        // ctx.to_value(t)
+        debug!(?res);
+
+        Ok(todo!())
+    })?)?;
+
+    drop(module);
+    Ok(lua)
+}
+
+fn lua_env_fetch<'lua, 'result>(
+    ctx: &'lua Lua,
+    input: Value<'result>,
+) -> Result<LuaAnyUserData<'result>, LuaError>
+where
+    'lua: 'result,
+{
+    let user_input = ctx.from_value::<FetchInput>(input)?;
+    let result_unit = Unit::try_from(user_input)?;
+    let internal_repr = ctx.create_ser_userdata(result_unit)?;
+    Ok(internal_repr)
+}
+
+fn lua_env_package<'lua, 'result>(
+    ctx: &'lua Lua,
+    input: Value<'result>,
+) -> Result<LuaAnyUserData<'result>, LuaError>
+where
+    'lua: 'result,
+{
+    let user_input: PackageInput = ctx.from_value(input)?;
+    let result_unit = Unit::try_from(user_input)?;
+    let internal_repr = ctx.create_ser_userdata(result_unit)?;
+    Ok(internal_repr)
+}
+
+fn lua_env_f<'lua, 'result>(
+    ctx: &'lua Lua,
+    input: LuaString<'result>,
+) -> Result<LuaString<'result>, LuaError>
+where
+    'lua: 'result,
+{
+    let repr = input.to_str()?;
+    trace!(?repr);
+
+    let output: LuaString = input;
+
+    Ok(output)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MetaTextInput {
+    Simple(String),
+    Full(MetaText)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetaText {
+    deps: Vec<String>,
+    value: String
+}
+
+pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
+    let path = path.as_ref();
+    info!("Loading {:?}", path);
+
+    let lua = create_lua_env()?;
 
     let toplevel_export_lua: Table = lua.load(&std::fs::read_to_string(path)?).eval()?;
 
@@ -142,7 +214,7 @@ pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
 
     debug!(?toplevel_export);
 
-    for (name, elem) in &toplevel_export {
+    for (_, elem) in &toplevel_export {
         let result = match &elem {
             Unit::PackageUnit(inner) => &inner.result,
             Unit::FetchUnit(inner) => &inner.result,

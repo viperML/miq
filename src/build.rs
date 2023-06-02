@@ -11,14 +11,14 @@ use color_eyre::eyre::{bail, Context};
 use daggy::petgraph;
 use tracing::{debug, trace};
 
+use crate::eval::UnitRef;
 use crate::schema_eval::{Fetch, Package, Unit};
 use crate::*;
 
 #[derive(Debug, clap::Args)]
 pub struct Args {
     /// Unitref to build
-    #[arg()]
-    unit_ref: String,
+    unit_ref: UnitRef,
 
     /// Don't show build output
     #[arg(long, short)]
@@ -56,13 +56,13 @@ pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
 
 impl Args {
     pub fn main(&self) -> Result<()> {
-        // let result_dag = eval::evaluate_dag(&self.unit)?;
-        let result_dag: daggy::Dag<Unit, ()> = todo!();
+        let result = eval::dispatch(&self.unit_ref)?;
+        let dag = eval::dag(result)?;
 
-        let sorted_dag = petgraph::algo::toposort(&result_dag, None)
+        let sorted_dag = petgraph::algo::toposort(&dag, None)
             .expect("DAG was not acyclic!")
             .iter()
-            .map(|&node| result_dag.node_weight(node).expect("Couldn't get node"))
+            .map(|&node| dag.node_weight(node).expect("Couldn't get node"))
             .collect::<Vec<_>>();
 
         trace!(?sorted_dag);
