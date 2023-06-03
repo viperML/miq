@@ -65,6 +65,7 @@ fn trace_table(t: Table) {
 }
 
 static LUA_INSPECT: &'static str = std::include_str!("inspect.lua");
+static LUA_F: &'static str = std::include_str!("f.lua");
 
 /// Add some utility modules to be require-able
 fn preload_modules(lua: &Lua) -> LuaResult<()> {
@@ -95,9 +96,8 @@ fn create_lua_env() -> Result<Lua> {
         )
     };
 
-    preload_modules(&lua)?;
-
     let module = get_or_create_module(&lua, "miq")?;
+    preload_modules(&lua)?;
 
     module.set(
         "hello",
@@ -109,7 +109,6 @@ fn create_lua_env() -> Result<Lua> {
 
     module.set("fetch", lua.create_function(lua_env_fetch)?)?;
     module.set("package", lua.create_function(lua_env_package)?)?;
-    module.set("f", lua.create_function(lua_env_f)?)?;
     module.set(
         "trace",
         lua.create_function(|ctx, input: Value| {
@@ -128,13 +127,10 @@ fn create_lua_env() -> Result<Lua> {
         })?,
     )?;
 
-    module.set("parse_metatext", lua.create_function(|ctx, input: Value| {
-        let res: MetaTextInput = ctx.from_value(input)?;
-        // ctx.to_value(t)
-        debug!(?res);
+    module.set("get_result", lua.create_function(lua_env_get_result)?)?;
 
-        Ok(todo!())
-    })?)?;
+    let f: Value = lua.load(LUA_F).eval()?;
+    module.set("f", f)?;
 
     drop(module);
     Ok(lua)
@@ -181,17 +177,30 @@ where
     Ok(output)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum MetaTextInput {
-    Simple(String),
-    Full(MetaText)
+fn lua_env_get_result<'lua, 'result>(
+    ctx: &'lua Lua,
+    input: Value,
+) -> Result<Value<'result>, LuaError>
+where
+    'lua: 'result,
+{
+    let input: Unit = ctx.from_value(input)?;
+    ctx.to_value(&input.result())
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Educe)]
+#[educe(Default)]
+#[serde(untagged)]
+pub enum MetaTextInput {
+    #[educe(Default)]
+    Simple(String),
+    Full(MetaText),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub struct MetaText {
     deps: Vec<String>,
-    value: String
+    value: String,
 }
 
 pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
@@ -244,7 +253,7 @@ struct FetchInput {
 struct PackageInput {
     name: String,
     version: Option<String>,
-    script: Option<String>,
+    script: Option<MetaTextInput>,
     deps: Option<Vec<Unit>>,
     env: Option<BTreeMap<String, String>>,
 }
@@ -290,12 +299,11 @@ impl TryFrom<FetchInput> for Unit {
 impl TryFrom<PackageInput> for Unit {
     type Error = LuaError;
 
-    #[tracing::instrument(level = "trace", ret, err)]
     fn try_from(value: PackageInput) -> std::result::Result<Self, Self::Error> {
         let hash = hash_string(&value);
         let result = format!("{}-{}", value.name, hash);
 
-        let deps = value
+        let mut deps = value
             .deps
             .unwrap_or_default()
             .iter()
@@ -307,11 +315,21 @@ impl TryFrom<PackageInput> for Unit {
 
         trace!(?deps);
 
+        let script = match value.script.unwrap_or_default() {
+            MetaTextInput::Simple(inner) => inner,
+            MetaTextInput::Full(inner) => {
+                deps.extend(inner.deps);
+                inner.value
+            }
+        };
+
+        let script = dedent(&script);
+
         let result = Package {
             result,
             name: value.name,
             version: value.version.unwrap_or_default(),
-            script: dedent(&value.script.unwrap_or_default()),
+            script,
             env: value.env.unwrap_or_default(),
             deps,
         };

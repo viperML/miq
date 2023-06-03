@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::str::FromStr;
 
-use color_eyre::eyre::{bail, ContextCompat};
+use color_eyre::eyre::{bail, ContextCompat, Context};
 use color_eyre::{Report, Result};
 use daggy::petgraph::algo::toposort;
 use daggy::petgraph::dot::{Config, Dot};
@@ -95,6 +95,7 @@ pub fn dispatch(unit_ref: &UnitRef) -> Result<String> {
             let toplevel = crate::lua::evaluate(&inner.root)?;
             let selected_unit = toplevel
                 .get(&inner.element)
+                .context(format!("Getting element {:?}", inner.element))
                 .context("Unit wasn't found")?
                 .clone();
             selected_unit.result()
