@@ -43,7 +43,12 @@ in {
       inherit src;
       inherit (v) target;
       inherit (cargo-toml.package) version;
-      cargoLock.lockFile = src + "/Cargo.lock";
+      cargoLock = {
+        lockFile = src + "/Cargo.lock";
+        outputHashes = {
+          "mlua-0.9.0-beta.2" = "sha256-DmIBCyhDHuRjn6XL/2PYsaLCfR09davsysN7oq2aD9M=";
+        };
+      };
       CARGO_BUILD_TARGET = v.target;
       CARGO_BUILD_RUSTFLAGS =
         if v.static
