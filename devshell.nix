@@ -36,7 +36,7 @@
           pkgs.lua-language-server
         ];
         NIX_DEBUG = "1";
-        RUST_BACKTRACE = "1";
+        RUST_BACKTRACE = "0";
         shellHook = ''
           ln -Tsf ${venv} .venv
         '';
