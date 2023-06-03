@@ -32,12 +32,11 @@ pkgs.foo = package {
   name = "foo",
   version = "1.0",
   deps = {
-    -- pkgs.bootstrap_tools,
-    -- pkgs.toybox
   },
   script = f[[
     set -x
-    ls -lv {{pkgs.busybox}}
+    {{pkgs.busybox}} ls
+    exit 1
   ]],
   env = {
     FOO = "bar",

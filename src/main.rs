@@ -31,8 +31,11 @@ fn setup_logging() -> Result<()> {
         .with_line_number(true)
         .compact();
 
+    let layer_error = tracing_error::ErrorLayer::default();
+
     tracing_subscriber::registry()
         .with(layer_filter)
+        .with(layer_error)
         .with(layer_fmt)
         .init();
 

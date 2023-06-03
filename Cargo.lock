@@ -800,6 +800,7 @@ dependencies = [
  "textwrap",
  "toml 0.7.2",
  "tracing",
+ "tracing-error",
  "tracing-subscriber",
  "url",
 ]

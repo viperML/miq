@@ -60,3 +60,4 @@ url = { version = "2.3.1", features = [
     "serde",
 ] }
 textwrap = "0.16.0"
+tracing-error = "0.2.0"
