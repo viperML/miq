@@ -36,6 +36,7 @@ pkgs.foo = package {
   script = f[[
     set -x
     {{pkgs.busybox}} ls
+    ls ${HOME}
     exit 1
   ]],
   env = {
