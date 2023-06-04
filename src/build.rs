@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ffi::{OsStr, OsString};
 use std::fmt::Debug;
 use std::fs::File;
 use std::os::unix::prelude::PermissionsExt;
@@ -11,7 +12,7 @@ use color_eyre::eyre::{bail, Context};
 use daggy::petgraph;
 use tracing::{debug, trace};
 
-use crate::eval::{UnitRef, MiqPath};
+use crate::eval::{MiqPath, UnitRef};
 use crate::schema_eval::{Fetch, Package, Unit};
 use crate::*;
 
@@ -57,7 +58,7 @@ pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
 impl Args {
     pub fn main(&self) -> Result<()> {
         let result = eval::dispatch(&self.unit_ref)?;
-        let dag = eval::dag(result.0)?;
+        let dag = eval::dag(&result)?;
 
         let sorted_dag = petgraph::algo::toposort(&dag, None)
             .expect("DAG was not acyclic!")
@@ -86,14 +87,14 @@ impl Args {
 }
 
 #[tracing::instrument(skip(_build_args), ret, level = "info")]
-fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<PathBuf> {
-    let path = MiqPath::from(&input.result).0;
+fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<()> {
+    let path = MiqPath::from(&input.result);
 
     if db::is_db_path(&path)? {
         if rebuild {
             db::remove(&path)?;
         } else {
-            return Ok(path);
+            return Ok(());
         }
     }
 
@@ -112,29 +113,32 @@ fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<PathB
         // FIXME
         debug!("Setting exec bit");
         std::process::Command::new("chmod")
-            .args(["+x", (path.to_str().unwrap())])
+            .args([OsStr::new("+x"), path.as_ref()])
             .output()?;
     }
 
     db::add(&path)?;
 
-    Ok(path)
+    Ok(())
 }
 
-#[tracing::instrument(skip(_build_args), ret, err, level = "info")]
-fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<PathBuf> {
-    let path = MiqPath::from(&input.result).0;
+#[tracing::instrument(skip(_build_args), ret, level = "info")]
+fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<()> {
+    let miq_path: MiqPath = MiqPath::from(&input.result);
 
-    if db::is_db_path(&path)? {
+    if db::is_db_path(&miq_path)? {
         if rebuild {
-            db::remove(&path)?;
+            db::remove(&miq_path)?;
         } else {
-            return Ok(path);
+            return Ok(());
         }
     }
 
-    let mut miq_env: HashMap<&str, &str> = HashMap::new();
-    miq_env.insert("miq_out", path.to_str().unwrap());
+    let mut miq_env: HashMap<&OsStr, &OsStr> = HashMap::new();
+    miq_env.insert(
+        OsStr::new("miq_out"),
+        miq_path.as_ref(),
+    );
 
     // FIXME
     // miq_env.insert("HOME", "/home/ayats");
@@ -142,7 +146,7 @@ fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<P
     debug!(?miq_env);
 
     let mut cmd = Command::new("/bin/sh");
-    cmd.args(["-c", &input.script]);
+    cmd.args([OsStr::new("-c"), &input.script]);
     cmd.env_clear();
     cmd.envs(&input.env);
     cmd.envs(&miq_env);
@@ -150,13 +154,13 @@ fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<P
     let sandbox = sandbox::SandBox {};
     sandbox.run(&mut cmd)?;
 
-    match path.try_exists().wrap_err("Failed to produce an output") {
+    match miq_path.try_exists().wrap_err("Failed to produce an output") {
         Ok(true) => {}
-        Ok(false) => bail!("Output path doesn't exist: {:?}", path),
+        Ok(false) => bail!("Output path doesn't exist: {:?}", miq_path),
         Err(e) => bail!(e),
     }
 
-    db::add(&path)?;
+    db::add(&miq_path)?;
 
-    Ok(path)
+    Ok(())
 }

@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::hash::Hash;
 use std::path::Path;
 use std::str::FromStr;
@@ -94,7 +95,7 @@ pub fn dispatch(unit_ref: &UnitRef) -> Result<MiqResult> {
     let result = match unit_ref {
         UnitRef::Serialized(inner) => {
             todo!("Accept serialized unitefs");
-        },
+        }
 
         // Dispatch to inner lua evaluator
         UnitRef::Lua(inner) => {
@@ -122,7 +123,7 @@ impl Args {
             return Ok(());
         };
 
-        let dag = dag(result.0)?;
+        let dag = dag(&result)?;
 
         let dot = Dot::with_attr_getters(
             // -
@@ -154,11 +155,9 @@ impl Args {
 }
 
 #[tracing::instrument(skip_all, ret, level = "debug")]
-pub fn dag<P: AsRef<str> + std::fmt::Debug>(input: P) -> Result<UnitDag> {
-    let path = format!("/miq/eval/{}.toml", input.as_ref());
-
+pub fn dag(input: &MiqResult) -> Result<UnitDag> {
     let mut dag = UnitNodeDag::new();
-    let root_n_weight: Unit = toml::from_str(&std::fs::read_to_string(path)?)?;
+    let root_n_weight: Unit = input.try_into()?;
     let root_n_weight = UnitNode::new(root_n_weight);
     let root_n = dag.add_node(root_n_weight);
 
@@ -204,7 +203,8 @@ fn cycle_dag(dag: &mut UnitNodeDag, node: NodeIndex) -> Result<()> {
                     trace!("I want to create {:?}", elem);
 
                     // let target = Unit::from_result(elem)?;
-                    let target = elem.read_unit()?;
+                    // let target = elem.read_unit()?;
+                    let target: Unit = elem.try_into()?;
 
                     for parent in Topo::new(&old_dag).iter(&old_dag) {
                         let p = &old_dag[parent].inner;
@@ -239,7 +239,7 @@ fn cycle_dag(dag: &mut UnitNodeDag, node: NodeIndex) -> Result<()> {
 }
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default)]
-pub struct MiqResult(pub String);
+pub struct MiqResult(String);
 
 impl MiqResult {
     pub fn create<H: Hash>(name: &str, hashable: &H) -> MiqResult {
@@ -251,37 +251,15 @@ impl MiqResult {
     }
 }
 
-#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default)]
-pub struct MiqPath(pub PathBuf);
+// impl MiqResult {
+//     pub fn read_unit(&self) -> Result<Unit> {
+//         let path = MiqPath::from(self);
+//         let contents = std::fs::read_to_string(path)?;
+//         let unit = toml::from_str(contents.as_str())?;
 
-impl AsRef<Path> for MiqPath {
-    fn as_ref(&self) -> &Path {
-        self.0.as_ref()
-    }
-}
-
-impl From<&MiqResult> for MiqPath {
-    fn from(value: &MiqResult) -> Self {
-        let inner = PathBuf::from_iter(["/miq/store", &value.0]);
-        Self(inner)
-    }
-}
-
-impl MiqResult {
-    pub fn read_unit(&self) -> Result<Unit> {
-        let path = MiqPath::from(self);
-        let contents = std::fs::read_to_string(path)?;
-        let unit = toml::from_str(contents.as_str())?;
-
-        Ok(unit)
-    }
-}
-
-impl From<Unit> for MiqPath {
-    fn from(value: Unit) -> Self {
-        todo!()
-    }
-}
+//         Ok(unit)
+//     }
+// }
 
 impl From<Unit> for MiqResult {
     fn from(value: Unit) -> Self {
@@ -292,3 +270,47 @@ impl From<Unit> for MiqResult {
     }
 }
 
+impl TryFrom<&MiqResult> for Unit {
+    type Error = Report;
+
+    fn try_from(value: &MiqResult) -> std::result::Result<Self, Self::Error> {
+        let path = MiqPath::from(value);
+        let raw_text = std::fs::read_to_string(path)?;
+        let result = toml::from_str(&raw_text)?;
+        Ok(result)
+    }
+}
+
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default)]
+pub struct MiqPath(PathBuf);
+
+impl AsRef<Path> for MiqPath {
+    fn as_ref(&self) -> &Path {
+        self.0.as_ref()
+    }
+}
+
+impl AsRef<OsStr> for MiqPath {
+    fn as_ref(&self) -> &OsStr {
+        self.0.as_os_str()
+    }
+}
+
+impl From<&MiqResult> for MiqPath {
+    fn from(value: &MiqResult) -> Self {
+        let inner = PathBuf::from_iter(["/miq/store", &value.0]);
+        Self(inner)
+    }
+}
+
+impl MiqPath {
+    pub fn try_exists(&self) -> std::io::Result<bool> {
+        self.0.try_exists()
+    }
+}
+
+// impl From<Unit> for MiqPath {
+//     fn from(value: Unit) -> Self {
+//         todo!()
+//     }
+// }

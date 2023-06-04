@@ -4,6 +4,7 @@
  rm ~/.config/Code/User/globalStorage/tamasfe.even-better-toml/*
 */ */
 use std::collections::{HashMap, BTreeMap};
+use std::ffi::OsString;
 use std::path::PathBuf;
 
 use color_eyre::Result;
@@ -69,9 +70,9 @@ pub struct Package {
     #[educe(Debug(ignore))]
     pub deps: Vec<MiqResult>,
     #[educe(Debug(ignore))]
-    pub script: String,
+    pub script: OsString,
     #[educe(Debug(ignore))]
-    pub env: BTreeMap<String, String>,
+    pub env: BTreeMap<OsString, OsString>,
 }
 
 #[derive(Educe, PartialEq, Clone, Deserialize, Serialize, JsonSchema, Default, Hash)]
