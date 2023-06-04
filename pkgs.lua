@@ -1,7 +1,7 @@
 local miq = require "miq"
 local inspect = miq.inspect
 local fetch = miq.fetch
--- local package = miq.package
+local package = miq.package
 local f = miq.f
 local trace = miq.trace
 
@@ -30,22 +30,22 @@ pkgs.unpack_bootstrap_tools = fetch {
 
 miq.trace(pkgs)
 
--- pkgs.foo = package {
---   name = "foo",
---   version = "1.0",
---   deps = {
---   },
---   script = f[[
---     set -x
---     {{pkgs.busybox}} ls
---     ls ${HOME}
---     exit 1
---   ]],
---   env = {
---     FOO = "bar",
---     FOOO = "baar",
---   }
--- }
+pkgs.foo = package {
+  name = "foo",
+  version = "1.0",
+  deps = {
+  },
+  script = f[[
+    set -x
+    {{pkgs.busybox}} ls
+    ls ${HOME}
+    exit 1
+  ]],
+  env = {
+    FOO = "bar",
+    FOOO = "baar",
+  }
+}
 
 -- pkgs.bootstrap = package {
 --   name = "bootstap",

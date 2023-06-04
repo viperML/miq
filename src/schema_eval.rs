@@ -70,9 +70,9 @@ pub struct Package {
     #[educe(Debug(ignore))]
     pub deps: Vec<MiqResult>,
     #[educe(Debug(ignore))]
-    pub script: OsString,
+    pub script: String,
     #[educe(Debug(ignore))]
-    pub env: BTreeMap<OsString, OsString>,
+    pub env: BTreeMap<String, String>,
 }
 
 #[derive(Educe, PartialEq, Clone, Deserialize, Serialize, JsonSchema, Default, Hash)]

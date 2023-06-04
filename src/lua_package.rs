@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
+use std::ffi::OsString;
 
-use mlua::{prelude::*, chunk};
-use mlua::{Lua, Table, Value};
+use mlua::prelude::*;
+use mlua::{chunk, Lua, Table, Value};
 use serde::{Deserialize, Serialize};
 use textwrap::dedent;
 use tracing::trace;
@@ -9,7 +10,7 @@ use url::Url;
 
 use crate::eval::MiqResult;
 use crate::lua::MetaTextInput;
-use crate::schema_eval::{Fetch, Unit, Package};
+use crate::schema_eval::{Fetch, Package, Unit};
 
 /// Input to the lua package function, which will transform it into a proper Package
 #[derive(Debug, Serialize, Deserialize, Hash)]
@@ -21,26 +22,21 @@ struct PackageInput {
     env: Option<BTreeMap<String, String>>,
 }
 
-fn package<'lua, 'result>(
-    ctx: &'lua Lua,
-    input: Value<'result>,
-) -> Result<LuaAnyUserData<'result>, LuaError>
+fn package<'lua, 'result>(ctx: &'lua Lua, input: Value<'result>) -> Result<Value<'result>, LuaError>
 where
     'lua: 'result,
 {
-    let input_repr = input.clone();
-    ctx.load(chunk! {
-        local miq = require("miq")
-        miq.trace($input_repr)
-    })
-    .exec()?;
-
     let user_input: PackageInput = ctx.from_value(input)?;
+    trace!(?user_input);
     let result_unit = Unit::try_from(user_input)?;
-    let internal_repr = ctx.create_ser_userdata(result_unit)?;
-    Ok(internal_repr)
+    let repr = ctx.to_value(&result_unit)?;
+    Ok(repr)
 }
 
+pub fn add_to_module(ctx: &Lua, module: &Table) -> Result<(), LuaError> {
+    module.set("package", ctx.create_function(package)?)?;
+    Ok(())
+}
 
 impl TryFrom<PackageInput> for Unit {
     type Error = LuaError;
@@ -77,7 +73,7 @@ impl TryFrom<PackageInput> for Unit {
             result,
             name: value.name,
             version: value.version.unwrap_or_default(),
-            script,
+            script: script.into(),
             env: value.env.unwrap_or_default(),
             deps,
         };

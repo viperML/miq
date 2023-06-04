@@ -143,7 +143,7 @@ fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<(
     debug!(?miq_env);
 
     let mut cmd = Command::new("/bin/sh");
-    cmd.args([OsStr::new("-c"), &input.script]);
+    cmd.args(["-c", &input.script]);
     cmd.env_clear();
     cmd.envs(&input.env);
     cmd.envs(&miq_env);

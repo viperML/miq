@@ -91,6 +91,7 @@ pub struct LuaRef {
     element: String,
 }
 
+#[instrument(ret, err, level="info")]
 pub fn dispatch(unit_ref: &UnitRef) -> Result<MiqResult> {
     let result = match unit_ref {
         UnitRef::Serialized(inner) => {

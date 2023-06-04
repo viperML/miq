@@ -119,7 +119,7 @@ fn create_lua_env() -> Result<Lua> {
         Lua::unsafe_new_with(
             // Needed for f-string shenanigans
             StdLib::ALL_SAFE | StdLib::DEBUG,
-            LuaOptions::new().catch_rust_panics(false),
+            LuaOptions::new(), // .catch_rust_panics(false),
         )
     };
 
@@ -137,21 +137,32 @@ fn create_lua_env() -> Result<Lua> {
     )?;
 
     crate::lua_fetch::add_to_module(&lua, &module)?;
+    crate::lua_package::add_to_module(&lua, &module)?;
 
     module.set(
         "trace",
         lua.create_function(|ctx, input: Value| {
-            let inspect: Table = ctx.load(chunk! {
-                return (require("miq")).inspect
-            }).eval()?;
+            let inspect: Table = ctx
+                .load(chunk! {
+                    return (require("miq")).inspect
+                })
+                .eval()?;
             let inspected: LuaString = inspect.call(input.clone())?;
             let s = inspected.to_str()?;
-            trace!(?input, "luatrace>> {}", s);
+            trace!("luatrace>> {}", s);
             Ok(())
         })?,
     )?;
 
-    // module.set("get_result", lua.create_function(lua_env_get_result)?)?;
+    module.set(
+        "get_result",
+        lua.create_function(|ctx: &Lua, input: Table| {
+            let input: Unit = ctx.from_value(Value::Table(input))?;
+            let miqresult: MiqResult = input.into();
+            let res = ctx.to_value(&miqresult)?;
+            Ok(res)
+        })?,
+    )?;
 
     let f: Value = lua.load(LUA_F).eval()?;
     module.set("f", f)?;
@@ -159,9 +170,6 @@ fn create_lua_env() -> Result<Lua> {
     drop(module);
     Ok(lua)
 }
-
-
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Educe)]
 #[educe(Default)]

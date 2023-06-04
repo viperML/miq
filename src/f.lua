@@ -39,6 +39,8 @@ local f = function(str)
     local fn, err = load("return "..code, "expression `"..code.."`", "t", exp_env)
     if fn then
       local match_result = fn()
+      miq.trace("Calling get_result with: ")
+      miq.trace(match_result)
       match_result = miq.get_result(match_result)
       -- Append to result.deps list
       table.insert(result.deps, match_result)
