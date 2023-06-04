@@ -263,7 +263,6 @@ impl From<Unit> for MiqResult {
 impl TryFrom<&MiqResult> for Unit {
     type Error = Report;
 
-    #[instrument(ret, err, level="trace")]
     fn try_from(value: &MiqResult) -> std::result::Result<Self, Self::Error> {
         let path: MiqEvalPath = value.into();
         trace!(?path);
