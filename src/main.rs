@@ -7,6 +7,8 @@ mod cli;
 mod db;
 mod eval;
 mod ffi;
+mod lua_fetch;
+// mod lua_package;
 mod lua;
 mod sandbox;
 mod schema_db;

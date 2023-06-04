@@ -1,7 +1,7 @@
 local miq = require "miq"
-local inspect = require "inspect"
+local inspect = miq.inspect
 local fetch = miq.fetch
-local package = miq.package
+-- local package = miq.package
 local f = miq.f
 local trace = miq.trace
 
@@ -28,24 +28,53 @@ pkgs.unpack_bootstrap_tools = fetch {
   executable = true
 }
 
-pkgs.foo = package {
-  name = "foo",
-  version = "1.0",
-  deps = {
-  },
-  script = f[[
-    set -x
-    {{pkgs.busybox}} ls
-    ls ${HOME}
-    exit 1
-  ]],
-  env = {
-    FOO = "bar",
-    FOOO = "baar",
-  }
-}
+miq.trace(pkgs)
 
+-- pkgs.foo = package {
+--   name = "foo",
+--   version = "1.0",
+--   deps = {
+--   },
+--   script = f[[
+--     set -x
+--     {{pkgs.busybox}} ls
+--     ls ${HOME}
+--     exit 1
+--   ]],
+--   env = {
+--     FOO = "bar",
+--     FOOO = "baar",
+--   }
+-- }
 
+-- pkgs.bootstrap = package {
+--   name = "bootstap",
+--   version = "1.0",
+--   deps = {
+--   },
+--   script = f[[
+--     set -exu
+--     {{pkgs.toybox}} mkdir -p $HOME/bin
+--     export PATH="$HOME/bin:${PATH}"
+--     {{pkgs.toybox}} ln -vs {{pkgs.toybox}} $HOME/bin/ln
+--     {{pkgs.toybox}} ln -vs {{pkgs.toybox}} $HOME/bin/cp
+--     {{pkgs.toybox}} ln -vs {{pkgs.toybox}} $HOME/bin/tar
+--     {{pkgs.toybox}} ln -vs {{pkgs.toybox}} $HOME/bin/mkdir
+--     {{pkgs.toybox}} ln -vs {{pkgs.toybox}} $HOME/bin/chmod
+
+--     cp -v {{pkgs.bootstrap_tools}} $HOME/bootstrap.tar.xz
+--     mkdir -pv $miq_out
+--     pushd $miq_out
+--     tar -xvf $HOME/bootstrap.tar.xz
+
+--     export out=$miq_out
+--     export tarball={{pkgs.bootstrap_tools}}
+--     export builder={{pkgs.busybox}}
+--     {{pkgs.unpack_bootstrap_tools}}
+--   ]],
+--   env = {
+--   }
+-- }
 
 
 

@@ -15,7 +15,11 @@ use textwrap::dedent;
 use tracing::{debug, info, trace, warn};
 use url::Url;
 
+use crate::eval::MiqResult;
+use crate::lua_fetch::FetchInput;
 use crate::schema_eval::{Fetch, Package, Unit};
+
+// impl LuaUserData for Unit {}
 
 #[derive(Debug, clap::Args)]
 pub struct Args {
@@ -25,6 +29,49 @@ pub struct Args {
     /// Name of the table key to evaluate
     #[clap(short, long)]
     unit: Option<String>,
+}
+
+impl Args {
+    pub fn main(&self) -> Result<()> {
+        evaluate(&self.path)?;
+        Ok(())
+    }
+}
+
+pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
+    let path = path.as_ref();
+    info!("Loading {:?}", path);
+
+    let lua = create_lua_env()?;
+
+    let toplevel_export_lua: Table = lua.load(&std::fs::read_to_string(path)?).eval()?;
+
+    let mut toplevel_export: BTreeMap<String, Unit> = BTreeMap::new();
+
+    for pair in toplevel_export_lua.pairs::<LuaString, Value>() {
+        let (k, v) = pair?;
+        let k = k.to_str()?.to_owned();
+        let v: Unit = lua.from_value(v)?;
+
+        toplevel_export.insert(k, v);
+    }
+
+    debug!(?toplevel_export);
+
+    // for (_, elem) in &toplevel_export {
+    //     let result = match &elem {
+    //         Unit::PackageUnit(inner) => &inner.result,
+    //         Unit::FetchUnit(inner) => &inner.result,
+    //     };
+
+    //     let path = format!("/miq/eval/{}.toml", result);
+    //     trace!(?path);
+
+    //     let serialized = toml::to_string_pretty(&elem)?;
+    //     std::fs::write(path, serialized)?;
+    // }
+
+    Ok(toplevel_export)
 }
 
 pub fn get_or_create_module<'lua, 'module>(lua: &'lua Lua, name: &str) -> Result<Table<'module>>
@@ -52,40 +99,20 @@ where
     }
 }
 
-#[tracing::instrument(level = "trace")]
-fn trace_table(t: Table) {
-    for (key, value) in t.pairs::<LuaValue, LuaValue>().flatten() {
-        if let Value::String(key) = key {
-            let key = key.to_str().unwrap();
-            trace!(?key, ?value);
-        } else {
-            trace!(?key, ?value);
-        }
-    }
-}
+// #[tracing::instrument(level = "trace")]
+// fn trace_table(t: Table) {
+//     for (key, value) in t.pairs::<LuaValue, LuaValue>().flatten() {
+//         if let Value::String(key) = key {
+//             let key = key.to_str().unwrap();
+//             trace!(?key, ?value);
+//         } else {
+//             trace!(?key, ?value);
+//         }
+//     }
+// }
 
 static LUA_INSPECT: &'static str = std::include_str!("inspect.lua");
 static LUA_F: &'static str = std::include_str!("f.lua");
-
-/// Add some utility modules to be require-able
-fn preload_modules(lua: &Lua) -> LuaResult<()> {
-    let globals = lua.globals();
-
-    let package: Table = globals.get("package")?;
-    let loaded: Table = package.get("loaded")?;
-
-    let inspect: Value = lua.load(LUA_INSPECT).eval()?;
-    loaded.set("inspect", inspect)?;
-
-    Ok(())
-}
-
-impl Args {
-    pub fn main(&self) -> Result<()> {
-        evaluate(&self.path)?;
-        Ok(())
-    }
-}
 
 fn create_lua_env() -> Result<Lua> {
     let lua = unsafe {
@@ -97,37 +124,34 @@ fn create_lua_env() -> Result<Lua> {
     };
 
     let module = get_or_create_module(&lua, "miq")?;
-    preload_modules(&lua)?;
+
+    let inspect = lua.load(LUA_INSPECT).eval::<Table>()?;
+    module.set("inspect", inspect)?;
 
     module.set(
         "hello",
         lua.create_function(|_, _: Value| {
-            println!("Hello from rust! 🦀");
+            eprintln!("🦀 Hello World! 🦀");
             Ok(())
         })?,
     )?;
 
-    module.set("fetch", lua.create_function(lua_env_fetch)?)?;
-    module.set("package", lua.create_function(lua_env_package)?)?;
+    crate::lua_fetch::add_to_module(&lua, &module)?;
+
     module.set(
         "trace",
         lua.create_function(|ctx, input: Value| {
-            let inspect: LuaTable = ctx
-                .load(chunk! {
-                    local inspect = require("inspect")
-                    return inspect
-                })
-                .eval()?;
-
-            let inspected: LuaString = inspect.call(input)?;
+            let inspect: Table = ctx.load(chunk! {
+                return (require("miq")).inspect
+            }).eval()?;
+            let inspected: LuaString = inspect.call(input.clone())?;
             let s = inspected.to_str()?;
-            trace!("lua trace: {}", s);
-
+            trace!(?input, "luatrace>> {}", s);
             Ok(())
         })?,
     )?;
 
-    module.set("get_result", lua.create_function(lua_env_get_result)?)?;
+    // module.set("get_result", lua.create_function(lua_env_get_result)?)?;
 
     let f: Value = lua.load(LUA_F).eval()?;
     module.set("f", f)?;
@@ -136,57 +160,8 @@ fn create_lua_env() -> Result<Lua> {
     Ok(lua)
 }
 
-fn lua_env_fetch<'lua, 'result>(
-    ctx: &'lua Lua,
-    input: Value<'result>,
-) -> Result<LuaAnyUserData<'result>, LuaError>
-where
-    'lua: 'result,
-{
-    let user_input = ctx.from_value::<FetchInput>(input)?;
-    let result_unit = Unit::try_from(user_input)?;
-    let internal_repr = ctx.create_ser_userdata(result_unit)?;
-    Ok(internal_repr)
-}
 
-fn lua_env_package<'lua, 'result>(
-    ctx: &'lua Lua,
-    input: Value<'result>,
-) -> Result<LuaAnyUserData<'result>, LuaError>
-where
-    'lua: 'result,
-{
-    let user_input: PackageInput = ctx.from_value(input)?;
-    let result_unit = Unit::try_from(user_input)?;
-    let internal_repr = ctx.create_ser_userdata(result_unit)?;
-    Ok(internal_repr)
-}
 
-fn lua_env_f<'lua, 'result>(
-    ctx: &'lua Lua,
-    input: LuaString<'result>,
-) -> Result<LuaString<'result>, LuaError>
-where
-    'lua: 'result,
-{
-    let repr = input.to_str()?;
-    trace!(?repr);
-
-    let output: LuaString = input;
-
-    Ok(output)
-}
-
-fn lua_env_get_result<'lua, 'result>(
-    ctx: &'lua Lua,
-    input: Value,
-) -> Result<Value<'result>, LuaError>
-where
-    'lua: 'result,
-{
-    let input: Unit = ctx.from_value(input)?;
-    ctx.to_value(&input.result())
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Educe)]
 #[educe(Default)]
@@ -197,198 +172,8 @@ pub enum MetaTextInput {
     Full(MetaText),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Default)]
 pub struct MetaText {
-    deps: Vec<String>,
-    value: String,
+    pub deps: Vec<MiqResult>,
+    pub value: String,
 }
-
-pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
-    let path = path.as_ref();
-    info!("Loading {:?}", path);
-
-    let lua = create_lua_env()?;
-
-    let toplevel_export_lua: Table = lua.load(&std::fs::read_to_string(path)?).eval()?;
-
-    let mut toplevel_export: BTreeMap<String, Unit> = BTreeMap::new();
-
-    for pair in toplevel_export_lua.pairs::<LuaString, Value>() {
-        let (k, v) = pair?;
-        let k = k.to_str()?.to_owned();
-        let v: Unit = lua.from_value(v)?;
-
-        toplevel_export.insert(k, v);
-    }
-
-    debug!(?toplevel_export);
-
-    for (_, elem) in &toplevel_export {
-        let result = match &elem {
-            Unit::PackageUnit(inner) => &inner.result,
-            Unit::FetchUnit(inner) => &inner.result,
-        };
-
-        let path = format!("/miq/eval/{}.toml", result);
-        trace!(?path);
-
-        let serialized = toml::to_string_pretty(&elem)?;
-        std::fs::write(path, serialized)?;
-    }
-
-    Ok(toplevel_export)
-}
-
-/// Input to the lua fetch function, which will transform it into a proper Fetch
-#[derive(Educe, Serialize, Deserialize, Hash)]
-#[educe(Debug)]
-struct FetchInput {
-    #[educe(Debug(trait = "std::fmt::Display"))]
-    url: Url,
-    executable: Option<bool>,
-}
-
-/// Input to the lua package function, which will transform it into a proper Package
-#[derive(Debug, Serialize, Deserialize, Hash)]
-struct PackageInput {
-    name: String,
-    version: Option<String>,
-    script: Option<MetaTextInput>,
-    deps: Option<Vec<Unit>>,
-    env: Option<BTreeMap<String, String>>,
-}
-
-fn hash_string<H: Hash>(input: &H) -> String {
-    let mut hasher = fnv::FnvHasher::default();
-    input.hash(&mut hasher);
-    let result = hasher.finish();
-    let s = format!("{:x}", result);
-    s
-}
-
-impl LuaUserData for Unit {}
-
-impl TryFrom<FetchInput> for Unit {
-    type Error = LuaError;
-
-    #[tracing::instrument(level = "trace", ret, err)]
-    fn try_from(value: FetchInput) -> std::result::Result<Self, Self::Error> {
-        let name = value
-            .url
-            .path_segments()
-            .expect("URL doesn't have segments")
-            .last()
-            .unwrap()
-            .to_owned();
-
-        let hash = hash_string(&value);
-        let result = format!("{}-{}", name, hash);
-
-        let result = Fetch {
-            result,
-            name,
-            url: value.url.to_string(),
-            integrity: String::from("FIXME"),
-            executable: value.executable.unwrap_or_default(),
-        };
-
-        Ok(Unit::FetchUnit(result))
-    }
-}
-
-impl TryFrom<PackageInput> for Unit {
-    type Error = LuaError;
-
-    fn try_from(value: PackageInput) -> std::result::Result<Self, Self::Error> {
-        let hash = hash_string(&value);
-        let result = format!("{}-{}", value.name, hash);
-
-        let mut deps = value
-            .deps
-            .unwrap_or_default()
-            .iter()
-            .map(|elem| match elem {
-                Unit::PackageUnit(inner) => inner.result.clone(),
-                Unit::FetchUnit(inner) => inner.result.clone(),
-            })
-            .collect::<Vec<_>>();
-
-        trace!(?deps);
-
-        let script = match value.script.unwrap_or_default() {
-            MetaTextInput::Simple(inner) => inner,
-            MetaTextInput::Full(inner) => {
-                deps.extend(inner.deps);
-                inner.value
-            }
-        };
-
-        let script = dedent(&script);
-
-        let result = Package {
-            result,
-            name: value.name,
-            version: value.version.unwrap_or_default(),
-            script,
-            env: value.env.unwrap_or_default(),
-            deps,
-        };
-
-        Ok(Unit::PackageUnit(result))
-    }
-}
-
-// module.set("f", lua.create_function(lua_f_string)?)?;
-// lua.load(chunk! {
-//     local inspect = require "inspect"
-
-// function copy(t)
-//   if type(t) == "table" then
-//     local ans = {}
-//     for k,v in next,t do ans[ k ] = v end
-//     return ans
-//   end
-//   return t
-// end
-
-// function f(s)
-//   local env = copy(_ENV)
-//   local i,k,v,fmt = 0
-//   repeat
-//     i = i + 1
-//     k,v = debug.getlocal(2,i)
-//     if k ~= nil then env[k] = v end
-//   until k == nil
-//   print(inspect(env))
-// end
-
-//         })
-// .exec()?;
-
-// #[tracing::instrument(level = "debug", ret, err)]
-// fn lua_f_string(ctx: &Lua, input: LuaString) -> Result<LuaNumber, LuaError> {
-//     let globals = ctx.globals();
-
-//     ctx.load(chunk! {
-// function copy(t)
-//   if type(t) == "table" then
-//     local ans = {}
-//     for k,v in next,t do ans[ k ] = v end
-//     return ans
-//   end
-//   return t
-// end
-
-// local env = copy(_ENV)
-//   local i,k,v,fmt = 0
-//   repeat
-//     i = i + 1
-//     k,v = debug.getlocal(2,i)
-//     if k ~= nil then env[k] = v end
-//   until k == nil
-
-//   print(inspect(env))
-//     }).exec()?;
-
-//     Ok(0.0)
-// }

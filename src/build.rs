@@ -11,7 +11,7 @@ use color_eyre::eyre::{bail, Context};
 use daggy::petgraph;
 use tracing::{debug, trace};
 
-use crate::eval::UnitRef;
+use crate::eval::{UnitRef, MiqPath};
 use crate::schema_eval::{Fetch, Package, Unit};
 use crate::*;
 
@@ -57,7 +57,7 @@ pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
 impl Args {
     pub fn main(&self) -> Result<()> {
         let result = eval::dispatch(&self.unit_ref)?;
-        let dag = eval::dag(result)?;
+        let dag = eval::dag(result.0)?;
 
         let sorted_dag = petgraph::algo::toposort(&dag, None)
             .expect("DAG was not acyclic!")
@@ -87,7 +87,7 @@ impl Args {
 
 #[tracing::instrument(skip(_build_args), ret, level = "info")]
 fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<PathBuf> {
-    let path = PathBuf::from(format!("/miq/store/{}", input.result));
+    let path = MiqPath::from(&input.result).0;
 
     if db::is_db_path(&path)? {
         if rebuild {
@@ -123,7 +123,7 @@ fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<PathB
 
 #[tracing::instrument(skip(_build_args), ret, err, level = "info")]
 fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<PathBuf> {
-    let path = PathBuf::from(format!("/miq/store/{}", input.result));
+    let path = MiqPath::from(&input.result).0;
 
     if db::is_db_path(&path)? {
         if rebuild {

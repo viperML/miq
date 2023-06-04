@@ -11,6 +11,8 @@ use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
+use crate::eval::MiqResult;
+
 #[derive(Debug, clap::Args)]
 pub struct Args {
     /// Generate dummy data to test the schema
@@ -55,32 +57,17 @@ pub enum Unit {
     FetchUnit(Fetch),
 }
 
-impl Unit {
-    pub fn from_result<P: AsRef<str>>(r: P) -> Result<Unit> {
-        let r = r.as_ref();
-        let filename = format!("/miq/eval/{}.toml", r);
-        let contents = std::fs::read_to_string(filename)?;
-        Ok(toml::from_str(contents.as_str())?)
-    }
-
-    pub fn result(self) -> String {
-        match self {
-            Unit::PackageUnit(inner) => inner.result,
-            Unit::FetchUnit(inner) => inner.result,
-        }
-    }
-}
 
 #[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Default, Hash)]
 #[educe(Debug)]
 pub struct Package {
     #[educe(Debug(ignore))]
-    pub result: String,
+    pub result: MiqResult,
     pub name: String,
     #[educe(Debug(ignore))]
     pub version: String,
     #[educe(Debug(ignore))]
-    pub deps: Vec<String>,
+    pub deps: Vec<MiqResult>,
     #[educe(Debug(ignore))]
     pub script: String,
     #[educe(Debug(ignore))]
@@ -91,7 +78,7 @@ pub struct Package {
 #[educe(Debug)]
 pub struct Fetch {
     #[educe(Debug(ignore))]
-    pub result: String,
+    pub result: MiqResult,
     pub name: String,
     #[educe(Debug(ignore))]
     pub url: String,

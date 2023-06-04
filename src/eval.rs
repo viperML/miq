@@ -1,14 +1,18 @@
+use std::hash::Hash;
 use std::path::Path;
 use std::str::FromStr;
 
-use color_eyre::eyre::{bail, ContextCompat, Context};
+use color_eyre::eyre::{bail, Context, ContextCompat};
 use color_eyre::{Report, Result};
 use daggy::petgraph::algo::toposort;
 use daggy::petgraph::dot::{Config, Dot};
 use daggy::petgraph::visit::Topo;
 use daggy::{petgraph, Dag, NodeIndex, Walker};
 use schema_eval::Unit;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use tracing::{info, trace};
+use tracing_subscriber::fmt::format;
 
 use crate::*;
 
@@ -42,6 +46,8 @@ pub struct Args {
     /// Write the resulting graph to this file
     #[arg(short, long)]
     output_file: Option<PathBuf>,
+    #[arg(short, long)]
+    no_dag: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -67,7 +73,7 @@ impl FromStr for UnitRef {
                 }
             }
             &[path, element] => Self::Lua(LuaRef {
-                root: path.into(),
+                main: path.into(),
                 element: element.into(),
             }),
             _ => bail!("Input is not a valid UnitRef"),
@@ -78,27 +84,29 @@ impl FromStr for UnitRef {
 
 #[derive(Debug, Clone)]
 pub struct LuaRef {
-    root: PathBuf,
+    /// Luafile to evaluate
+    main: PathBuf,
+    /// element to evaluate
     element: String,
 }
 
-pub fn dispatch(unit_ref: &UnitRef) -> Result<String> {
-    let result: String = match unit_ref {
-        UnitRef::Serialized(inner) => inner
-            .to_str()
-            .unwrap()
-            .replace("/miq/eval/", "")
-            .replace(".toml", ""),
+pub fn dispatch(unit_ref: &UnitRef) -> Result<MiqResult> {
+    let result = match unit_ref {
+        UnitRef::Serialized(inner) => {
+            todo!("Accept serialized unitefs");
+        },
 
         // Dispatch to inner lua evaluator
         UnitRef::Lua(inner) => {
-            let toplevel = crate::lua::evaluate(&inner.root)?;
+            // let toplevel = crate::lua::evaluate(&inner.root)?;
+            let toplevel = crate::lua::evaluate(&inner.main)?;
             let selected_unit = toplevel
                 .get(&inner.element)
                 .context(format!("Getting element {:?}", inner.element))
                 .context("Unit wasn't found")?
                 .clone();
-            selected_unit.result()
+
+            selected_unit.into()
         }
     };
 
@@ -110,7 +118,11 @@ impl Args {
         let result = dispatch(&self.unit_ref)?;
         info!(?result);
 
-        let dag = dag(result)?;
+        if self.no_dag {
+            return Ok(());
+        };
+
+        let dag = dag(result.0)?;
 
         let dot = Dot::with_attr_getters(
             // -
@@ -191,7 +203,8 @@ fn cycle_dag(dag: &mut UnitNodeDag, node: NodeIndex) -> Result<()> {
                 for elem in &inner.deps {
                     trace!("I want to create {:?}", elem);
 
-                    let target = Unit::from_result(elem)?;
+                    // let target = Unit::from_result(elem)?;
+                    let target = elem.read_unit()?;
 
                     for parent in Topo::new(&old_dag).iter(&old_dag) {
                         let p = &old_dag[parent].inner;
@@ -224,3 +237,58 @@ fn cycle_dag(dag: &mut UnitNodeDag, node: NodeIndex) -> Result<()> {
 
     Ok(())
 }
+
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default)]
+pub struct MiqResult(pub String);
+
+impl MiqResult {
+    pub fn create<H: Hash>(name: &str, hashable: &H) -> MiqResult {
+        let mut hasher = fnv::FnvHasher::default();
+        hashable.hash(&mut hasher);
+        let hash_result = std::hash::Hasher::finish(&hasher);
+        let hash_string = format!("{:x}", hash_result);
+        MiqResult(format!("{}-{}", name, hash_result))
+    }
+}
+
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default)]
+pub struct MiqPath(pub PathBuf);
+
+impl AsRef<Path> for MiqPath {
+    fn as_ref(&self) -> &Path {
+        self.0.as_ref()
+    }
+}
+
+impl From<&MiqResult> for MiqPath {
+    fn from(value: &MiqResult) -> Self {
+        let inner = PathBuf::from_iter(["/miq/store", &value.0]);
+        Self(inner)
+    }
+}
+
+impl MiqResult {
+    pub fn read_unit(&self) -> Result<Unit> {
+        let path = MiqPath::from(self);
+        let contents = std::fs::read_to_string(path)?;
+        let unit = toml::from_str(contents.as_str())?;
+
+        Ok(unit)
+    }
+}
+
+impl From<Unit> for MiqPath {
+    fn from(value: Unit) -> Self {
+        todo!()
+    }
+}
+
+impl From<Unit> for MiqResult {
+    fn from(value: Unit) -> Self {
+        match value {
+            Unit::PackageUnit(inner) => inner.result,
+            Unit::FetchUnit(inner) => inner.result,
+        }
+    }
+}
+
