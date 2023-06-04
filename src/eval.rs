@@ -12,7 +12,7 @@ use daggy::{petgraph, Dag, NodeIndex, Walker};
 use schema_eval::Unit;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use tracing::{info, trace};
+use tracing::{info, trace, instrument};
 use tracing_subscriber::fmt::format;
 
 use crate::*;
@@ -247,19 +247,9 @@ impl MiqResult {
         hashable.hash(&mut hasher);
         let hash_result = std::hash::Hasher::finish(&hasher);
         let hash_string = format!("{:x}", hash_result);
-        MiqResult(format!("{}-{}", name, hash_result))
+        MiqResult(format!("{}-{}", name, hash_string))
     }
 }
-
-// impl MiqResult {
-//     pub fn read_unit(&self) -> Result<Unit> {
-//         let path = MiqPath::from(self);
-//         let contents = std::fs::read_to_string(path)?;
-//         let unit = toml::from_str(contents.as_str())?;
-
-//         Ok(unit)
-//     }
-// }
 
 impl From<Unit> for MiqResult {
     fn from(value: Unit) -> Self {
@@ -273,8 +263,10 @@ impl From<Unit> for MiqResult {
 impl TryFrom<&MiqResult> for Unit {
     type Error = Report;
 
+    #[instrument(ret, err, level="trace")]
     fn try_from(value: &MiqResult) -> std::result::Result<Self, Self::Error> {
-        let path = MiqPath::from(value);
+        let path: MiqEvalPath = value.into();
+        trace!(?path);
         let raw_text = std::fs::read_to_string(path)?;
         let result = toml::from_str(&raw_text)?;
         Ok(result)
@@ -282,35 +274,60 @@ impl TryFrom<&MiqResult> for Unit {
 }
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default)]
-pub struct MiqPath(PathBuf);
+pub struct MiqEvalPath(PathBuf);
 
-impl AsRef<Path> for MiqPath {
+impl From<&MiqResult> for MiqEvalPath {
+    fn from(value: &MiqResult) -> Self {
+        let path_str = &["/miq/eval/", &value.0, ".toml"].join("");
+        MiqEvalPath(PathBuf::from(path_str))
+    }
+}
+
+#[test]
+fn test_get_evalpath() {
+    let input = MiqResult("hello-world-AAAA".into());
+    let output: MiqEvalPath = (&input).into();
+    let output_expected = MiqEvalPath("/miq/eval/hello-world-AAAA.toml".into());
+    assert_eq!(output, output_expected);
+}
+
+impl AsRef<Path> for MiqEvalPath {
     fn as_ref(&self) -> &Path {
         self.0.as_ref()
     }
 }
 
-impl AsRef<OsStr> for MiqPath {
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default)]
+pub struct MiqStorePath(PathBuf);
+
+impl From<&MiqResult> for MiqStorePath {
+    fn from(value: &MiqResult) -> Self {
+        let path_str = &["/miq/eval/", &value.0].join("");
+        MiqStorePath(PathBuf::from(path_str))
+    }
+}
+#[test]
+fn test_get_storepath() {
+    let input = MiqResult("hello-world-AAAA".into());
+    let output: MiqStorePath = (&input).into();
+    let output_expected = MiqStorePath("/miq/eval/hello-world-AAAA".into());
+    assert_eq!(output, output_expected);
+}
+
+impl AsRef<Path> for MiqStorePath {
+    fn as_ref(&self) -> &Path {
+        self.0.as_ref()
+    }
+}
+
+impl AsRef<OsStr> for MiqStorePath {
     fn as_ref(&self) -> &OsStr {
         self.0.as_os_str()
     }
 }
 
-impl From<&MiqResult> for MiqPath {
-    fn from(value: &MiqResult) -> Self {
-        let inner = PathBuf::from_iter(["/miq/store", &value.0]);
-        Self(inner)
-    }
-}
-
-impl MiqPath {
+impl MiqStorePath {
     pub fn try_exists(&self) -> std::io::Result<bool> {
         self.0.try_exists()
     }
 }
-
-// impl From<Unit> for MiqPath {
-//     fn from(value: Unit) -> Self {
-//         todo!()
-//     }
-// }

@@ -12,7 +12,7 @@ use color_eyre::eyre::{bail, Context};
 use daggy::petgraph;
 use tracing::{debug, trace};
 
-use crate::eval::{MiqPath, UnitRef};
+use crate::eval::{MiqStorePath, UnitRef};
 use crate::schema_eval::{Fetch, Package, Unit};
 use crate::*;
 
@@ -88,7 +88,7 @@ impl Args {
 
 #[tracing::instrument(skip(_build_args), ret, level = "info")]
 fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<()> {
-    let path = MiqPath::from(&input.result);
+    let path: MiqStorePath = (&input.result).into();
 
     if db::is_db_path(&path)? {
         if rebuild {
@@ -124,21 +124,18 @@ fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<()> {
 
 #[tracing::instrument(skip(_build_args), ret, level = "info")]
 fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<()> {
-    let miq_path: MiqPath = MiqPath::from(&input.result);
+    let path: MiqStorePath = (&input.result).into();
 
-    if db::is_db_path(&miq_path)? {
+    if db::is_db_path(&path)? {
         if rebuild {
-            db::remove(&miq_path)?;
+            db::remove(&path)?;
         } else {
             return Ok(());
         }
     }
 
     let mut miq_env: HashMap<&OsStr, &OsStr> = HashMap::new();
-    miq_env.insert(
-        OsStr::new("miq_out"),
-        miq_path.as_ref(),
-    );
+    miq_env.insert(OsStr::new("miq_out"), path.as_ref());
 
     // FIXME
     // miq_env.insert("HOME", "/home/ayats");
@@ -154,13 +151,13 @@ fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<(
     let sandbox = sandbox::SandBox {};
     sandbox.run(&mut cmd)?;
 
-    match miq_path.try_exists().wrap_err("Failed to produce an output") {
+    match path.try_exists().wrap_err("Failed to produce an output") {
         Ok(true) => {}
-        Ok(false) => bail!("Output path doesn't exist: {:?}", miq_path),
+        Ok(false) => bail!("Output path doesn't exist: {:?}", path),
         Err(e) => bail!(e),
     }
 
-    db::add(&miq_path)?;
+    db::add(&path)?;
 
     Ok(())
 }
