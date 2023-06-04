@@ -301,7 +301,7 @@ pub struct MiqStorePath(PathBuf);
 
 impl From<&MiqResult> for MiqStorePath {
     fn from(value: &MiqResult) -> Self {
-        let path_str = &["/miq/build/", &value.0].join("");
+        let path_str = &["/miq/store/", &value.0].join("");
         MiqStorePath(PathBuf::from(path_str))
     }
 }
@@ -309,7 +309,7 @@ impl From<&MiqResult> for MiqStorePath {
 fn test_get_storepath() {
     let input = MiqResult("hello-world-AAAA".into());
     let output: MiqStorePath = (&input).into();
-    let output_expected = MiqStorePath("/miq/build/hello-world-AAAA".into());
+    let output_expected = MiqStorePath("/miq/store/hello-world-AAAA".into());
     assert_eq!(output, output_expected);
 }
 
