@@ -122,7 +122,7 @@ fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<()> {
     Ok(())
 }
 
-#[tracing::instrument(skip(_build_args), ret, level = "info")]
+#[tracing::instrument(skip(_build_args), ret, err, level = "info")]
 fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<()> {
     let path: MiqStorePath = (&input.result).into();
 
