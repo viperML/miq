@@ -3,7 +3,7 @@
  Wipe cache with:
  rm ~/.config/Code/User/globalStorage/tamasfe.even-better-toml/*
 */ */
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{HashMap, BTreeMap, HashSet, BTreeSet};
 use std::ffi::OsString;
 use std::path::PathBuf;
 
@@ -68,7 +68,7 @@ pub struct Package {
     #[educe(Debug(ignore))]
     pub version: String,
     #[educe(Debug(ignore))]
-    pub deps: Vec<MiqResult>,
+    pub deps: BTreeSet<MiqResult>,
     #[educe(Debug(ignore))]
     pub script: String,
     #[educe(Debug(ignore))]

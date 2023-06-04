@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet, BTreeSet};
 use std::ffi::OsString;
 
 use mlua::prelude::*;
@@ -44,6 +44,7 @@ impl TryFrom<PackageInput> for Unit {
     fn try_from(value: PackageInput) -> std::result::Result<Self, Self::Error> {
         let result = MiqResult::create(&value.name, &value);
 
+        // Collect into Set to remove dupes
         let mut deps = value
             .deps
             .unwrap_or_default()
@@ -52,7 +53,7 @@ impl TryFrom<PackageInput> for Unit {
                 Unit::PackageUnit(inner) => inner.result.clone(),
                 Unit::FetchUnit(inner) => inner.result.clone(),
             })
-            .collect::<Vec<_>>();
+            .collect::<BTreeSet<_>>();
 
         trace!(?deps);
 
@@ -63,9 +64,6 @@ impl TryFrom<PackageInput> for Unit {
                 inner.value
             }
         };
-        // let meta_text = value.script.unwrap_or_default();
-        // let script = meta_text.value;
-        // deps.extend(meta_text.deps);
 
         let script = dedent(&script);
 

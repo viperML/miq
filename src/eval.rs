@@ -155,7 +155,7 @@ impl Args {
     }
 }
 
-#[tracing::instrument(skip_all, ret, level = "debug")]
+#[tracing::instrument(skip_all, ret, err, level = "debug")]
 pub fn dag(input: &MiqResult) -> Result<UnitDag> {
     let mut dag = UnitNodeDag::new();
     let root_n_weight: Unit = input.try_into()?;
@@ -239,8 +239,10 @@ fn cycle_dag(dag: &mut UnitNodeDag, node: NodeIndex) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default, PartialOrd, Eq, Ord)]
 pub struct MiqResult(String);
+
+
 
 impl MiqResult {
     pub fn create<H: Hash>(name: &str, hashable: &H) -> MiqResult {

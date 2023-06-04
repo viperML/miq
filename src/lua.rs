@@ -15,7 +15,7 @@ use textwrap::dedent;
 use tracing::{debug, info, trace, warn};
 use url::Url;
 
-use crate::eval::MiqResult;
+use crate::eval::{MiqResult, MiqEvalPath};
 use crate::lua_fetch::FetchInput;
 use crate::schema_eval::{Fetch, Package, Unit};
 
@@ -58,18 +58,13 @@ pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
 
     debug!(?toplevel_export);
 
-    // for (_, elem) in &toplevel_export {
-    //     let result = match &elem {
-    //         Unit::PackageUnit(inner) => &inner.result,
-    //         Unit::FetchUnit(inner) => &inner.result,
-    //     };
+    for (_, elem) in toplevel_export.clone() {
+        let result: MiqResult = elem.clone().into();
+        let eval_path: MiqEvalPath = (&result).into();
 
-    //     let path = format!("/miq/eval/{}.toml", result);
-    //     trace!(?path);
-
-    //     let serialized = toml::to_string_pretty(&elem)?;
-    //     std::fs::write(path, serialized)?;
-    // }
+        let serialized = toml::to_string_pretty(&elem)?;
+        std::fs::write(eval_path, serialized)?;
+    }
 
     Ok(toplevel_export)
 }
