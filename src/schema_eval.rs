@@ -66,7 +66,7 @@ pub struct Package {
     pub result: MiqResult,
     pub name: String,
     #[educe(Debug(ignore))]
-    pub version: String,
+    pub version: Option<String>,
     #[educe(Debug(ignore))]
     pub deps: BTreeSet<MiqResult>,
     #[educe(Debug(ignore))]

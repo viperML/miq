@@ -12,7 +12,7 @@ use daggy::{petgraph, Dag, NodeIndex, Walker};
 use schema_eval::Unit;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use tracing::{info, trace, instrument};
+use tracing::{info, instrument, trace};
 use tracing_subscriber::fmt::format;
 
 use crate::*;
@@ -91,7 +91,7 @@ pub struct LuaRef {
     element: String,
 }
 
-#[instrument(ret, err, level="info")]
+#[instrument(ret, err, level = "info")]
 pub fn dispatch(unit_ref: &UnitRef) -> Result<MiqResult> {
     let result = match unit_ref {
         UnitRef::Serialized(inner) => {
@@ -133,7 +133,11 @@ impl Args {
             &|_, _| String::new(),
             &|_, (_, weight)| match weight {
                 Unit::PackageUnit(inner) => {
-                    format!("label = \"{}-{}\" ", inner.name, inner.version)
+                    if let Some(ref v) = inner.version {
+                        format!("label = \"{}-{}\" ", inner.name, v)
+                    } else {
+                        format!("label = \"{}\" ", inner.name)
+                    }
                 }
                 Unit::FetchUnit(inner) => format!("label = \"{}\" ", inner.name),
             },
@@ -239,10 +243,10 @@ fn cycle_dag(dag: &mut UnitNodeDag, node: NodeIndex) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default, PartialOrd, Eq, Ord)]
+#[derive(
+    Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default, PartialOrd, Eq, Ord,
+)]
 pub struct MiqResult(String);
-
-
 
 impl MiqResult {
     pub fn create<H: Hash>(name: &str, hashable: &H) -> MiqResult {

@@ -87,7 +87,7 @@ impl TryFrom<PackageInput> for Unit {
         let result = Package {
             result,
             name: value.name,
-            version: value.version.unwrap_or_default(),
+            version: value.version,
             script: script.into(),
             env,
             deps,
