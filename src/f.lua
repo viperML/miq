@@ -1,10 +1,14 @@
 local miq = require("miq")
 
----@alias Metatext
+---@alias MetaText
 ---| { value: string, deps: string[] }
 
+---@alias MetaTextInput
+---| MetaText
+---| string
+
 ---@param str string
----@return Metatext substituted
+---@return MetaTextInput result
 local f = function(str)
   local outer_env = _ENV
 
@@ -52,7 +56,13 @@ local f = function(str)
 
   result.value = substituted
 
-  return result
+  -- Serde doesn't like an empty list to deser
+  -- So return just the inner text
+  if next(result.deps) == nil then
+    return result.value
+  else
+    return result
+  end
 end
 
 return f

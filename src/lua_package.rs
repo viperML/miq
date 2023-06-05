@@ -17,7 +17,7 @@ use crate::schema_eval::{Fetch, Package, Unit};
 struct PackageInput {
     name: String,
     version: Option<String>,
-    script: Option<MetaTextInput>,
+    script: MetaTextInput,
     deps: Option<Vec<Unit>>,
     env: Option<BTreeMap<String, String>>,
 }
@@ -57,7 +57,7 @@ impl TryFrom<PackageInput> for Unit {
 
         trace!(?deps);
 
-        let script = match value.script.unwrap_or_default() {
+        let script = match value.script {
             MetaTextInput::Simple(inner) => inner,
             MetaTextInput::Full(inner) => {
                 deps.extend(inner.deps);

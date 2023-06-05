@@ -28,20 +28,18 @@ pkgs.unpack_bootstrap_tools = fetch {
   executable = true
 }
 
-pkgs.foo = package {
-  name = "foo",
-  version = "1.0",
-  deps = {
-  },
-  script = f[[
+
+pkgs.test = package {
+  name = "test",
+  script =  f[[
     set -x
-    {{pkgs.busybox}} ls
-    ls ${HOME}
-    exit 1
+    echo $FOO
+    echo $FOO2
+    exit 2
   ]],
   env = {
     FOO = "bar",
-    FOOO = "baar",
+    FOO2 = "{{pkgs.busybox}}"
   }
 }
 

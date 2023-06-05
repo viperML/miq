@@ -44,7 +44,7 @@ pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
 
     let lua = create_lua_env()?;
 
-    let toplevel_export_lua: Table = lua.load(&std::fs::read_to_string(path)?).eval()?;
+    let toplevel_export_lua: Table = lua.load(path).eval()?;
 
     let mut toplevel_export: BTreeMap<String, Unit> = BTreeMap::new();
 
