@@ -64,15 +64,15 @@ impl FromStr for UnitRef {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let components: Vec<_> = s.split('#').collect();
 
-        let result = match &*components {
-            &[path] => {
+        let result = match *components {
+            [path] => {
                 if path.starts_with("/miq/eval") {
                     Self::Serialized(path.into())
                 } else {
                     bail!("Input is not a valid UnitRef")
                 }
             }
-            &[path, element] => Self::Lua(LuaRef {
+            [path, element] => Self::Lua(LuaRef {
                 main: path.into(),
                 element: element.into(),
             }),

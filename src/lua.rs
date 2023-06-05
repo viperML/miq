@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::hash::{Hash, Hasher};
+use std::hash::{Hash};
 use std::path::{Path, PathBuf};
 
 use color_eyre::eyre::bail;
@@ -7,7 +7,6 @@ use color_eyre::Result;
 use mlua::prelude::*;
 use mlua::{chunk, StdLib, Table, Value};
 use serde::{Deserialize, Serialize};
-use sha2::Digest;
 use tracing::{debug, info, trace};
 
 use crate::eval::{MiqEvalPath, MiqResult};
