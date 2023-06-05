@@ -39,7 +39,7 @@ pkgs.test = package {
   ]],
   env = {
     FOO = "bar",
-    FOO2 = "{{pkgs.busybox}}"
+    FOO2 = f"{{pkgs.busybox}}"
   }
 }
 

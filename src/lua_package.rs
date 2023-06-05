@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::ffi::OsString;
 
 use mlua::prelude::*;
@@ -19,7 +19,7 @@ struct PackageInput {
     version: Option<String>,
     script: MetaTextInput,
     deps: Option<Vec<Unit>>,
-    env: Option<BTreeMap<String, String>>,
+    env: Option<BTreeMap<String, MetaTextInput>>,
 }
 
 fn package<'lua, 'result>(ctx: &'lua Lua, input: Value<'result>) -> Result<Value<'result>, LuaError>
@@ -65,6 +65,23 @@ impl TryFrom<PackageInput> for Unit {
             }
         };
 
+        let meta_env = value.env.unwrap_or_default();
+
+        let env = meta_env
+            .into_iter()
+            .map(|(k, v)| {
+                let new_val = match v {
+                    MetaTextInput::Simple(inner) => inner,
+                    MetaTextInput::Full(inner) => {
+                        deps.extend(inner.deps);
+                        inner.value
+                    }
+                };
+
+                (k, new_val)
+            })
+            .collect();
+
         let script = dedent(&script);
 
         let result = Package {
@@ -72,7 +89,7 @@ impl TryFrom<PackageInput> for Unit {
             name: value.name,
             version: value.version.unwrap_or_default(),
             script: script.into(),
-            env: value.env.unwrap_or_default(),
+            env,
             deps,
         };
 
