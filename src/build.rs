@@ -1,9 +1,7 @@
 use std::collections::HashMap;
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
 use std::fmt::Debug;
-use std::fs::File;
-use std::os::unix::prelude::PermissionsExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 use std::{fs, io};
 

@@ -1,23 +1,17 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
-use std::ptr::hash;
 
-use color_eyre::eyre::{bail, Context};
+use color_eyre::eyre::bail;
 use color_eyre::Result;
 use mlua::prelude::*;
-use mlua::serde::de;
 use mlua::{chunk, StdLib, Table, Value};
 use serde::{Deserialize, Serialize};
-use sha2::digest::Update;
-use sha2::{Digest, Sha256};
-use textwrap::dedent;
-use tracing::{debug, info, trace, warn};
-use url::Url;
+use sha2::Digest;
+use tracing::{debug, info, trace};
 
-use crate::eval::{MiqResult, MiqEvalPath};
-use crate::lua_fetch::FetchInput;
-use crate::schema_eval::{Fetch, Package, Unit};
+use crate::eval::{MiqEvalPath, MiqResult};
+use crate::schema_eval::Unit;
 
 // impl LuaUserData for Unit {}
 
@@ -106,8 +100,8 @@ where
 //     }
 // }
 
-static LUA_INSPECT: &'static str = std::include_str!("inspect.lua");
-static LUA_F: &'static str = std::include_str!("f.lua");
+static LUA_INSPECT: &str = std::include_str!("inspect.lua");
+static LUA_F: &str = std::include_str!("f.lua");
 
 fn create_lua_env() -> Result<Lua> {
     let lua = unsafe {

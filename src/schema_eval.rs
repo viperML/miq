@@ -3,8 +3,7 @@
  Wipe cache with:
  rm ~/.config/Code/User/globalStorage/tamasfe.even-better-toml/*
 */ */
-use std::collections::{HashMap, BTreeMap, HashSet, BTreeSet};
-use std::ffi::OsString;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use color_eyre::Result;
@@ -57,7 +56,6 @@ pub enum Unit {
     #[educe(Debug(name = false))]
     FetchUnit(Fetch),
 }
-
 
 #[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Default, Hash)]
 #[educe(Debug)]

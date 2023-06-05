@@ -1,4 +1,4 @@
-#![cfg_attr(debug_assertions, allow(dead_code, unused_imports))]
+// #![cfg_attr(debug_assertions, allow(dead_code, unused_imports))]
 #[macro_use]
 extern crate educe;
 
@@ -6,10 +6,9 @@ mod build;
 mod cli;
 mod db;
 mod eval;
-mod ffi;
+mod lua;
 mod lua_fetch;
 mod lua_package;
-mod lua;
 mod sandbox;
 mod schema_db;
 mod schema_eval;

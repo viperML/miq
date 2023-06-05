@@ -1,16 +1,14 @@
-use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::ffi::OsString;
+use std::collections::{BTreeMap, BTreeSet};
 
 use mlua::prelude::*;
-use mlua::{chunk, Lua, Table, Value};
+use mlua::{Lua, Table, Value};
 use serde::{Deserialize, Serialize};
 use textwrap::dedent;
 use tracing::trace;
-use url::Url;
 
 use crate::eval::MiqResult;
 use crate::lua::MetaTextInput;
-use crate::schema_eval::{Fetch, Package, Unit};
+use crate::schema_eval::{Package, Unit};
 
 /// Input to the lua package function, which will transform it into a proper Package
 #[derive(Debug, Serialize, Deserialize, Hash)]
@@ -88,7 +86,7 @@ impl TryFrom<PackageInput> for Unit {
             result,
             name: value.name,
             version: value.version,
-            script: script.into(),
+            script,
             env,
             deps,
         };

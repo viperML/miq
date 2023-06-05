@@ -16,5 +16,5 @@ pub enum MiqCommands {
     /// Evaluate a unit
     Eval(crate::eval::Args),
     /// -
-    Lua(crate::lua::Args)
+    Lua(crate::lua::Args),
 }

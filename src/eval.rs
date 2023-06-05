@@ -13,7 +13,6 @@ use schema_eval::Unit;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tracing::{info, instrument, trace};
-use tracing_subscriber::fmt::format;
 
 use crate::*;
 
@@ -94,7 +93,7 @@ pub struct LuaRef {
 #[instrument(ret, err, level = "info")]
 pub fn dispatch(unit_ref: &UnitRef) -> Result<MiqResult> {
     let result = match unit_ref {
-        UnitRef::Serialized(inner) => {
+        UnitRef::Serialized(_inner) => {
             todo!("Accept serialized unitefs");
         }
 
