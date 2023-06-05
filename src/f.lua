@@ -14,12 +14,12 @@ local f = function(str)
   local substituted = str:gsub("%b{}", function(block)
     local code = block:match("{{(.*)}}")
     -- Workaround: we are matching {FOO}, skip if we do
-    miq.trace("Got block: "..block)
+    -- miq.trace("Got block: "..block)
     -- Check if code is nil
     if code == nil then
       return block
   end
-    miq.trace("Found string to substitute: "..code)
+    -- miq.trace("Found string to substitute: "..code)
     local exp_env = {}
     setmetatable(exp_env, { __index = function(_, k)
       local stack_level = 5
@@ -39,8 +39,8 @@ local f = function(str)
     local fn, err = load("return "..code, "expression `"..code.."`", "t", exp_env)
     if fn then
       local match_result = fn()
-      miq.trace("Calling get_result with: ")
-      miq.trace(match_result)
+      -- miq.trace("Calling get_result with: ")
+      -- miq.trace(match_result)
       match_result = miq.get_result(match_result)
       -- Append to result.deps list
       table.insert(result.deps, match_result)

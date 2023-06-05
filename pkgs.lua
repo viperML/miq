@@ -28,8 +28,6 @@ pkgs.unpack_bootstrap_tools = fetch {
   executable = true
 }
 
-miq.trace(pkgs)
-
 pkgs.foo = package {
   name = "foo",
   version = "1.0",
@@ -76,6 +74,8 @@ pkgs.bootstrap = package {
   }
 }
 
+
+miq.trace(pkgs)
 
 
 return pkgs

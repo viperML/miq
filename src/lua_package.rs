@@ -27,7 +27,7 @@ where
     'lua: 'result,
 {
     let user_input: PackageInput = ctx.from_value(input)?;
-    trace!(?user_input);
+    // trace!(?user_input);
     let result_unit = Unit::try_from(user_input)?;
     let repr = ctx.to_value(&result_unit)?;
     Ok(repr)

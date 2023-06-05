@@ -86,15 +86,15 @@ impl Args {
     }
 }
 
-#[tracing::instrument(skip(_build_args), ret, level = "info")]
-fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<()> {
+#[tracing::instrument(skip(_build_args), ret, err, level = "info")]
+fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<MiqStorePath> {
     let path: MiqStorePath = (&input.result).into();
 
     if db::is_db_path(&path)? {
         if rebuild {
             db::remove(&path)?;
         } else {
-            return Ok(());
+            return Ok(path);
         }
     }
 
@@ -119,18 +119,18 @@ fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<()> {
 
     db::add(&path)?;
 
-    Ok(())
+    Ok(path)
 }
 
 #[tracing::instrument(skip(_build_args), ret, err, level = "info")]
-fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<()> {
+fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<MiqStorePath> {
     let path: MiqStorePath = (&input.result).into();
 
     if db::is_db_path(&path)? {
         if rebuild {
             db::remove(&path)?;
         } else {
-            return Ok(());
+            return Ok(path);
         }
     }
 
@@ -159,5 +159,5 @@ fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<(
 
     db::add(&path)?;
 
-    Ok(())
+    Ok(path)
 }
