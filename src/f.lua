@@ -49,15 +49,10 @@ local f = function(raw_text)
 			local lua_value = fn()
 
       local text, dep = miq.interpolate(lua_value)
-      table.insert(result.deps, dep)
+      if dep ~= nil then
+        table.insert(result.deps, dep)
+      end
       return text
-
-			-- miq.trace("Calling get_result with: ")
-			-- miq.trace(lua_value)
-			-- lua_value = miq.get_result(lua_value)
-			-- -- Append to result.deps list
-			-- table.insert(result.deps, lua_value)
-			-- return "/miq/store/" .. lua_value
 		else
 			error(err, 0)
 		end

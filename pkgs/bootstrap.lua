@@ -59,7 +59,10 @@ pkgs.stdenv = function(input)
     input.env = {}
   end
 
-  input.env.PATH = f"{{pkgs.bootstrap}}/bin"
+  input.env = {
+    PATH = f"{{pkgs.bootstrap}}/bin",
+    CC = f"{{pkgs.bootstrap}}/bin/gcc"
+  }
 
   return miq.package(input)
 end
@@ -76,13 +79,13 @@ int main() {
 
 pkgs.test_bootstrap = pkgs.stdenv {
   name = "test_bootstrap",
-  script = [[
-    tee main.c <<EOF
-    {{c_example}}
-    EOF
-    cat main.c
-    exit 2
-  ]]
+  script = f[[
+tee main.c <<EOF
+{{c_example}}
+EOF
+
+$CC main.c
+]]
 }
 
 

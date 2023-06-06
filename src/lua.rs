@@ -166,8 +166,6 @@ fn create_lua_env() -> Result<Lua> {
         })?,
     )?;
 
-    module.set("get_result", lua.create_function(get_result)?)?;
-
     module.set("interpolate", lua.create_function(interpolate)?)?;
 
     let f: Value = lua.load(LUA_F).eval()?;
@@ -177,26 +175,25 @@ fn create_lua_env() -> Result<Lua> {
     Ok(lua)
 }
 
-#[instrument(ret, err, level = "trace")]
-fn get_result<'lua>(ctx: &'lua Lua, input: Table) -> Result<Value<'lua>, LuaError> {
-    let input: Unit = ctx.from_value(Value::Table(input))?;
-    let miqresult: MiqResult = input.into();
-    let res = ctx.to_value(&miqresult)?;
-    Ok(res)
-}
-
-#[instrument(ret, err, level = "trace")]
-fn interpolate<'lua>(ctx: &'lua Lua, value: Value) -> Result<(String, String), LuaError> {
-    if let Ok(unit) = ctx.from_value::<Unit>(value) {
-        let miq_result: MiqResult = unit.into();
-        let store_path: MiqStorePath = (&miq_result).into();
-        let store_path: &Path = store_path.as_ref();
-        let left = store_path.to_str().unwrap().to_owned();
-        let right = miq_result.deref().clone();
-        return Ok((left, right));
+fn interpolate<'lua>(ctx: &'lua Lua, value: Value<'lua>) -> Result<(Value<'lua>, Value<'lua>), LuaError> {
+    match value {
+        table @ Value::Table(_) => {
+            if let Ok(unit) = ctx.from_value::<Unit>(table) {
+                let miq_result: MiqResult = unit.into();
+                let store_path: MiqStorePath = (&miq_result).into();
+                let store_path: &Path = store_path.as_ref();
+                let left = store_path.to_str().unwrap().to_owned();
+                let right = miq_result.deref().clone();
+                Ok((ctx.pack(left)?, ctx.pack(right)?))
+            } else {
+                Err(LuaError::DeserializeError("Can't interpolate value".into()))
+            }
+        }
+        s @ Value::String(_) => {
+            Ok((s, Value::Nil))
+        },
+        _ => Err(LuaError::DeserializeError("Can't interpolate value".into())),
     }
-
-    todo!();
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Educe)]
