@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::hash::Hash;
 use std::path::{Path, PathBuf};
 
-use color_eyre::eyre::{bail, Context};
+use color_eyre::eyre::{bail, Context, ContextCompat};
 use color_eyre::Result;
 use mlua::prelude::*;
 use mlua::{chunk, StdLib, Table, Value};
@@ -34,9 +34,13 @@ impl crate::Main for Args {
 
 pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
     let path = path.as_ref();
+    let path = path.canonicalize()?;
     info!("Loading {:?}", path);
 
     let lua = create_lua_env()?;
+
+    let parent = path.parent().wrap_err("Reading input file's parent")?;
+    std::env::set_current_dir(parent).wrap_err(format!("Changing directory to {:?}", parent))?;
 
     let toplevel_export_lua: Table = lua.load(path).eval().wrap_err("Loading input file")?;
 
