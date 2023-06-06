@@ -2,7 +2,7 @@
   packages.trivial = with pkgs.pkgsMusl;
     stdenv.mkDerivation {
       name = "trivial";
-      src = ./pkgs;
+      src = ./.;
       NIX_DEBUG = "1";
 
       buildPhase = ''
