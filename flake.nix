@@ -43,7 +43,7 @@
         imports = [
           ./devshell.nix
           ./packages.nix
-          ./pkgs/trivial.nix
+          ./pkgs
         ];
       };
     };
