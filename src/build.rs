@@ -53,8 +53,8 @@ pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
     }
 }
 
-impl Args {
-    pub fn main(&self) -> Result<()> {
+impl crate::Main for  Args {
+    fn main(&self) -> Result<()> {
         let result = eval::dispatch(&self.unit_ref)?;
         let dag = eval::dag(&result)?;
 

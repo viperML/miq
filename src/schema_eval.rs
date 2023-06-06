@@ -23,8 +23,8 @@ pub struct Args {
     parse: Option<PathBuf>,
 }
 
-impl Args {
-    pub fn main(&self) -> Result<()> {
+impl crate::Main for Args {
+    fn main(&self) -> Result<()> {
         if let Some(p) = &self.parse {
             let s = std::fs::read_to_string(p)?;
             let result: Unit = toml::from_str(&s)?;

@@ -114,8 +114,8 @@ pub fn dispatch(unit_ref: &UnitRef) -> Result<MiqResult> {
     Ok(result)
 }
 
-impl Args {
-    pub fn main(&self) -> Result<()> {
+impl crate::Main for Args {
+    fn main(&self) -> Result<()> {
         let result = dispatch(&self.unit_ref)?;
         info!(?result);
 

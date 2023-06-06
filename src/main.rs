@@ -3,7 +3,6 @@
 extern crate educe;
 
 mod build;
-mod cli;
 mod db;
 mod eval;
 mod lua;
@@ -15,12 +14,16 @@ mod schema_eval;
 
 use std::path::PathBuf;
 
+use ambassador::{delegatable_trait, Delegate};
 use clap::Parser;
 use color_eyre::Result;
 use tracing_subscriber::prelude::*;
 
 fn setup_logging() -> Result<()> {
-    color_eyre::install()?;
+    color_eyre::config::HookBuilder::default()
+        .display_location_section(true)
+        .display_env_section(false)
+        .install()?;
 
     let layer_filter = tracing_subscriber::EnvFilter::from_default_env()
         .add_directive("info".parse()?)
@@ -45,14 +48,33 @@ fn setup_logging() -> Result<()> {
 
 fn main() -> Result<()> {
     setup_logging()?;
+    let parsed = CliParser::parse();
+    parsed.command.main()
+}
 
-    let parsed = cli::CliParser::parse();
+#[delegatable_trait]
+pub trait Main {
+    fn main(&self) -> Result<()>;
+}
 
-    match parsed.command {
-        cli::MiqCommands::Schema(args) => args.main(),
-        cli::MiqCommands::Build(args) => args.main(),
-        cli::MiqCommands::Store(args) => db::cli_dispatch(args),
-        cli::MiqCommands::Eval(args) => args.main(),
-        cli::MiqCommands::Lua(args) => args.main(),
-    }
+#[derive(clap::Parser, Debug)]
+pub struct CliParser {
+    #[command(subcommand)]
+    pub command: MiqCommands,
+}
+
+#[derive(clap::Subcommand, Debug, Delegate)]
+#[clap(disable_help_subcommand(true))]
+#[delegate(Main)]
+pub enum MiqCommands {
+    /// Generate the unit schema
+    Schema(crate::schema_eval::Args),
+    /// Build a unit into the store
+    Build(crate::build::Args),
+    /// Query and operate on the store database
+    Store(crate::db::Args),
+    /// Evaluate a unit
+    Eval(crate::eval::Args),
+    /// -
+    Lua(crate::lua::Args),
 }

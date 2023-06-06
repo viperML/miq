@@ -14,7 +14,7 @@ use crate::schema_db::store::dsl::*;
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[derive(Debug, clap::Args)]
-pub struct CliArgs {
+pub struct Args {
     #[command(subcommand)]
     pub action: crate::db::CliSubcommand,
 }
@@ -45,22 +45,24 @@ pub struct IsPathArgs {
     path: PathBuf,
 }
 
-pub fn cli_dispatch(args: CliArgs) -> Result<()> {
-    match args.action {
-        CliSubcommand::List => list(),
-        CliSubcommand::Add(args) => {
-            let path_normalized = fix_dir_trailing_slash(args.path);
-            add(path_normalized)
-        }
-        CliSubcommand::IsPath(args) => {
-            let path_normalized = fix_dir_trailing_slash(args.path);
-            let result = is_db_path(path_normalized)?;
-            info!("{:?}", result);
-            Ok(())
-        }
-        CliSubcommand::Remove(args) => {
-            let path_normalized = fix_dir_trailing_slash(args.path);
-            remove(path_normalized)
+impl crate::Main for Args {
+    fn main(&self) -> Result<()> {
+        match &self.action {
+            CliSubcommand::List => list(),
+            CliSubcommand::Add(args) => {
+                let path_normalized = fix_dir_trailing_slash(&args.path);
+                add(path_normalized)
+            }
+            CliSubcommand::IsPath(args) => {
+                let path_normalized = fix_dir_trailing_slash(&args.path);
+                let result = is_db_path(path_normalized)?;
+                info!("{:?}", result);
+                Ok(())
+            }
+            CliSubcommand::Remove(args) => {
+                let path_normalized = fix_dir_trailing_slash(&args.path);
+                remove(path_normalized)
+            }
         }
     }
 }

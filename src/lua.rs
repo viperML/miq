@@ -24,8 +24,8 @@ pub struct Args {
     unit: Option<String>,
 }
 
-impl Args {
-    pub fn main(&self) -> Result<()> {
+impl crate::Main for Args {
+    fn main(&self) -> Result<()> {
         evaluate(&self.path)?;
         Ok(())
     }
