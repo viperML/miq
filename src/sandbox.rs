@@ -62,7 +62,7 @@ impl SandBox {
                 // Rebind a lot of folders like /dev into newroot
 
                 // unshare(CloneFlags::CLONE_NEWUSER | CloneFlags::CLONE_NEWNS)
-                //     .context("While unshare the process")?;
+                //     .wrap_err("While unshare the process")?;
 
                 // mount(
                 //     Some(workdir),
@@ -71,7 +71,7 @@ impl SandBox {
                 //     MsFlags::MS_PRIVATE | MsFlags::MS_BIND,
                 //     NONE_STR,
                 // )
-                // .context("While re-mounting the workdir")?;
+                // .wrap_err("While re-mounting the workdir")?;
 
                 std::env::set_current_dir(workdir)?;
 

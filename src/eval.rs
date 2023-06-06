@@ -104,8 +104,11 @@ pub fn dispatch(unit_ref: &UnitRef) -> Result<MiqResult> {
             let toplevel = crate::lua::evaluate(&inner.main)?;
             let selected_unit = toplevel
                 .get(&inner.element)
-                .context(format!("Getting element {:?}", inner.element))
-                .context("Unit wasn't found")?
+                .wrap_err(format!(
+                    "Selecting element {} from toplevel export",
+                    inner.element
+                ))
+                .wrap_err("Unit wasn't found")?
                 .clone();
 
             selected_unit.into()

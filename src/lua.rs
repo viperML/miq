@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
-use std::hash::{Hash};
+use std::hash::Hash;
 use std::path::{Path, PathBuf};
 
-use color_eyre::eyre::bail;
+use color_eyre::eyre::{bail, Context};
 use color_eyre::Result;
 use mlua::prelude::*;
 use mlua::{chunk, StdLib, Table, Value};
@@ -38,7 +38,7 @@ pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
 
     let lua = create_lua_env()?;
 
-    let toplevel_export_lua: Table = lua.load(path).eval()?;
+    let toplevel_export_lua: Table = lua.load(path).eval().wrap_err("Loading input file")?;
 
     let mut toplevel_export: BTreeMap<String, Unit> = BTreeMap::new();
 
