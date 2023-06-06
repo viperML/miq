@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::hash::Hash;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use color_eyre::eyre::{bail, Context, ContextCompat};
@@ -7,9 +8,9 @@ use color_eyre::Result;
 use mlua::prelude::*;
 use mlua::{chunk, StdLib, Table, Value};
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, trace};
+use tracing::{debug, info, instrument, trace};
 
-use crate::eval::{MiqEvalPath, MiqResult};
+use crate::eval::{MiqEvalPath, MiqResult, MiqStorePath};
 use crate::schema_eval::Unit;
 
 // impl LuaUserData for Unit {}
@@ -153,21 +154,40 @@ fn create_lua_env() -> Result<Lua> {
         })?,
     )?;
 
-    module.set(
-        "get_result",
-        lua.create_function(|ctx: &Lua, input: Table| {
-            let input: Unit = ctx.from_value(Value::Table(input))?;
-            let miqresult: MiqResult = input.into();
-            let res = ctx.to_value(&miqresult)?;
-            Ok(res)
-        })?,
-    )?;
+    module.set("get_result", lua.create_function(get_result)?)?;
+
+    module.set("interpolate", lua.create_function(interpolate)?)?;
 
     let f: Value = lua.load(LUA_F).eval()?;
     module.set("f", f)?;
 
     drop(module);
     Ok(lua)
+}
+
+#[instrument(ret, err, level = "trace")]
+fn get_result<'lua>(ctx: &'lua Lua, input: Table) -> Result<Value<'lua>, LuaError> {
+    let input: Unit = ctx.from_value(Value::Table(input))?;
+    let miqresult: MiqResult = input.into();
+    let res = ctx.to_value(&miqresult)?;
+    Ok(res)
+}
+
+#[instrument(ret, err, level = "trace")]
+fn interpolate<'lua>(
+    ctx: &'lua Lua,
+    value: Value,
+) -> Result<(String, String), LuaError> {
+    if let Ok(unit) = ctx.from_value::<Unit>(value) {
+        let miq_result: MiqResult = unit.into();
+        let store_path: MiqStorePath = (&miq_result).into();
+        let store_path: &Path = store_path.as_ref();
+        let left = store_path.to_str().unwrap().to_owned();
+        let right = miq_result.deref().clone();
+        return Ok((left, right));
+    }
+
+    todo!();
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Educe)]

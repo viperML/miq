@@ -1,4 +1,4 @@
-local miq = require "miq"
+local miq = require("miq")
 
 local fetch = miq.fetch
 local package = miq.package
@@ -54,10 +54,36 @@ pkgs.bootstrap = package {
   }
 }
 
-pkgs.stdenv = function()
+pkgs.stdenv = function(input)
+  if input.env == nil then
+    input.env = {}
+  end
 
+  input.env.PATH = f"{{pkgs.bootstrap}}/bin"
+
+  return miq.package(input)
 end
 
-pkgs.foo = {}
+local c_example = [[
+#include <stdio.h>
+#include <stdlib.h>
+
+int main() {
+  printf("Hello World");
+  exit(0);
+}
+]]
+
+pkgs.test_bootstrap = pkgs.stdenv {
+  name = "test_bootstrap",
+  script = [[
+    tee main.c <<EOF
+    {{c_example}}
+    EOF
+    cat main.c
+    exit 2
+  ]]
+}
+
 
 return pkgs

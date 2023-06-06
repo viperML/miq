@@ -247,9 +247,12 @@ fn cycle_dag(dag: &mut UnitNodeDag, node: NodeIndex) -> Result<()> {
 }
 
 #[derive(
-    Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default, PartialOrd, Eq, Ord,
+    Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default, PartialOrd, Eq, Ord, Educe
 )]
+#[educe(Deref)]
 pub struct MiqResult(String);
+
+
 
 impl MiqResult {
     pub fn create<H: Hash>(name: &str, hashable: &H) -> MiqResult {
