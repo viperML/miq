@@ -14,6 +14,7 @@ use tracing::info;
 use crate::eval::MiqResult;
 
 #[derive(Debug, clap::Args)]
+/// Generate the IR schema
 pub struct Args {
     /// Generate dummy data to test the schema
     #[clap(short, long)]

@@ -15,7 +15,7 @@ mod schema_eval;
 use std::path::PathBuf;
 
 use ambassador::{delegatable_trait, Delegate};
-use clap::Parser;
+use clap::{Parser};
 use color_eyre::Result;
 use tracing_subscriber::prelude::*;
 
@@ -58,23 +58,29 @@ pub trait Main {
 }
 
 #[derive(clap::Parser, Debug)]
+#[clap(
+    disable_help_subcommand = true,
+    author = clap::crate_authors!("\n"),
+    version = clap::crate_version!(),
+    help_template = "\
+{before-help}{name} {version}
+{author-with-newline}{about-with-newline}
+{usage-heading} {usage}
+
+{all-args}{after-help}
+"
+)]
 pub struct CliParser {
     #[command(subcommand)]
     pub command: MiqCommands,
 }
 
 #[derive(clap::Subcommand, Debug, Delegate)]
-#[clap(disable_help_subcommand(true))]
 #[delegate(Main)]
 pub enum MiqCommands {
-    /// Generate the unit schema
-    Schema(crate::schema_eval::Args),
-    /// Build a unit into the store
     Build(crate::build::Args),
-    /// Query and operate on the store database
-    Store(crate::db::Args),
-    /// Evaluate a unit
     Eval(crate::eval::Args),
-    /// -
     Lua(crate::lua::Args),
+    Store(crate::db::Args),
+    Schema(crate::schema_eval::Args),
 }

@@ -15,6 +15,7 @@ use crate::schema_eval::{Fetch, Package, Unit};
 use crate::*;
 
 #[derive(Debug, clap::Args)]
+/// Build a package
 pub struct Args {
     /// Unitref to build
     unit_ref: UnitRef,

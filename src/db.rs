@@ -14,6 +14,7 @@ use crate::schema_db::store::dsl::*;
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[derive(Debug, clap::Args)]
+/// Query the file storage
 pub struct Args {
     #[command(subcommand)]
     pub action: crate::db::CliSubcommand,

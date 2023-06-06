@@ -15,6 +15,7 @@ use crate::schema_eval::Unit;
 // impl LuaUserData for Unit {}
 
 #[derive(Debug, clap::Args)]
+/// Shorthand to the internal Lua evaluator
 pub struct Args {
     /// Toplevel lua file to evaluate
     #[clap(short, long, default_value = "pkgs.lua")]

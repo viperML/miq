@@ -39,6 +39,7 @@ type UnitNodeDag = Dag<UnitNode, ()>;
 type UnitDag = Dag<Unit, ()>;
 
 #[derive(Debug, clap::Args)]
+/// Evaluate packages
 pub struct Args {
     /// Unitref to evaluate
     #[clap(value_parser = clap::value_parser!(UnitRef))]
