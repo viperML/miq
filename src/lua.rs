@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
+use std::fs::{File, OpenOptions};
 use std::hash::Hash;
+use std::io::Write;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
@@ -67,8 +69,18 @@ pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
         let result: MiqResult = elem.clone().into();
         let eval_path: MiqEvalPath = (&result).into();
 
+        let prefix = "#:schema /miq/eval-schema.json";
         let serialized = toml::to_string_pretty(&elem)?;
-        std::fs::write(eval_path, serialized)?;
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&eval_path)
+            .wrap_err(format!("Opening serialisation file for {:?}", eval_path))?;
+
+        file.write_all(prefix.as_bytes())?;
+        file.write_all("\n".as_bytes())?;
+        file.write_all(serialized.as_bytes())?;
     }
 
     Ok(toplevel_export)
@@ -174,10 +186,7 @@ fn get_result<'lua>(ctx: &'lua Lua, input: Table) -> Result<Value<'lua>, LuaErro
 }
 
 #[instrument(ret, err, level = "trace")]
-fn interpolate<'lua>(
-    ctx: &'lua Lua,
-    value: Value,
-) -> Result<(String, String), LuaError> {
+fn interpolate<'lua>(ctx: &'lua Lua, value: Value) -> Result<(String, String), LuaError> {
     if let Ok(unit) = ctx.from_value::<Unit>(value) {
         let miq_result: MiqResult = unit.into();
         let store_path: MiqStorePath = (&miq_result).into();

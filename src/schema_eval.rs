@@ -50,7 +50,8 @@ impl crate::Main for Args {
 
 #[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Hash)]
 #[educe(Debug)]
-#[serde(untagged)]
+// #[serde(untagged)]
+#[serde(tag = "type")]
 pub enum Unit {
     #[educe(Debug(name = false))]
     PackageUnit(Package),
