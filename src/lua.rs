@@ -18,7 +18,6 @@ use crate::schema_eval::Unit;
 /// Shorthand to the internal Lua evaluator
 pub struct Args {
     /// Toplevel lua file to evaluate
-    #[clap(short, long, default_value = "pkgs.lua")]
     path: PathBuf,
     /// Name of the table key to evaluate
     #[clap(short, long)]
@@ -48,10 +47,17 @@ pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
 
     for pair in toplevel_export_lua.pairs::<LuaString, Value>() {
         let (k, v) = pair?;
-        let k = k.to_str()?.to_owned();
-        let v: Unit = lua.from_value(v)?;
+        let key = k.to_str()?.to_owned();
 
-        toplevel_export.insert(k, v);
+        match lua.from_value::<Unit>(v) {
+            Ok(v) => {
+                toplevel_export.insert(key, v);
+            }
+            Err(err @ LuaError::DeserializeError(_)) => {
+                trace!(?key, ?err);
+            }
+            Err(err) => bail!(err),
+        };
     }
 
     debug!(?toplevel_export);

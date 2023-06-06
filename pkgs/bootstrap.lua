@@ -54,4 +54,10 @@ pkgs.bootstrap = package {
   }
 }
 
+pkgs.stdenv = function()
+
+end
+
+pkgs.foo = {}
+
 return pkgs
