@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 use std::hash::Hash;
 use std::io::Write;
 use std::ops::Deref;
@@ -10,7 +10,7 @@ use color_eyre::Result;
 use mlua::prelude::*;
 use mlua::{chunk, StdLib, Table, Value};
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, instrument, trace};
+use tracing::{debug, info, trace};
 
 use crate::eval::{MiqEvalPath, MiqResult, MiqStorePath};
 use crate::schema_eval::Unit;

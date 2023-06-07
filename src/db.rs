@@ -1,10 +1,8 @@
-use std::borrow::BorrowMut;
 use std::cell::RefCell;
-use std::ops::{Deref, DerefMut};
+use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 
-use color_eyre::eyre::bail;
+use color_eyre::eyre::{bail, eyre};
 use color_eyre::Result;
 use diesel::migration::MigrationVersion;
 use diesel::prelude::*;
@@ -21,11 +19,11 @@ pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 /// Query the file storage
 pub struct Args {
     #[command(subcommand)]
-    pub action: crate::db::CliSubcommand,
+    action: crate::db::CliSubcommand,
 }
 
 #[derive(Debug, clap::Subcommand)]
-pub enum CliSubcommand {
+enum CliSubcommand {
     /// List all paths registered
     #[command(visible_alias("ls"))]
     List,
@@ -35,18 +33,31 @@ pub enum CliSubcommand {
     IsPath(IsPathArgs),
     /// Manually remove a path
     #[command(visible_alias("rm"))]
-    Remove(AddArgs),
+    Remove(RemoveArgs),
 }
 
 #[derive(Debug, clap::Args)]
-pub struct AddArgs {
+struct AddArgs {
     #[arg(value_hint = clap::ValueHint::DirPath)]
+    /// Path to add to the store
     path: PathBuf,
 }
 
 #[derive(Debug, clap::Args)]
-pub struct IsPathArgs {
+struct RemoveArgs {
     #[arg(value_hint = clap::ValueHint::DirPath)]
+    /// Path to remove from the store
+    path: Option<PathBuf>,
+
+    /// Remove all known paths (wipe store)
+    #[arg(long)]
+    all: bool,
+}
+
+#[derive(Debug, clap::Args)]
+struct IsPathArgs {
+    #[arg(value_hint = clap::ValueHint::DirPath)]
+    /// Store path to query
     path: PathBuf,
 }
 
@@ -56,7 +67,10 @@ impl crate::Main for Args {
 
         match &self.action {
             CliSubcommand::List => {
-                conn.list()?;
+                let all = conn.list()?;
+                for path in all {
+                    info!(?path);
+                }
             }
             CliSubcommand::Add(args) => {
                 let path_normalized = fix_dir_trailing_slash(&args.path);
@@ -68,8 +82,24 @@ impl crate::Main for Args {
                 info!("{:?}", result);
             }
             CliSubcommand::Remove(args) => {
-                let path_normalized = fix_dir_trailing_slash(&args.path);
-                conn.remove(path_normalized)?;
+                match (&args.path, &args.all) {
+                    (Some(path), _) => {
+                        let path_normalized = fix_dir_trailing_slash(&path);
+                        conn.remove(path_normalized)?;
+                    }
+                    (None, true) => {
+                        let all = conn.list()?;
+                        for elem in all {
+                            info!(?elem, "Removing");
+                            conn.remove(&elem.store_path)?;
+                        }
+                    }
+                    _ => {
+                        let err = eyre!(clap::error::ErrorKind::TooFewValues)
+                            .wrap_err("Either use a store path or --all");
+                        return Err(err);
+                    }
+                };
             }
         }
 
@@ -113,16 +143,12 @@ impl DbConnection {
         })
     }
 
-    pub fn list(&self) -> Result<()> {
+    pub fn list(&self) -> Result<Vec<StorePath>> {
         let p: Vec<StorePath> = store
             .limit(5)
             .load::<StorePath>(self.inner.borrow_mut().deref_mut())?;
 
-        for elem in p {
-            info!(?elem);
-        }
-
-        Ok(())
+        Ok(p)
     }
 
     pub fn add<P: AsRef<Path> + std::fmt::Debug>(&mut self, path: P) -> Result<()> {
@@ -183,7 +209,7 @@ fn fix_dir_trailing_slash<P: AsRef<Path> + std::fmt::Debug>(path: P) -> PathBuf 
     let base = &mut PathBuf::from("/");
 
     for comp in path.as_ref().components() {
-        debug!("{:?}", comp);
+        trace!("{:?}", comp);
         base.push(comp);
     }
 

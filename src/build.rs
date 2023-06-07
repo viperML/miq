@@ -12,7 +12,7 @@ use tracing::{debug, trace};
 
 use crate::db::DbConnection;
 use crate::eval::{MiqStorePath, UnitRef};
-use crate::schema_eval::{Build, Fetch, Package, Unit};
+use crate::schema_eval::{Build, Fetch, Package};
 use crate::*;
 
 #[derive(Debug, clap::Args)]
@@ -114,7 +114,7 @@ impl Build for Fetch {
                 .output()?;
         }
 
-        conn.add(&path);
+        conn.add(&path)?;
 
         Ok(path)
     }
@@ -123,7 +123,6 @@ impl Build for Package {
     #[tracing::instrument(skip(_args, conn), ret, err, level = "info")]
     fn build(&self, _args: &Args, rebuild: bool, conn: &mut DbConnection) -> Result<MiqStorePath> {
         let path: MiqStorePath = (&self.result).into();
-        let conn = &mut crate::db::DbConnection::new()?;
 
         if conn.is_db_path(&path)? {
             if rebuild {
@@ -156,7 +155,7 @@ impl Build for Package {
             Err(e) => bail!(e),
         }
 
-        conn.add(&path);
+        conn.add(&path)?;
 
         Ok(path)
     }
