@@ -80,7 +80,6 @@ impl crate::Main for Args {
 #[derive(Debug, Queryable, Selectable)]
 #[diesel(table_name = store)]
 pub struct StorePath {
-    pub id: i32,
     pub store_path: String,
 }
 

@@ -1,0 +1,3 @@
+CREATE TABLE store (
+  store_path VARCHAR NOT NULL PRIMARY KEY
+)

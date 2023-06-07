@@ -1,8 +1,7 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    store (id) {
-        id -> Integer,
+    store (store_path) {
         store_path -> Text,
     }
 }
