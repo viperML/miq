@@ -12,6 +12,7 @@ use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
+use crate::db::DbConnection;
 use crate::eval::{MiqResult, MiqStorePath};
 
 #[derive(Debug, clap::Args)]
@@ -51,7 +52,7 @@ impl crate::Main for Args {
 
 #[delegatable_trait]
 pub trait Build {
-    fn build(&self, args: &crate::build::Args, rebuild: bool) -> Result<MiqStorePath>;
+    fn build(&self, args: &crate::build::Args, rebuild: bool, conn: &mut DbConnection) -> Result<MiqStorePath>;
 }
 
 #[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Hash, Delegate)]

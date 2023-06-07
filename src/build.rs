@@ -10,6 +10,7 @@ use color_eyre::eyre::{bail, Context};
 use daggy::petgraph;
 use tracing::{debug, trace};
 
+use crate::db::DbConnection;
 use crate::eval::{MiqStorePath, UnitRef};
 use crate::schema_eval::{Build, Fetch, Package, Unit};
 use crate::*;
@@ -69,9 +70,12 @@ impl crate::Main for Args {
 
         // Only build last package in the chain
         let n_units = sorted_dag.len();
+
+        let conn = &mut crate::db::DbConnection::new()?;
+
         for (i, unit) in sorted_dag.iter().enumerate() {
             let rebuild = self.rebuild && i == n_units - 1;
-            unit.build(self, rebuild)?;
+            unit.build(self, rebuild, conn)?;
         }
 
         Ok(())
@@ -79,13 +83,13 @@ impl crate::Main for Args {
 }
 
 impl Build for Fetch {
-    #[tracing::instrument(skip(_args), ret, err, level = "info")]
-    fn build(&self, _args: &Args, rebuild: bool) -> Result<MiqStorePath> {
+    #[tracing::instrument(skip(_args, conn), ret, err, level = "info")]
+    fn build(&self, _args: &Args, rebuild: bool, conn: &mut DbConnection) -> Result<MiqStorePath> {
         let path: MiqStorePath = (&self.result).into();
 
-        if db::is_db_path(&path)? {
+        if conn.is_db_path(&path)? {
             if rebuild {
-                db::remove(&path)?;
+                conn.remove(&path)?;
             } else {
                 return Ok(path);
             }
@@ -110,19 +114,20 @@ impl Build for Fetch {
                 .output()?;
         }
 
-        db::add(&path)?;
+        conn.add(&path);
 
         Ok(path)
     }
 }
 impl Build for Package {
-    #[tracing::instrument(skip(_args), ret, err, level = "info")]
-    fn build(&self, _args: &Args, rebuild: bool) -> Result<MiqStorePath> {
+    #[tracing::instrument(skip(_args, conn), ret, err, level = "info")]
+    fn build(&self, _args: &Args, rebuild: bool, conn: &mut DbConnection) -> Result<MiqStorePath> {
         let path: MiqStorePath = (&self.result).into();
+        let conn = &mut crate::db::DbConnection::new()?;
 
-        if db::is_db_path(&path)? {
+        if conn.is_db_path(&path)? {
             if rebuild {
-                db::remove(&path)?;
+                conn.remove(&path)?;
             } else {
                 return Ok(path);
             }
@@ -151,7 +156,7 @@ impl Build for Package {
             Err(e) => bail!(e),
         }
 
-        db::add(&path)?;
+        conn.add(&path);
 
         Ok(path)
     }
