@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
-use ambassador::{Delegate, delegatable_trait};
+use ambassador::{delegatable_trait, Delegate};
 use color_eyre::Result;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
@@ -54,7 +54,6 @@ pub trait Build {
     fn build(&self, args: &crate::build::Args, rebuild: bool) -> Result<MiqStorePath>;
 }
 
-
 #[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Hash, Delegate)]
 #[delegate(Build)]
 #[educe(Debug)]
@@ -66,7 +65,6 @@ pub enum Unit {
     #[educe(Debug(name = false))]
     FetchUnit(Fetch),
 }
-
 
 #[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Default, Hash)]
 #[educe(Debug)]
@@ -97,6 +95,3 @@ pub struct Fetch {
     #[educe(Debug(ignore))]
     pub executable: bool,
 }
-
-
-

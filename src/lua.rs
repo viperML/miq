@@ -175,7 +175,10 @@ fn create_lua_env() -> Result<Lua> {
     Ok(lua)
 }
 
-fn interpolate<'lua>(ctx: &'lua Lua, value: Value<'lua>) -> Result<(Value<'lua>, Value<'lua>), LuaError> {
+fn interpolate<'lua>(
+    ctx: &'lua Lua,
+    value: Value<'lua>,
+) -> Result<(Value<'lua>, Value<'lua>), LuaError> {
     match value {
         table @ Value::Table(_) => {
             if let Ok(unit) = ctx.from_value::<Unit>(table) {
@@ -189,9 +192,7 @@ fn interpolate<'lua>(ctx: &'lua Lua, value: Value<'lua>) -> Result<(Value<'lua>,
                 Err(LuaError::DeserializeError("Can't interpolate value".into()))
             }
         }
-        s @ Value::String(_) => {
-            Ok((s, Value::Nil))
-        },
+        s @ Value::String(_) => Ok((s, Value::Nil)),
         _ => Err(LuaError::DeserializeError("Can't interpolate value".into())),
     }
 }

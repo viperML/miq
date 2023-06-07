@@ -15,7 +15,7 @@ mod schema_eval;
 use std::path::PathBuf;
 
 use ambassador::{delegatable_trait, Delegate};
-use clap::{Parser};
+use clap::Parser;
 use color_eyre::Result;
 use tracing_subscriber::prelude::*;
 

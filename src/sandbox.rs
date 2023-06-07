@@ -14,7 +14,7 @@ use tracing::{debug, info};
 #[derive(Debug)]
 pub struct SandBox {}
 
-static NONE_STR: Option<&'static str> = None;
+const _NONE_STR: Option<&'static str> = None;
 
 impl SandBox {
     pub fn run(&self, cmd: &mut Command) -> Result<()> {
