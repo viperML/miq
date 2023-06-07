@@ -7,6 +7,7 @@ devel
 *.out
 *.dot
 /miq
+*.svg
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,pythonvanilla
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,pythonvanilla

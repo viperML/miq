@@ -61,7 +61,8 @@ pkgs.stdenv = function(input)
 
   input.env = {
     PATH = f"{{pkgs.bootstrap}}/bin",
-    CC = f"{{pkgs.bootstrap}}/bin/gcc"
+    CC = f"{{pkgs.bootstrap}}/bin/gcc",
+    CFLAGS = "-O2 -pipe -pie -fPIE -fPIC"
   }
 
   return miq.package(input)

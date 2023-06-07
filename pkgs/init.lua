@@ -1,37 +1,24 @@
-local miq = require ("miq")
+local miq = require("miq")
 local package = miq.package
 local f = miq.f
 
----@param first table
----@param second table
+---@param first table<string, any>
+---@param second table<string, any>
 local merge = function(first, second)
-  for k,v in pairs(second) do first[k] = v end
+	for k, v in pairs(second) do
+		if first[k] == nil then
+			first[k] = v
+		else
+			error("Tried to merge two tables with same key: " .. k, 2)
+		end
+	end
 end
-
 
 local pkgs = {}
 
 merge(pkgs, require("bootstrap"))
-
-
-pkgs.test = package {
-  name = "test",
-  script =  f[[
-    set -x
-    echo $FOO
-    echo $FOO2
-    exit 2
-  ]],
-  env = {
-    FOO = "bar",
-    FOO2 = f"{{pkgs.busybox}}"
-  }
-}
-
-
-
+merge(pkgs, require("stage1"))
 
 miq.trace(pkgs)
-
 
 return pkgs

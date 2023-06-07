@@ -35,6 +35,7 @@
           venv
           pkgs.lua-language-server
           pkgs.stylua
+          pkgs.graphviz-nox
         ];
         NIX_DEBUG = "1";
         RUST_BACKTRACE = "0";
