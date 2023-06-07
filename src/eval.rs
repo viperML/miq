@@ -121,7 +121,6 @@ pub fn dispatch(unit_ref: &UnitRef) -> Result<MiqResult> {
 impl crate::Main for Args {
     fn main(&self) -> Result<()> {
         let result = dispatch(&self.unit_ref)?;
-        info!(?result);
 
         if self.no_dag {
             return Ok(());
@@ -162,7 +161,7 @@ impl crate::Main for Args {
     }
 }
 
-#[tracing::instrument(skip_all, ret, err, level = "debug")]
+#[tracing::instrument(skip_all, ret, err, level = "trace")]
 pub fn dag(input: &MiqResult) -> Result<UnitDag> {
     let mut dag = UnitNodeDag::new();
     let root_n_weight: Unit = input.try_into()?;

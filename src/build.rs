@@ -11,7 +11,7 @@ use daggy::petgraph;
 use tracing::{debug, trace};
 
 use crate::eval::{MiqStorePath, UnitRef};
-use crate::schema_eval::{Fetch, Package, Unit};
+use crate::schema_eval::{Build, Fetch, Package, Unit};
 use crate::*;
 
 #[derive(Debug, clap::Args)]
@@ -54,7 +54,7 @@ pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
     }
 }
 
-impl crate::Main for  Args {
+impl crate::Main for Args {
     fn main(&self) -> Result<()> {
         let result = eval::dispatch(&self.unit_ref)?;
         let dag = eval::dag(&result)?;
@@ -71,92 +71,88 @@ impl crate::Main for  Args {
         let n_units = sorted_dag.len();
         for (i, unit) in sorted_dag.iter().enumerate() {
             let rebuild = self.rebuild && i == n_units - 1;
-            match unit {
-                Unit::PackageUnit(inner) => {
-                    build_package(inner, self, rebuild)?;
-                }
-                Unit::FetchUnit(inner) => {
-                    build_fetch(inner, self, rebuild)?;
-                }
-            };
+            unit.build(self, rebuild)?;
         }
 
         Ok(())
     }
 }
 
-#[tracing::instrument(skip(_build_args), ret, err, level = "info")]
-fn build_fetch(input: &Fetch, _build_args: &Args, rebuild: bool) -> Result<MiqStorePath> {
-    let path: MiqStorePath = (&input.result).into();
+impl Build for Fetch {
+    #[tracing::instrument(skip(_args), ret, err, level = "info")]
+    fn build(&self, _args: &Args, rebuild: bool) -> Result<MiqStorePath> {
+        let path: MiqStorePath = (&self.result).into();
 
-    if db::is_db_path(&path)? {
-        if rebuild {
-            db::remove(&path)?;
-        } else {
-            return Ok(path);
+        if db::is_db_path(&path)? {
+            if rebuild {
+                db::remove(&path)?;
+            } else {
+                return Ok(path);
+            }
         }
+
+        let tempfile = &mut tempfile::NamedTempFile::new()?;
+        debug!(?tempfile);
+
+        let client = reqwest::blocking::Client::new();
+        trace!("Fetching file, please wait");
+        let response = client.get(&self.url).send()?;
+        let content = &mut response.bytes()?.reader();
+        std::io::copy(content, tempfile)?;
+
+        std::fs::copy(tempfile.path(), &path)?;
+
+        if self.executable {
+            // FIXME
+            debug!("Setting exec bit");
+            std::process::Command::new("chmod")
+                .args([OsStr::new("+x"), path.as_ref()])
+                .output()?;
+        }
+
+        db::add(&path)?;
+
+        Ok(path)
     }
-
-    let tempfile = &mut tempfile::NamedTempFile::new()?;
-    debug!(?tempfile);
-
-    let client = reqwest::blocking::Client::new();
-    trace!("Fetching file, please wait");
-    let response = client.get(&input.url).send()?;
-    let content = &mut response.bytes()?.reader();
-    std::io::copy(content, tempfile)?;
-
-    std::fs::copy(tempfile.path(), &path)?;
-
-    if input.executable {
-        // FIXME
-        debug!("Setting exec bit");
-        std::process::Command::new("chmod")
-            .args([OsStr::new("+x"), path.as_ref()])
-            .output()?;
-    }
-
-    db::add(&path)?;
-
-    Ok(path)
 }
+impl Build for Package {
+    #[tracing::instrument(skip(_args), ret, err, level = "info")]
+    fn build(&self, _args: &Args, rebuild: bool) -> Result<MiqStorePath> {
+        let path: MiqStorePath = (&self.result).into();
 
-#[tracing::instrument(skip(_build_args), ret, err, level = "info")]
-fn build_package(input: &Package, _build_args: &Args, rebuild: bool) -> Result<MiqStorePath> {
-    let path: MiqStorePath = (&input.result).into();
-
-    if db::is_db_path(&path)? {
-        if rebuild {
-            db::remove(&path)?;
-        } else {
-            return Ok(path);
+        if db::is_db_path(&path)? {
+            if rebuild {
+                db::remove(&path)?;
+            } else {
+                return Ok(path);
+            }
         }
+
+        let mut miq_env: HashMap<&OsStr, &OsStr> = HashMap::new();
+        miq_env.insert(OsStr::new("miq_out"), path.as_ref());
+
+        // FIXME
+        // miq_env.insert("HOME", "/home/ayats");
+        // miq_env.insert("PATH", "/var/empty");
+        debug!(?miq_env);
+
+        let mut cmd = Command::new("/bin/sh");
+        cmd.args(["-c", &self.script]);
+        cmd.env_clear();
+        cmd.envs(&self.env);
+        cmd.envs(&miq_env);
+
+        let sandbox = sandbox::SandBox {};
+        sandbox.run(&mut cmd)?;
+
+        match path.try_exists().wrap_err("Failed to produce an output") {
+            Ok(true) => {}
+            Ok(false) => bail!("Output path doesn't exist: {:?}", path),
+            Err(e) => bail!(e),
+        }
+
+        db::add(&path)?;
+
+        Ok(path)
     }
-
-    let mut miq_env: HashMap<&OsStr, &OsStr> = HashMap::new();
-    miq_env.insert(OsStr::new("miq_out"), path.as_ref());
-
-    // FIXME
-    // miq_env.insert("HOME", "/home/ayats");
-    // miq_env.insert("PATH", "/var/empty");
-    debug!(?miq_env);
-
-    let mut cmd = Command::new("/bin/sh");
-    cmd.args(["-c", &input.script]);
-    cmd.env_clear();
-    cmd.envs(&input.env);
-    cmd.envs(&miq_env);
-
-    let sandbox = sandbox::SandBox {};
-    sandbox.run(&mut cmd)?;
-
-    match path.try_exists().wrap_err("Failed to produce an output") {
-        Ok(true) => {}
-        Ok(false) => bail!("Output path doesn't exist: {:?}", path),
-        Err(e) => bail!(e),
-    }
-
-    db::add(&path)?;
-
-    Ok(path)
 }

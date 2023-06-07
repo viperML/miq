@@ -27,7 +27,7 @@ fn setup_logging() -> Result<()> {
 
     let layer_filter = tracing_subscriber::EnvFilter::from_default_env()
         .add_directive("info".parse()?)
-        .add_directive("miq=trace".parse()?);
+        .add_directive("miq=debug".parse()?);
 
     let layer_fmt = tracing_subscriber::fmt::layer()
         .with_writer(std::io::stderr)

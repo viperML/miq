@@ -6,12 +6,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
+use ambassador::{Delegate, delegatable_trait};
 use color_eyre::Result;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::eval::MiqResult;
+use crate::eval::{MiqResult, MiqStorePath};
 
 #[derive(Debug, clap::Args)]
 /// Generate the IR schema
@@ -48,7 +49,14 @@ impl crate::Main for Args {
     }
 }
 
-#[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Hash)]
+#[delegatable_trait]
+pub trait Build {
+    fn build(&self, args: &crate::build::Args, rebuild: bool) -> Result<MiqStorePath>;
+}
+
+
+#[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Hash, Delegate)]
+#[delegate(Build)]
 #[educe(Debug)]
 // #[serde(untagged)]
 #[serde(tag = "type")]
@@ -58,6 +66,7 @@ pub enum Unit {
     #[educe(Debug(name = false))]
     FetchUnit(Fetch),
 }
+
 
 #[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Default, Hash)]
 #[educe(Debug)]
@@ -88,3 +97,6 @@ pub struct Fetch {
     #[educe(Debug(ignore))]
     pub executable: bool,
 }
+
+
+
