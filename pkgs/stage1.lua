@@ -25,7 +25,7 @@ stage1.libc = bootstrap.stdenv {
         --enable-wrapper=all \
         --syslibdir="$miq_out/lib"
 
-    make -j16
+    make -j$(nproc)
     make install
 
     ln -vs $miq_out/lib/libc.so $miq_out/bin/ldd
