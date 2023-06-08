@@ -1,9 +1,11 @@
 use std::ffi::OsStr;
+use std::fs::OpenOptions;
 use std::hash::Hash;
+use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
 
-use color_eyre::eyre::{bail, Context, ContextCompat};
+use color_eyre::eyre::{bail, Context};
 use color_eyre::{Report, Result};
 use daggy::petgraph::algo::toposort;
 use daggy::petgraph::dot::{Config, Dot};
@@ -12,7 +14,7 @@ use daggy::{petgraph, Dag, NodeIndex, Walker};
 use schema_eval::Unit;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use tracing::{info, instrument, trace};
+use tracing::{info, trace};
 
 use crate::*;
 
@@ -42,7 +44,7 @@ type UnitDag = Dag<Unit, ()>;
 /// Evaluate packages
 pub struct Args {
     /// Unitref to evaluate
-    #[clap(value_parser = clap::value_parser!(UnitRef))]
+    // #[clap(value_parser = clap::value_parser!(UnitRef))]
     unit_ref: UnitRef,
     /// Write the resulting graph to this file
     #[arg(short, long)]
@@ -51,82 +53,51 @@ pub struct Args {
     no_dag: bool,
 }
 
-#[derive(Debug, Clone)]
+#[delegatable_trait]
+pub trait RefToUnit {
+    fn ref_to_unit(&self) -> Result<Unit>;
+}
+
+#[derive(Debug, Clone, Delegate)]
+#[delegate(RefToUnit)]
 pub enum UnitRef {
     /// Already evaluated unit.toml
     Serialized(PathBuf),
     /// Dispatch to the internal evaluator
-    Lua(LuaRef),
+    Lua(lua::LuaRef),
+}
+
+impl RefToUnit for PathBuf {
+    fn ref_to_unit(&self) -> Result<Unit> {
+        todo!();
+    }
 }
 
 impl FromStr for UnitRef {
     type Err = Report;
 
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let components: Vec<_> = s.split('#').collect();
-
-        let result = match *components {
-            [path] => {
-                if path.starts_with("/miq/eval") {
-                    Self::Serialized(path.into())
-                } else {
-                    bail!("Input is not a valid UnitRef")
-                }
-            }
-            [path, element] => Self::Lua(LuaRef {
-                main: path.into(),
-                element: element.into(),
-            }),
-            _ => bail!("Input is not a valid UnitRef"),
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.starts_with("/miq/eval") {
+            return Ok(Self::Serialized(PathBuf::from(s)));
         };
-        Ok(result)
+
+        if s.contains("#") {
+            return Ok(Self::Lua(lua::LuaRef::new(s)?));
+        }
+
+        bail!(format!("Couldn't match {} as a valid UnitRef", s));
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct LuaRef {
-    /// Luafile to evaluate
-    main: PathBuf,
-    /// element to evaluate
-    element: String,
-}
-
-#[instrument(ret, err, level = "info")]
-pub fn dispatch(unit_ref: &UnitRef) -> Result<MiqResult> {
-    let result = match unit_ref {
-        UnitRef::Serialized(_inner) => {
-            todo!("Accept serialized unitefs");
-        }
-
-        // Dispatch to inner lua evaluator
-        UnitRef::Lua(inner) => {
-            // let toplevel = crate::lua::evaluate(&inner.root)?;
-            let toplevel = crate::lua::evaluate(&inner.main)?;
-            let selected_unit = toplevel
-                .get(&inner.element)
-                .wrap_err(format!(
-                    "Selecting element {} from toplevel export",
-                    inner.element
-                ))
-                .wrap_err("Unit wasn't found")?
-                .clone();
-
-            selected_unit.into()
-        }
-    };
-
-    Ok(result)
 }
 
 impl crate::Main for Args {
     fn main(&self) -> Result<()> {
-        let result = dispatch(&self.unit_ref)?;
+        let root_unit = self.unit_ref.ref_to_unit()?;
 
         if self.no_dag {
             return Ok(());
         };
 
-        let dag = dag(&result)?;
+        let dag = dag(root_unit)?;
 
         let dot = Dot::with_attr_getters(
             // -
@@ -162,10 +133,10 @@ impl crate::Main for Args {
 }
 
 #[tracing::instrument(skip_all, ret, err, level = "trace")]
-pub fn dag(input: &MiqResult) -> Result<UnitDag> {
+pub fn dag(input: Unit) -> Result<UnitDag> {
     let mut dag = UnitNodeDag::new();
-    let root_n_weight: Unit = input.try_into()?;
-    let root_n_weight = UnitNode::new(root_n_weight);
+    // let root_n_weight: Unit = input.try_into()?;
+    let root_n_weight = UnitNode::new(input);
     let root_n = dag.add_node(root_n_weight);
 
     let max_cycles = 10;
@@ -287,7 +258,8 @@ impl TryFrom<&MiqResult> for Unit {
     fn try_from(value: &MiqResult) -> std::result::Result<Self, Self::Error> {
         let path: MiqEvalPath = value.into();
         trace!(?path);
-        let raw_text = std::fs::read_to_string(path)?;
+        let raw_text =
+            std::fs::read_to_string(&path).wrap_err(format!("Reading eval path {:?}", path))?;
         let result = toml::from_str(&raw_text)?;
         Ok(result)
     }
@@ -349,5 +321,26 @@ impl AsRef<OsStr> for MiqStorePath {
 impl MiqStorePath {
     pub fn try_exists(&self) -> std::io::Result<bool> {
         self.0.try_exists()
+    }
+}
+
+impl Unit {
+    pub fn write_to_disk(&self) -> Result<()> {
+        let prefix = "#:schema /miq/eval-schema.json";
+        let serialized = toml::to_string_pretty(self)?;
+        let result: MiqResult = MiqResult::from(self.clone());
+        let eval_path: MiqEvalPath = (&result).into();
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&eval_path)
+            .wrap_err(format!("Opening serialisation file for {:?}", eval_path))?;
+
+        file.write_all(prefix.as_bytes())?;
+        file.write_all("\n".as_bytes())?;
+        file.write_all(serialized.as_bytes())?;
+
+        Ok(())
     }
 }

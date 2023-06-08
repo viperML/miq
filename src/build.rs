@@ -11,7 +11,7 @@ use daggy::petgraph;
 use tracing::{debug, trace};
 
 use crate::db::DbConnection;
-use crate::eval::{MiqStorePath, UnitRef};
+use crate::eval::{MiqStorePath, RefToUnit, UnitRef};
 use crate::schema_eval::{Build, Fetch, Package};
 use crate::*;
 
@@ -57,8 +57,8 @@ pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
 
 impl crate::Main for Args {
     fn main(&self) -> Result<()> {
-        let result = eval::dispatch(&self.unit_ref)?;
-        let dag = eval::dag(&result)?;
+        let unit = self.unit_ref.ref_to_unit()?;
+        let dag = eval::dag(unit)?;
 
         let sorted_dag = petgraph::algo::toposort(&dag, None)
             .expect("DAG was not acyclic!")

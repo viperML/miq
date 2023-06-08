@@ -38,7 +38,9 @@ impl TryFrom<FetchInput> for Unit {
             executable: value.executable.unwrap_or_default(),
         };
 
-        Ok(Unit::FetchUnit(inner))
+        let unit = Unit::FetchUnit(inner);
+        unit.write_to_disk().expect("Failed to write to disk");
+        Ok(unit)
     }
 }
 

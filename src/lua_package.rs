@@ -91,6 +91,8 @@ impl TryFrom<PackageInput> for Unit {
             deps,
         };
 
-        Ok(Unit::PackageUnit(result))
+        let unit = Unit::PackageUnit(result);
+        unit.write_to_disk().expect("Failed to write to disk");
+        Ok(unit)
     }
 }

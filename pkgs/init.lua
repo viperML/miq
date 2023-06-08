@@ -16,9 +16,11 @@ end
 
 local pkgs = {}
 
-merge(pkgs, require "bootstrap")
-merge(pkgs, require "stage1")
+-- merge(pkgs, require "bootstrap")
+-- merge(pkgs, require "stage1")
 
-miq.trace(pkgs)
+pkgs.bootstrap = require("bootstrap")
+pkgs.stage1 = require("stage1")
+
 
 return pkgs

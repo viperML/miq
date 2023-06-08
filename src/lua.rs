@@ -1,89 +1,111 @@
-use std::collections::BTreeMap;
-use std::fs::OpenOptions;
 use std::hash::Hash;
-use std::io::Write;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use color_eyre::eyre::{bail, Context, ContextCompat};
-use color_eyre::Result;
+use color_eyre::{Help, Result};
 use mlua::prelude::*;
 use mlua::{chunk, StdLib, Table, Value};
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, trace};
+use tracing::{instrument, trace};
 
-use crate::eval::{MiqEvalPath, MiqResult, MiqStorePath};
+use crate::eval::{MiqResult, MiqStorePath, RefToUnit};
 use crate::schema_eval::Unit;
 
 // impl LuaUserData for Unit {}
 
 #[derive(Debug, clap::Args)]
-/// Shorthand to the internal Lua evaluator
+/// Reference implementation of the evaluator, in Lua
 pub struct Args {
-    /// Toplevel lua file to evaluate
-    path: PathBuf,
-    /// Name of the table key to evaluate
-    #[clap(short, long)]
-    unit: Option<String>,
+    #[clap(value_parser = LuaRef::new)]
+    /// LuaRef to evaluate, for example ./pkgs/init.lua#bootstrap.busybox
+    luaref: LuaRef,
 }
 
 impl crate::Main for Args {
     fn main(&self) -> Result<()> {
-        evaluate(&self.path)?;
+        let lua = create_lua_env()?;
+        self.luaref.get_toplevel(&lua)?;
         Ok(())
     }
 }
 
-pub fn evaluate<P: AsRef<Path>>(path: P) -> Result<BTreeMap<String, Unit>> {
-    let path = path.as_ref();
-    let path = path.canonicalize()?;
-    info!("Loading {:?}", path);
+#[derive(Debug, Clone, clap::Args)]
+/// How the user refers to something that uses the Lua evaluators and returns a Unit
+pub struct LuaRef {
+    /// Luafile to evaluate
+    root: PathBuf,
+    /// element to evaluate
+    element: Option<Vec<String>>,
+}
 
-    let lua = create_lua_env()?;
-
-    let parent = path.parent().wrap_err("Reading input file's parent")?;
-    std::env::set_current_dir(parent).wrap_err(format!("Changing directory to {:?}", parent))?;
-
-    let toplevel_export_lua: Table = lua.load(path).eval().wrap_err("Loading input file")?;
-
-    let mut toplevel_export: BTreeMap<String, Unit> = BTreeMap::new();
-
-    for pair in toplevel_export_lua.pairs::<LuaString, Value>() {
-        let (k, v) = pair?;
-        let key = k.to_str()?.to_owned();
-
-        match lua.from_value::<Unit>(v) {
-            Ok(v) => {
-                toplevel_export.insert(key, v);
-            }
-            Err(err @ LuaError::DeserializeError(_)) => {
-                trace!(?key, ?err);
-            }
-            Err(err) => bail!(err),
+impl LuaRef {
+    #[instrument(ret, err, level = "trace")]
+    pub fn new(s: &str) -> Result<Self> {
+        let mut result = match *s.split('#').collect::<Vec<_>>() {
+            [root] => Self {
+                root: PathBuf::from(root),
+                element: None,
+            },
+            [root, element] => Self {
+                root: PathBuf::from(root),
+                element: Some(element.split(".").map(str::to_owned).collect()),
+            },
+            _ => bail!(format!("Couldn't match a Luaref from: {}", s)),
         };
+
+        result.root = result.root.canonicalize()?;
+
+        Ok(result)
     }
 
-    debug!(?toplevel_export);
+    pub fn get_toplevel<'lua, 'result>(&self, lua: &'lua Lua) -> Result<Table<'result>>
+    where
+        'lua: 'result,
+    {
+        let parent_path = self.root.parent().wrap_err("Reading the parent folder")?;
+        std::env::set_current_dir(parent_path)
+            .wrap_err(format!("Changing directory to {:?}", parent_path))?;
 
-    for (_, elem) in toplevel_export.clone() {
-        let result: MiqResult = elem.clone().into();
-        let eval_path: MiqEvalPath = (&result).into();
+        let export: Table = lua
+            .load(self.root.as_path())
+            .eval()
+            .wrap_err("Loading root file")?;
 
-        let prefix = "#:schema /miq/eval-schema.json";
-        let serialized = toml::to_string_pretty(&elem)?;
+        luatrace(&lua, export.clone())?;
 
-        let mut file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .open(&eval_path)
-            .wrap_err(format!("Opening serialisation file for {:?}", eval_path))?;
-
-        file.write_all(prefix.as_bytes())?;
-        file.write_all("\n".as_bytes())?;
-        file.write_all(serialized.as_bytes())?;
+        Ok(export)
     }
+}
 
-    Ok(toplevel_export)
+impl RefToUnit for LuaRef {
+    fn ref_to_unit(&self) -> Result<Unit> {
+        let lua = create_lua_env()?;
+        let mut export: Table = self.get_toplevel(&lua)?;
+
+        let mut elements = match &self.element {
+            None => bail!("Didn't specify which element to evaluate"),
+            Some(e) => e,
+        }
+        .to_owned();
+
+        let err_msg = format!("Deserializing element {:?}", elements.join("."));
+
+        let final_elem = elements.pop().wrap_err("Elements was empty")?;
+
+        for elem in elements {
+            let err_msg = format!("Trying to read element {}", elem);
+            export = export.get(elem.to_owned()).wrap_err(err_msg)?;
+        }
+
+        let result: Value = export.get(final_elem.as_str())?;
+        let result: Unit = lua
+            .from_value(result)
+            .wrap_err(err_msg)
+            .suggestion("Did you use a incorrent LuaRef?")?;
+
+        Ok(result)
+    }
 }
 
 pub fn get_or_create_module<'lua, 'module>(lua: &'lua Lua, name: &str) -> Result<Table<'module>>
@@ -110,18 +132,6 @@ where
         ),
     }
 }
-
-// #[tracing::instrument(level = "trace")]
-// fn trace_table(t: Table) {
-//     for (key, value) in t.pairs::<LuaValue, LuaValue>().flatten() {
-//         if let Value::String(key) = key {
-//             let key = key.to_str().unwrap();
-//             trace!(?key, ?value);
-//         } else {
-//             trace!(?key, ?value);
-//         }
-//     }
-// }
 
 static LUA_INSPECT: &str = std::include_str!("inspect.lua");
 static LUA_F: &str = std::include_str!("f.lua");
@@ -153,26 +163,35 @@ fn create_lua_env() -> Result<Lua> {
 
     module.set(
         "trace",
-        lua.create_function(|ctx, input: Value| {
-            let inspect: Table = ctx
-                .load(chunk! {
-                    return (require("miq")).inspect
-                })
-                .eval()?;
-            let inspected: LuaString = inspect.call(input.clone())?;
-            let s = inspected.to_str()?;
-            trace!("luatrace>> {}", s);
-            Ok(())
-        })?,
+        lua.create_function(|ctx, val: Value| luatrace(ctx, val))?,
     )?;
-
     module.set("interpolate", lua.create_function(interpolate)?)?;
 
     let f: Value = lua.load(LUA_F).eval()?;
     module.set("f", f)?;
 
     drop(module);
+
     Ok(lua)
+}
+
+fn luatrace<'value, 'lua, V: mlua::prelude::IntoLua<'value>>(
+    ctx: &'lua Lua,
+    input: V,
+) -> Result<(), LuaError>
+where
+    'lua: 'value,
+{
+    let inspect: Table = ctx
+        .load(chunk! {
+            return (require("miq")).inspect
+        })
+        .eval()?;
+
+    let inspected: LuaString = inspect.call(input)?;
+    let s = inspected.to_str()?;
+    trace!("luatrace>> {}", s);
+    Ok(())
 }
 
 fn interpolate<'lua>(
