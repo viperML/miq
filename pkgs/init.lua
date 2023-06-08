@@ -22,5 +22,13 @@ local pkgs = {}
 pkgs.bootstrap = require("bootstrap")
 pkgs.stage1 = require("stage1")
 
+pkgs.foo = pkgs.bootstrap.stdenv {
+  name = "foo",
+  script = [[
+    set -x
+    printenv
+    exit 2
+  ]]
+}
 
 return pkgs
