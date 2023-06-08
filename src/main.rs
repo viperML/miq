@@ -8,7 +8,6 @@ mod eval;
 mod lua;
 mod lua_fetch;
 mod lua_package;
-mod sandbox;
 mod schema_db;
 mod schema_eval;
 

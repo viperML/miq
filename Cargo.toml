@@ -65,3 +65,4 @@ textwrap = "0.16.0"
 tracing-error = "0.2.0"
 ambassador = { version = "0.3.5", default-features = false }
 rust-embed = "6.6.1"
+derive_builder = "0.12.0"

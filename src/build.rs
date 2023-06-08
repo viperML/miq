@@ -1,14 +1,15 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Child, Command};
 use std::{fs, io};
 
 use bytes::Buf;
 use color_eyre::eyre::{bail, Context};
 use daggy::petgraph;
-use tracing::{debug, trace};
+use derive_builder::Builder;
+use tracing::{debug, info, trace};
 
 use crate::db::DbConnection;
 use crate::eval::{MiqStorePath, RefToUnit, UnitRef};
@@ -119,44 +120,123 @@ impl Build for Fetch {
         Ok(path)
     }
 }
+
+#[derive(Debug, Builder)]
+struct Bubblewrap<'a> {
+    // args: Vec<String>,
+    builddir: &'a Path,
+    resultdir: &'a Path,
+    cmd: &'a [&'a str],
+    env: &'a BTreeMap<String, String>,
+}
+
+impl Bubblewrap<'_> {
+    fn run(&self) -> Result<Child> {
+        let resultdir = self.resultdir.to_str().unwrap();
+        let mut args = vec![
+            // Build directory
+            "--bind",
+            self.builddir.to_str().unwrap(),
+            "/build",
+            "--chdir",
+            "/build",
+            "--setenv",
+            "HOME",
+            "/build",
+            // Store
+            "--bind",
+            "/miq",
+            "/miq",
+            // Output directory
+            "--setenv",
+            "miq_out",
+            resultdir,
+            // Global environent
+            "--dev-bind",
+            "/dev",
+            "/dev",
+            "--proc",
+            "/proc",
+            "--bind",
+            "/run",
+            "/run",
+            "--ro-bind",
+            "/etc",
+            "/etc",
+            "--ro-bind",
+            "/nix",
+            "/nix",
+            "--ro-bind",
+            "/bin",
+            "/bin",
+            // No network
+            "--unshare-net",
+            // Set user/group
+            "--unshare-user",
+            "--uid",
+            "0",
+            "--gid",
+            "0",
+        ];
+
+        for (name, value) in self.env {
+            args.push("--setenv");
+            args.push(name);
+            args.push(value);
+        }
+
+        let mut command = Command::new("bwrap");
+        command.args(args);
+        command.args(self.cmd);
+        trace!(?command);
+
+        Ok(command.spawn()?)
+    }
+}
+
 impl Build for Package {
     #[tracing::instrument(skip(_args, conn), ret, err, level = "info")]
     fn build(&self, _args: &Args, rebuild: bool, conn: &mut DbConnection) -> Result<MiqStorePath> {
-        let path: MiqStorePath = (&self.result).into();
+        let store_path: MiqStorePath = (&self.result).into();
+        let p: &Path = store_path.as_ref();
 
-        if conn.is_db_path(&path)? {
+        if conn.is_db_path(&store_path)? {
             if rebuild {
-                conn.remove(&path)?;
+                conn.remove(&store_path)?;
             } else {
-                return Ok(path);
+                return Ok(store_path);
             }
         }
 
-        let mut miq_env: HashMap<&OsStr, &OsStr> = HashMap::new();
-        miq_env.insert(OsStr::new("miq_out"), path.as_ref());
+        let tempdir = tempfile::tempdir()?;
+        let builddir = tempdir.path();
 
-        // FIXME
-        // miq_env.insert("HOME", "/home/ayats");
-        // miq_env.insert("PATH", "/var/empty");
-        debug!(?miq_env);
+        let wrapped_cmd = ["/bin/sh", "-c", &self.script];
 
-        let mut cmd = Command::new("/bin/sh");
-        cmd.args(["-c", &self.script]);
-        cmd.env_clear();
-        cmd.envs(&self.env);
-        cmd.envs(&miq_env);
+        let bwrap = BubblewrapBuilder::default()
+            .builddir(builddir)
+            .resultdir(p)
+            .cmd(&wrapped_cmd)
+            .env(&self.env)
+            .build()?;
 
-        let sandbox = sandbox::SandBox {};
-        sandbox.run(&mut cmd)?;
+        let child_status = bwrap.run()?.wait()?;
 
-        match path.try_exists().wrap_err("Failed to produce an output") {
+        trace!(?child_status);
+
+        if child_status.success() {
+            info!(?child_status, "Build successful");
+        } else {
+            bail!("Bad exit: {:?}", child_status);
+        };
+
+        match p.try_exists().wrap_err("Failed to produce an output") {
             Ok(true) => {}
-            Ok(false) => bail!("Output path doesn't exist: {:?}", path),
+            Ok(false) => bail!("Output path doesn't exist: {:?}", p),
             Err(e) => bail!(e),
         }
 
-        conn.add(&path)?;
-
-        Ok(path)
+        conn.add(&store_path)?;
+        Ok(store_path)
     }
 }
