@@ -7,7 +7,6 @@ use color_eyre::eyre::{bail, Context, ContextCompat};
 use color_eyre::{Help, Report, Result};
 use mlua::prelude::*;
 use mlua::{chunk, StdLib, Table, Value};
-use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
 use tracing::{instrument, trace};
 
@@ -178,16 +177,15 @@ fn create_lua_env() -> Result<Lua> {
     Ok(lua)
 }
 
-#[derive(RustEmbed)]
-#[folder = "src/lua/"]
-struct LuaBundle;
+static LUA_INSPECT: &str = std::include_str!("lua/inspect.lua");
+static LUA_F: &str = std::include_str!("lua/f.lua");
 
 fn load_from_bundle(ctx: &Lua, module: &Table, name: &str) -> Result<()> {
-    let filename = format!("{}.lua", name);
-    let bytes = LuaBundle::get(&filename)
-        .wrap_err("Loading bundle")
-        .wrap_err(filename)?;
-    let string = std::str::from_utf8(&bytes.data)?;
+    let string = match name {
+        "f" => LUA_F,
+        "inspect" => LUA_INSPECT,
+        _ => todo!("Read any file")
+    };
 
     let export: Value = ctx.load(string).eval()?;
     module.set(name, export)?;
