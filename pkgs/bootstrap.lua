@@ -52,14 +52,13 @@ bootstrap.bootstrap = package {
 	env = {},
 }
 
-local env = {
-	PATH = f "{{bootstrap.bootstrap}}/bin",
-	CC = f "{{bootstrap.bootstrap}}/bin/gcc",
-	CFLAGS = "-O2 -pipe -pie -fPIE -fPIC",
-}
-
 bootstrap.stdenv = function(input)
-	input.env = env
+	local bootstrap = bootstrap
+	input.env = {
+		PATH = f "{{bootstrap.bootstrap}}/bin",
+		CC = f "{{bootstrap.bootstrap}}/bin/gcc",
+		CFLAGS = "-O2 -pipe -pie -fPIE -fPIC",
+	}
 	return miq.package(input)
 end
 
