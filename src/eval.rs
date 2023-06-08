@@ -82,7 +82,7 @@ impl FromStr for UnitRef {
         };
 
         if s.contains("#") {
-            return Ok(Self::Lua(lua::LuaRef::new(s)?));
+            return Ok(Self::Lua(lua::LuaRef::from_str(s)?));
         }
 
         bail!(format!("Couldn't match {} as a valid UnitRef", s));

@@ -1,9 +1,10 @@
 use std::hash::Hash;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use color_eyre::eyre::{bail, Context, ContextCompat};
-use color_eyre::{Help, Result};
+use color_eyre::{Help, Report, Result};
 use mlua::prelude::*;
 use mlua::{chunk, StdLib, Table, Value};
 use serde::{Deserialize, Serialize};
@@ -17,7 +18,6 @@ use crate::schema_eval::Unit;
 #[derive(Debug, clap::Args)]
 /// Reference implementation of the evaluator, in Lua
 pub struct Args {
-    #[clap(value_parser = LuaRef::new)]
     /// LuaRef to evaluate, for example ./pkgs/init.lua#bootstrap.busybox
     luaref: LuaRef,
 }
@@ -39,9 +39,11 @@ pub struct LuaRef {
     element: Option<Vec<String>>,
 }
 
-impl LuaRef {
+impl FromStr for LuaRef {
+    type Err = Report;
+
     #[instrument(ret, err, level = "trace")]
-    pub fn new(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let mut result = match *s.split('#').collect::<Vec<_>>() {
             [root] => Self {
                 root: PathBuf::from(root),
@@ -58,7 +60,9 @@ impl LuaRef {
 
         Ok(result)
     }
+}
 
+impl LuaRef {
     pub fn get_toplevel<'lua, 'result>(&self, lua: &'lua Lua) -> Result<Table<'result>>
     where
         'lua: 'result,
