@@ -7,6 +7,7 @@ use color_eyre::eyre::{bail, Context, ContextCompat};
 use color_eyre::{Help, Report, Result};
 use mlua::prelude::*;
 use mlua::{chunk, StdLib, Table, Value};
+use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
 use tracing::{instrument, trace};
 
@@ -137,8 +138,8 @@ where
     }
 }
 
-static LUA_INSPECT: &str = std::include_str!("inspect.lua");
-static LUA_F: &str = std::include_str!("f.lua");
+// static LUA_INSPECT: &str = std::include_str!("inspect.lua");
+// static LUA_F: &str = std::include_str!("f.lua");
 
 fn create_lua_env() -> Result<Lua> {
     let lua = unsafe {
@@ -151,8 +152,7 @@ fn create_lua_env() -> Result<Lua> {
 
     let module = get_or_create_module(&lua, "miq")?;
 
-    let inspect = lua.load(LUA_INSPECT).eval::<Table>()?;
-    module.set("inspect", inspect)?;
+    load_from_bundle(&lua, &module, "inspect")?;
 
     module.set(
         "hello",
@@ -171,12 +171,28 @@ fn create_lua_env() -> Result<Lua> {
     )?;
     module.set("interpolate", lua.create_function(interpolate)?)?;
 
-    let f: Value = lua.load(LUA_F).eval()?;
-    module.set("f", f)?;
+    load_from_bundle(&lua, &module, "f")?;
 
     drop(module);
 
     Ok(lua)
+}
+
+#[derive(RustEmbed)]
+#[folder = "src/lua/"]
+struct LuaBundle;
+
+fn load_from_bundle(ctx: &Lua, module: &Table, name: &str) -> Result<()> {
+    let filename = format!("{}.lua", name);
+    let bytes = LuaBundle::get(&filename)
+        .wrap_err("Loading bundle")
+        .wrap_err(filename)?;
+    let string = std::str::from_utf8(&bytes.data)?;
+
+    let export: Value = ctx.load(string).eval()?;
+    module.set(name, export)?;
+
+    Ok(())
 }
 
 fn luatrace<'value, 'lua, V: mlua::prelude::IntoLua<'value>>(
