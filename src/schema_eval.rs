@@ -5,9 +5,12 @@
 */ */
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 use ambassador::{delegatable_trait, Delegate};
+use async_trait::async_trait;
 use color_eyre::Result;
+use diesel::SqliteConnection;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -50,13 +53,13 @@ impl crate::Main for Args {
     }
 }
 
+#[async_trait]
 #[delegatable_trait]
 pub trait Build {
-    fn build(
+    async fn build(
         &self,
-        args: &crate::build::Args,
         rebuild: bool,
-        conn: &mut DbConnection,
+        conn: &Mutex<DbConnection>,
     ) -> Result<MiqStorePath>;
 }
 

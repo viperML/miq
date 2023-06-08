@@ -97,7 +97,7 @@ impl crate::Main for Args {
             return Ok(());
         };
 
-        let dag = dag(root_unit)?;
+        let (dag, _) = dag(root_unit)?;
 
         let dot = Dot::with_attr_getters(
             // -
@@ -133,7 +133,7 @@ impl crate::Main for Args {
 }
 
 #[tracing::instrument(skip_all, ret, err, level = "trace")]
-pub fn dag(input: Unit) -> Result<UnitDag> {
+pub fn dag(input: Unit) -> Result<(UnitDag, NodeIndex)> {
     let mut dag = UnitNodeDag::new();
     // let root_n_weight: Unit = input.try_into()?;
     let root_n_weight = UnitNode::new(input);
@@ -164,7 +164,7 @@ pub fn dag(input: Unit) -> Result<UnitDag> {
         |_, _| (),
     );
 
-    Ok(result)
+    Ok((result, root_n))
 }
 
 fn cycle_dag(dag: &mut UnitNodeDag, node: NodeIndex) -> Result<()> {

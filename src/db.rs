@@ -89,6 +89,7 @@ impl crate::Main for Args {
                     }
                     (None, true) => {
                         let all = conn.list()?;
+                        debug!(?all);
                         for elem in all {
                             info!(?elem, "Removing");
                             conn.remove(&elem.store_path)?;

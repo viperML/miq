@@ -19,7 +19,6 @@ clap = { version = "4.1.8", features = [
 ] }
 reqwest = { version = "0.11.14", default-features = false, features = [
     "rustls-tls",
-    "blocking",
 ] }
 schemars = "0.8.12"
 serde = { version = "1.0.154", features = [
@@ -65,3 +64,6 @@ textwrap = "0.16.0"
 tracing-error = "0.2.0"
 ambassador = { version = "0.3.5", default-features = false }
 derive_builder = "0.12.0"
+async-trait = "0.1.68"
+tokio = { version = "1.28.2", features = ["full"] }
+futures = "0.3.28"

@@ -2,14 +2,21 @@ use std::collections::{BTreeMap, HashMap};
 use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::path::Path;
-use std::process::{Child, Command};
+use std::process::Stdio;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use std::{fs, io};
 
+use async_trait::async_trait;
 use bytes::Buf;
 use color_eyre::eyre::{bail, Context};
-use daggy::petgraph;
+use daggy::petgraph::visit::Dfs;
+use daggy::{petgraph, Walker};
 use derive_builder::Builder;
-use tracing::{debug, info, trace};
+use futures::stream::futures_unordered;
+use futures::TryStreamExt;
+use tokio::process::Command;
+use tracing::{debug, info, span, trace, Level};
 
 use crate::db::DbConnection;
 use crate::eval::{MiqStorePath, RefToUnit, UnitRef};
@@ -56,41 +63,134 @@ pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
     }
 }
 
+#[derive(Debug, Default)]
+struct BuildTask {
+    buildable: bool,
+    building: bool,
+    built: bool,
+}
+
 impl crate::Main for Args {
     fn main(&self) -> Result<()> {
         let unit = self.unit_ref.ref_to_unit()?;
-        let dag = eval::dag(unit)?;
+        let (dag, root_node) = eval::dag(unit)?;
+        let mut graph_reversed = dag.graph().clone();
+        graph_reversed.reverse();
 
-        let sorted_dag = petgraph::algo::toposort(&dag, None)
-            .expect("DAG was not acyclic!")
-            .iter()
-            .map(|&node| dag.node_weight(node).expect("Couldn't get node"))
-            .collect::<Vec<_>>();
+        let conn = crate::db::DbConnection::new()?;
+        let conn = Arc::new(Mutex::new(conn));
 
-        trace!(?sorted_dag);
+        let rt = tokio::runtime::Runtime::new()?;
 
-        // Only build last package in the chain
-        let n_units = sorted_dag.len();
+        let mut tasks: HashMap<daggy::NodeIndex, BuildTask> = HashMap::new();
+        let mut sentry = 0;
+        let mut futs = futures_unordered::FuturesUnordered::new();
 
-        let conn = &mut crate::db::DbConnection::new()?;
+        rt.block_on(async {
+            loop {
+                sentry = sentry + 1;
 
-        for (i, unit) in sorted_dag.iter().enumerate() {
-            let rebuild = self.rebuild && i == n_units - 1;
-            unit.build(self, rebuild, conn)?;
-        }
+                let mut search = Dfs::new(&graph_reversed, root_node);
+                let mut all_built = true;
+
+                while let Some(index) = search.next(&graph_reversed) {
+                    let node = dag.node_weight(index).unwrap();
+                    let t = tasks.get(&index);
+                    let span = span!(Level::TRACE, "Graph walk", ?node, ?index);
+                    let _enter = span.enter();
+                    trace!(?t);
+
+                    if let Some(t) = t {
+                        if t.building || t.built {
+                            continue;
+                        }
+                    }
+
+                    let mut task = BuildTask::default();
+                    task.buildable = true;
+
+                    let mut all_parents_built = true;
+                    for (_, parent_index) in dag.parents(index).iter(&dag) {
+                        let parent = &dag[parent_index];
+                        trace!(?parent);
+                        let parent_task = tasks.get(&parent_index);
+                        trace!(?parent_task, ?parent_index);
+                        match parent_task {
+                            None => {
+                                all_parents_built = false;
+                            }
+                            Some(parent_task) => {
+                                // trace!(?index, "Setting as buildable");
+                                // task.buildable = !parent_task.built;
+                                if !parent_task.built {
+                                    all_parents_built = false;
+                                }
+                            }
+                        }
+                    }
+
+                    task.buildable = all_parents_built;
+
+                    trace!(?task, ?all_parents_built, "Inserting task to map");
+                    tasks.insert(index, task);
+                }
+
+                for (k, task) in tasks.iter_mut() {
+                    let unit = &dag[*k];
+                    // trace!(?unit, ?task, "Checking state of task");
+                    let conn = conn.clone();
+                    let unit = unit.clone();
+                    let k = k.clone();
+
+                    if !task.built {
+                        all_built = false;
+                    }
+
+                    if task.buildable && !task.built && !task.building {
+                        all_built = false;
+                        let fut = tokio::spawn(async move {
+                            trace!(?unit, "Starting build task");
+                            (unit.build(false, &conn).await, k)
+                        });
+                        futs.push(fut);
+                        task.building = true;
+                    }
+                }
+
+                while let Ok(Some((task_result, n))) = futs.try_next().await {
+                    let task_result = task_result?;
+                    debug!(?task_result, ?n, "Task finished");
+                    let t = tasks.get_mut(&n).unwrap();
+                    t.built = true;
+                    // tokio::time::sleep(Duration::from_secs(1)).await;
+                }
+
+                if all_built {
+                    break;
+                }
+
+                if sentry > 3 {
+                    bail!("Sentry reached!");
+                }
+            }
+
+            let res: Result<()> = Ok(());
+            return res;
+        })?;
 
         Ok(())
     }
 }
 
+#[async_trait]
 impl Build for Fetch {
-    #[tracing::instrument(skip(_args, conn), ret, err, level = "info")]
-    fn build(&self, _args: &Args, rebuild: bool, conn: &mut DbConnection) -> Result<MiqStorePath> {
+    #[tracing::instrument(skip(conn), ret, err, level = "info")]
+    async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>) -> Result<MiqStorePath> {
         let path: MiqStorePath = (&self.result).into();
 
-        if conn.is_db_path(&path)? {
+        if conn.lock().unwrap().is_db_path(&path)? {
             if rebuild {
-                conn.remove(&path)?;
+                conn.lock().unwrap().remove(&path)?;
             } else {
                 return Ok(path);
             }
@@ -99,10 +199,10 @@ impl Build for Fetch {
         let tempfile = &mut tempfile::NamedTempFile::new()?;
         debug!(?tempfile);
 
-        let client = reqwest::blocking::Client::new();
+        let client = reqwest::Client::new();
         trace!("Fetching file, please wait");
-        let response = client.get(&self.url).send()?;
-        let content = &mut response.bytes()?.reader();
+        let response = client.get(&self.url).send().await?;
+        let content = &mut response.bytes().await?.reader();
         std::io::copy(content, tempfile)?;
 
         std::fs::copy(tempfile.path(), &path)?;
@@ -115,9 +215,59 @@ impl Build for Fetch {
                 .output()?;
         }
 
-        conn.add(&path)?;
+        // FIXME
+        conn.lock().unwrap().add(&path)?;
 
         Ok(path)
+    }
+}
+
+#[async_trait]
+impl Build for Package {
+    #[tracing::instrument(skip(conn), ret, err, level = "info")]
+    async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>) -> Result<MiqStorePath> {
+        let store_path: MiqStorePath = (&self.result).into();
+        let p: &Path = store_path.as_ref();
+
+        if conn.lock().unwrap().is_db_path(&store_path)? {
+            if rebuild {
+                conn.lock().unwrap().remove(&store_path)?;
+            } else {
+                return Ok(store_path);
+            }
+        }
+
+        let tempdir = tempfile::tempdir()?;
+        let builddir = tempdir.path();
+
+        let wrapped_cmd = ["/bin/sh", "-c", &self.script];
+
+        let bwrap = BubblewrapBuilder::default()
+            .builddir(builddir)
+            .resultdir(p)
+            .cmd(&wrapped_cmd)
+            .env(&self.env)
+            .build()?;
+
+        let child_status = bwrap.build_command()?.stdout(Stdio::null()).spawn()?.wait().await?;
+
+        trace!(?child_status);
+
+        if child_status.success() {
+            info!(?child_status, "Build successful");
+        } else {
+            bail!("Bad exit: {:?}", child_status);
+        };
+
+        match p.try_exists().wrap_err("Failed to produce an output") {
+            Ok(true) => {}
+            Ok(false) => bail!("Output path doesn't exist: {:?}", p),
+            Err(e) => bail!(e),
+        }
+
+        // Fixme
+        conn.lock().unwrap().add(&store_path)?;
+        Ok(store_path)
     }
 }
 
@@ -131,7 +281,7 @@ struct Bubblewrap<'a> {
 }
 
 impl Bubblewrap<'_> {
-    fn run(&self) -> Result<Child> {
+    fn build_command(&self) -> Result<Command> {
         let resultdir = self.resultdir.to_str().unwrap();
         let mut args = vec![
             // Build directory
@@ -189,54 +339,6 @@ impl Bubblewrap<'_> {
         command.args(args);
         command.args(self.cmd);
         trace!(?command);
-
-        Ok(command.spawn()?)
-    }
-}
-
-impl Build for Package {
-    #[tracing::instrument(skip(_args, conn), ret, err, level = "info")]
-    fn build(&self, _args: &Args, rebuild: bool, conn: &mut DbConnection) -> Result<MiqStorePath> {
-        let store_path: MiqStorePath = (&self.result).into();
-        let p: &Path = store_path.as_ref();
-
-        if conn.is_db_path(&store_path)? {
-            if rebuild {
-                conn.remove(&store_path)?;
-            } else {
-                return Ok(store_path);
-            }
-        }
-
-        let tempdir = tempfile::tempdir()?;
-        let builddir = tempdir.path();
-
-        let wrapped_cmd = ["/bin/sh", "-c", &self.script];
-
-        let bwrap = BubblewrapBuilder::default()
-            .builddir(builddir)
-            .resultdir(p)
-            .cmd(&wrapped_cmd)
-            .env(&self.env)
-            .build()?;
-
-        let child_status = bwrap.run()?.wait()?;
-
-        trace!(?child_status);
-
-        if child_status.success() {
-            info!(?child_status, "Build successful");
-        } else {
-            bail!("Bad exit: {:?}", child_status);
-        };
-
-        match p.try_exists().wrap_err("Failed to produce an output") {
-            Ok(true) => {}
-            Ok(false) => bail!("Output path doesn't exist: {:?}", p),
-            Err(e) => bail!(e),
-        }
-
-        conn.add(&store_path)?;
-        Ok(store_path)
+        Ok(command)
     }
 }
