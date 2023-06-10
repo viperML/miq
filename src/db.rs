@@ -145,10 +145,7 @@ impl DbConnection {
     }
 
     pub fn list(&self) -> Result<Vec<StorePath>> {
-        let p: Vec<StorePath> = store
-            .limit(5)
-            .load::<StorePath>(self.inner.borrow_mut().deref_mut())?;
-
+        let p: Vec<StorePath> = store.load::<StorePath>(self.inner.borrow_mut().deref_mut())?;
         Ok(p)
     }
 
