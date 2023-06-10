@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::OsStr;
-use std::fmt::Debug;
+use std::fmt::{format, Debug};
+use std::io::Write;
+use std::ops::Deref;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
@@ -8,13 +10,15 @@ use std::{fs, io};
 
 use async_trait::async_trait;
 use bytes::Buf;
-use color_eyre::eyre::{bail, ensure, Context};
+use color_eyre::eyre::{bail, ensure, eyre, Context};
 use daggy::petgraph::visit::Dfs;
 use daggy::Walker;
 use derive_builder::Builder;
 use futures::stream::futures_unordered;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
+use tokio_process_stream::{Item, ProcessLineStream};
 use tracing::{debug, info, span, trace, Level};
 
 use crate::db::DbConnection;
@@ -32,7 +36,7 @@ pub struct Args {
     #[arg(long, short)]
     quiet: bool,
 
-    /// Rebuild even if it already exists
+    /// Rebuild the selected element, but don't rebuild its dependency tree
     #[arg(long, short)]
     rebuild: bool,
 
@@ -161,9 +165,10 @@ impl Args {
                 if all_parents_built && can_add_to_tasks {
                     let _db_conn = db_conn.clone();
                     let unit = unit.clone();
+                    let rebuild = (unit == root_node) && self.rebuild;
                     let fut = tokio::spawn(async move {
                         trace!("Starting build task");
-                        let res = unit.build(false, &_db_conn).await;
+                        let res = unit.build(rebuild, &_db_conn).await;
                         (unit, res)
                     });
 
@@ -245,27 +250,50 @@ impl Build for Package {
 
         let wrapped_cmd = ["/bin/sh", "-c", &self.script];
 
-        let bwrap = BubblewrapBuilder::default()
+        let mut cmd = BubblewrapBuilder::default()
             .builddir(builddir)
             .resultdir(p)
             .cmd(&wrapped_cmd)
             .env(&self.env)
-            .build()?;
+            .build()?
+            .build_command()?;
 
-        let child_status = bwrap
-            .build_command()?
-            .stdout(Stdio::null())
-            .spawn()?
-            .wait()
-            .await?;
+        let child = cmd
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()?;
 
-        trace!(?child_status);
+        let log_file_path = format!("/miq/log/{}.log", self.result.deref());
+        let err_msg = format!("Creating logfile at {}", log_file_path);
+        let mut log_file = std::fs::File::create(log_file_path).wrap_err(err_msg)?;
 
-        if child_status.success() {
-            info!(?child_status, "Build successful");
-        } else {
-            bail!("Bad exit: {:?}", child_status);
-        };
+        let mut procstream = ProcessLineStream::try_from(child)?;
+        while let Some(item) = procstream.next().await {
+            use owo_colors::OwoColorize;
+            match item {
+                Item::Stdout(line) => {
+                    let msg = format!("{}>>{}", self.name.blue(), line.bright_black());
+                    println!("{}", msg);
+                    log_file.write_all(line.as_bytes())?;
+                    log_file.write_all(b"\n")?;
+                }
+                Item::Stderr(line) => {
+                    let msg = format!("{}>>{}", self.name.blue(), line.bright_black());
+                    println!("{}", msg);
+                    log_file.write_all(line.as_bytes())?;
+                    log_file.write_all(b"\n")?;
+                }
+                Item::Done(Ok(exit)) => {
+                    if exit.success() {
+                        debug!("Build OK");
+                    } else {
+                        bail!(eyre!("Exit not successful").wrap_err(exit));
+                    }
+                }
+                Item::Done(Err(exit)) => bail!(exit),
+            }
+        }
 
         match p.try_exists().wrap_err("Failed to produce an output") {
             Ok(true) => {}
