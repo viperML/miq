@@ -63,6 +63,12 @@ pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
     }
 }
 
+impl crate::Main for Args {
+    fn main(&self) -> Result<()> {
+        tokio::runtime::Runtime::new()?.block_on(self._main())
+    }
+}
+
 #[derive(Debug, Default)]
 struct BuildTask {
     buildable: bool,
@@ -70,114 +76,107 @@ struct BuildTask {
     built: bool,
 }
 
-impl crate::Main for Args {
-    fn main(&self) -> Result<()> {
-        let unit = self.unit_ref.ref_to_unit()?;
-        let (dag, root_node) = eval::dag(unit)?;
+impl Args {
+    async fn _main(&self) -> Result<()> {
+        let root_unit = self.unit_ref.ref_to_unit()?;
+        let (dag, root_node) = eval::dag(root_unit)?;
+
         let mut graph_reversed = dag.graph().clone();
         graph_reversed.reverse();
 
-        let conn = crate::db::DbConnection::new()?;
-        let conn = Arc::new(Mutex::new(conn));
+        let db_conn = Arc::new(Mutex::new(crate::db::DbConnection::new()?));
 
-        let rt = tokio::runtime::Runtime::new()?;
-
-        let mut tasks: HashMap<daggy::NodeIndex, BuildTask> = HashMap::new();
-        let mut sentry = 0;
+        let mut build_tasks: HashMap<daggy::NodeIndex, BuildTask> = HashMap::new();
         let mut futs = futures_unordered::FuturesUnordered::new();
 
-        rt.block_on(async {
-            loop {
-                sentry = sentry + 1;
+        let mut sentry = 0;
 
-                let mut search = Dfs::new(&graph_reversed, root_node);
-                let mut all_built = true;
+        loop {
+            sentry = sentry + 1;
 
-                while let Some(index) = search.next(&graph_reversed) {
-                    let node = dag.node_weight(index).unwrap();
-                    let t = tasks.get(&index);
-                    let span = span!(Level::TRACE, "Graph walk", ?node, ?index);
-                    let _enter = span.enter();
-                    trace!(?t);
+            let mut search = Dfs::new(&graph_reversed, root_node);
+            let mut all_built = true;
 
-                    if let Some(t) = t {
-                        if t.building || t.built {
-                            continue;
-                        }
+            while let Some(index) = search.next(&graph_reversed) {
+                let node = dag.node_weight(index).unwrap();
+                let t = build_tasks.get(&index);
+                let span = span!(Level::TRACE, "Graph walk", ?node, ?index);
+                let _enter = span.enter();
+                trace!(?t);
+
+                if let Some(t) = t {
+                    if t.building || t.built {
+                        continue;
                     }
+                }
 
-                    let mut task = BuildTask::default();
-                    task.buildable = true;
+                let mut task = BuildTask::default();
+                task.buildable = true;
 
-                    let mut all_parents_built = true;
-                    for (_, parent_index) in dag.parents(index).iter(&dag) {
-                        let parent = &dag[parent_index];
-                        trace!(?parent);
-                        let parent_task = tasks.get(&parent_index);
-                        trace!(?parent_task, ?parent_index);
-                        match parent_task {
-                            None => {
+                let mut all_parents_built = true;
+                for (_, parent_index) in dag.parents(index).iter(&dag) {
+                    let parent = &dag[parent_index];
+                    trace!(?parent);
+                    let parent_task = build_tasks.get(&parent_index);
+                    trace!(?parent_task, ?parent_index);
+                    match parent_task {
+                        None => {
+                            all_parents_built = false;
+                        }
+                        Some(parent_task) => {
+                            // trace!(?index, "Setting as buildable");
+                            // task.buildable = !parent_task.built;
+                            if !parent_task.built {
                                 all_parents_built = false;
                             }
-                            Some(parent_task) => {
-                                // trace!(?index, "Setting as buildable");
-                                // task.buildable = !parent_task.built;
-                                if !parent_task.built {
-                                    all_parents_built = false;
-                                }
-                            }
                         }
                     }
-
-                    task.buildable = all_parents_built;
-
-                    trace!(?task, ?all_parents_built, "Inserting task to map");
-                    tasks.insert(index, task);
                 }
 
-                for (k, task) in tasks.iter_mut() {
-                    let unit = &dag[*k];
-                    // trace!(?unit, ?task, "Checking state of task");
-                    let conn = conn.clone();
-                    let unit = unit.clone();
-                    let k = k.clone();
+                task.buildable = all_parents_built;
 
-                    if !task.built {
-                        all_built = false;
-                    }
+                trace!(?task, ?all_parents_built, "Inserting task to map");
+                build_tasks.insert(index, task);
+            }
 
-                    if task.buildable && !task.built && !task.building {
-                        all_built = false;
-                        let fut = tokio::spawn(async move {
-                            trace!(?unit, "Starting build task");
-                            (unit.build(false, &conn).await, k)
-                        });
-                        futs.push(fut);
-                        task.building = true;
-                    }
+            for (k, task) in build_tasks.iter_mut() {
+                let unit = &dag[*k];
+                // trace!(?unit, ?task, "Checking state of task");
+                let conn = db_conn.clone();
+                let unit = unit.clone();
+                let k = k.clone();
+
+                if !task.built {
+                    all_built = false;
                 }
 
-                while let Ok(Some((task_result, n))) = futs.try_next().await {
-                    let task_result = task_result?;
-                    debug!(?task_result, ?n, "Task finished");
-                    let t = tasks.get_mut(&n).unwrap();
-                    t.built = true;
-                    // tokio::time::sleep(Duration::from_secs(1)).await;
-                }
-
-                if all_built {
-                    break;
-                }
-
-                if sentry > 3 {
-                    bail!("Sentry reached!");
+                if task.buildable && !task.built && !task.building {
+                    all_built = false;
+                    let fut = tokio::spawn(async move {
+                        trace!(?unit, "Starting build task");
+                        (unit.build(false, &conn).await, k)
+                    });
+                    futs.push(fut);
+                    task.building = true;
                 }
             }
 
-            let res: Result<()> = Ok(());
-            return res;
-        })?;
+            while let Ok(Some((task_result, n))) = futs.try_next().await {
+                let task_result = task_result?;
+                debug!(?task_result, ?n, "Task finished");
+                let t = build_tasks.get_mut(&n).unwrap();
+                t.built = true;
+                // tokio::time::sleep(Duration::from_secs(1)).await;
+            }
 
+            if all_built {
+                break;
+            }
+
+            if sentry > 3 {
+                bail!("Sentry reached!");
+            }
+        }
         Ok(())
     }
 }
@@ -249,7 +248,12 @@ impl Build for Package {
             .env(&self.env)
             .build()?;
 
-        let child_status = bwrap.build_command()?.stdout(Stdio::null()).spawn()?.wait().await?;
+        let child_status = bwrap
+            .build_command()?
+            .stdout(Stdio::null())
+            .spawn()?
+            .wait()
+            .await?;
 
         trace!(?child_status);
 
