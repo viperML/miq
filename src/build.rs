@@ -72,7 +72,7 @@ impl crate::Main for Args {
 
 #[derive(Debug, PartialEq, Eq)]
 enum BuildTask {
-    Waiting,
+    Pending,
     Building,
     Finished,
 }
@@ -83,7 +83,7 @@ impl Args {
         let root_node = self.unit_ref.ref_to_unit()?;
         let (dag, root_index) = eval::dag(root_node.clone())?;
 
-        // There is no reverse search algo, so us regular search on reversed graph
+        // There is no reverse search algo, so use regular search on reversed graph
         let graph_reversed = {
             let mut g = dag.graph().clone();
             g.reverse();
@@ -97,15 +97,15 @@ impl Args {
 
         let mut sentry = 0;
 
-        build_tasks.insert(&root_node, BuildTask::Waiting);
+        build_tasks.insert(&root_node, BuildTask::Pending);
 
-        while ! build_tasks.iter().all(|(_, task)| match task {
+        while !build_tasks.iter().all(|(_, task)| match task {
             BuildTask::Finished => true,
             _ => false,
         }) {
             // Avoid blowing up
             sentry = sentry + 1;
-            if sentry > 3 {
+            if sentry > 10 {
                 panic!("Sentry reached, something went wrong!")
             }
 
@@ -117,22 +117,21 @@ impl Args {
                 let _enter = span.enter();
 
                 // If already building (or implied built), skip
-                let existing_task: Option<&BuildTask> = build_tasks.get(&unit);
+                let existing_task = build_tasks.get(&unit);
                 trace!(?existing_task);
-                if let Some(BuildTask::Building) = existing_task {
-                    continue;
-                }
+                match existing_task {
+                    None | Some(BuildTask::Pending) => {}
+                    _ => continue,
+                };
 
-                let mut task = BuildTask::Waiting;
+                let mut task = BuildTask::Pending;
 
-                if dag
-                    .parents(index)
-                    .iter(&dag)
-                    .all(|(_, parent_index)| match &build_tasks.get(&dag[parent_index]) {
+                if dag.parents(index).iter(&dag).all(|(_, parent_index)| {
+                    match &build_tasks.get(&dag[parent_index]) {
                         Some(BuildTask::Finished) => true,
                         _ => false,
-                    })
-                {
+                    }
+                }) {
                     let _db_conn = db_conn.clone();
                     let unit = unit.clone();
                     let fut = tokio::spawn(async move {
