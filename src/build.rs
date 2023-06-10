@@ -1,23 +1,21 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::OsStr;
 use std::fmt::Debug;
-use std::iter::zip;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 use std::{fs, io};
 
 use async_trait::async_trait;
 use bytes::Buf;
-use color_eyre::eyre::{bail, Context};
+use color_eyre::eyre::{bail, ensure, Context};
 use daggy::petgraph::visit::Dfs;
-use daggy::{petgraph, NodeIndex, Walker};
+use daggy::Walker;
 use derive_builder::Builder;
 use futures::stream::futures_unordered;
 use futures::TryStreamExt;
 use tokio::process::Command;
-use tracing::{debug, info, instrument, span, trace, Level};
+use tracing::{debug, info, span, trace, Level};
 
 use crate::db::DbConnection;
 use crate::eval::{MiqStorePath, RefToUnit, UnitRef};
@@ -37,6 +35,10 @@ pub struct Args {
     /// Rebuild even if it already exists
     #[arg(long, short)]
     rebuild: bool,
+
+    /// Maximum number of concurrent build jobs. Fetch jobs are parallelized automatically.
+    #[arg(long, short, default_value = "1")]
+    jobs: usize,
 }
 
 pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
@@ -105,9 +107,10 @@ impl Args {
         }) {
             // Avoid blowing up
             sentry = sentry + 1;
-            if sentry > 10 {
-                panic!("Sentry reached, something went wrong!")
-            }
+            ensure!(
+                sentry <= 10,
+                "Sentry reached, something might have gone wrong!"
+            );
 
             let mut graph_search = Dfs::new(&graph_reversed, root_index);
 
@@ -116,7 +119,6 @@ impl Args {
                 let span = span!(Level::TRACE, "Graph walk", ?unit, ?index);
                 let _enter = span.enter();
 
-                // If already building (or implied built), skip
                 let existing_task = build_tasks.get(&unit);
                 trace!(?existing_task);
                 match existing_task {
@@ -126,12 +128,37 @@ impl Args {
 
                 let mut task = BuildTask::Pending;
 
-                if dag.parents(index).iter(&dag).all(|(_, parent_index)| {
+                let all_parents_built = dag.parents(index).iter(&dag).all(|(_, parent_index)| {
                     match &build_tasks.get(&dag[parent_index]) {
                         Some(BuildTask::Finished) => true,
                         _ => false,
                     }
-                }) {
+                });
+
+                let number_packages_building = build_tasks
+                    .iter()
+                    .filter(|(unit, _)| match unit {
+                        Unit::PackageUnit(_) => true,
+                        _ => false,
+                    })
+                    .filter(|(_, task)| match task {
+                        BuildTask::Building => true,
+                        _ => false,
+                    })
+                    .count();
+
+                let can_add_to_tasks = match unit {
+                    Unit::PackageUnit(_) => number_packages_building < self.jobs,
+                    _ => true,
+                };
+
+                trace!(
+                    ?number_packages_building,
+                    ?can_add_to_tasks,
+                    ?all_parents_built
+                );
+
+                if all_parents_built && can_add_to_tasks {
                     let _db_conn = db_conn.clone();
                     let unit = unit.clone();
                     let fut = tokio::spawn(async move {

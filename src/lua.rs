@@ -184,7 +184,7 @@ fn load_from_bundle(ctx: &Lua, module: &Table, name: &str) -> Result<()> {
     let string = match name {
         "f" => LUA_F,
         "inspect" => LUA_INSPECT,
-        _ => todo!("Read any file")
+        _ => todo!("Read any file"),
     };
 
     let export: Value = ctx.load(string).eval()?;
