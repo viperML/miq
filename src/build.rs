@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::OsStr;
 use std::fmt::Debug;
+use std::iter::zip;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
@@ -11,16 +12,16 @@ use async_trait::async_trait;
 use bytes::Buf;
 use color_eyre::eyre::{bail, Context};
 use daggy::petgraph::visit::Dfs;
-use daggy::{petgraph, Walker};
+use daggy::{petgraph, NodeIndex, Walker};
 use derive_builder::Builder;
 use futures::stream::futures_unordered;
 use futures::TryStreamExt;
 use tokio::process::Command;
-use tracing::{debug, info, span, trace, Level};
+use tracing::{debug, info, instrument, span, trace, Level};
 
 use crate::db::DbConnection;
 use crate::eval::{MiqStorePath, RefToUnit, UnitRef};
-use crate::schema_eval::{Build, Fetch, Package};
+use crate::schema_eval::{Build, Fetch, Package, Unit};
 use crate::*;
 
 #[derive(Debug, clap::Args)]
@@ -69,113 +70,92 @@ impl crate::Main for Args {
     }
 }
 
-#[derive(Debug, Default)]
-struct BuildTask {
-    buildable: bool,
-    building: bool,
-    built: bool,
+#[derive(Debug, PartialEq, Eq)]
+enum BuildTask {
+    Waiting,
+    Building,
+    Finished,
 }
 
 impl Args {
     async fn _main(&self) -> Result<()> {
-        let root_unit = self.unit_ref.ref_to_unit()?;
-        let (dag, root_node) = eval::dag(root_unit)?;
+        trace!("Starting async");
+        let root_node = self.unit_ref.ref_to_unit()?;
+        let (dag, root_index) = eval::dag(root_node.clone())?;
 
-        let mut graph_reversed = dag.graph().clone();
-        graph_reversed.reverse();
+        // There is no reverse search algo, so us regular search on reversed graph
+        let graph_reversed = {
+            let mut g = dag.graph().clone();
+            g.reverse();
+            g
+        };
 
         let db_conn = Arc::new(Mutex::new(crate::db::DbConnection::new()?));
 
-        let mut build_tasks: HashMap<daggy::NodeIndex, BuildTask> = HashMap::new();
+        let mut build_tasks: HashMap<&Unit, BuildTask> = HashMap::new();
         let mut futs = futures_unordered::FuturesUnordered::new();
 
         let mut sentry = 0;
 
-        loop {
+        build_tasks.insert(&root_node, BuildTask::Waiting);
+
+        while ! build_tasks.iter().all(|(_, task)| match task {
+            BuildTask::Finished => true,
+            _ => false,
+        }) {
+            // Avoid blowing up
             sentry = sentry + 1;
-
-            let mut search = Dfs::new(&graph_reversed, root_node);
-            let mut all_built = true;
-
-            while let Some(index) = search.next(&graph_reversed) {
-                let node = dag.node_weight(index).unwrap();
-                let t = build_tasks.get(&index);
-                let span = span!(Level::TRACE, "Graph walk", ?node, ?index);
-                let _enter = span.enter();
-                trace!(?t);
-
-                if let Some(t) = t {
-                    if t.building || t.built {
-                        continue;
-                    }
-                }
-
-                let mut task = BuildTask::default();
-                task.buildable = true;
-
-                let mut all_parents_built = true;
-                for (_, parent_index) in dag.parents(index).iter(&dag) {
-                    let parent = &dag[parent_index];
-                    trace!(?parent);
-                    let parent_task = build_tasks.get(&parent_index);
-                    trace!(?parent_task, ?parent_index);
-                    match parent_task {
-                        None => {
-                            all_parents_built = false;
-                        }
-                        Some(parent_task) => {
-                            // trace!(?index, "Setting as buildable");
-                            // task.buildable = !parent_task.built;
-                            if !parent_task.built {
-                                all_parents_built = false;
-                            }
-                        }
-                    }
-                }
-
-                task.buildable = all_parents_built;
-
-                trace!(?task, ?all_parents_built, "Inserting task to map");
-                build_tasks.insert(index, task);
-            }
-
-            for (k, task) in build_tasks.iter_mut() {
-                let unit = &dag[*k];
-                // trace!(?unit, ?task, "Checking state of task");
-                let conn = db_conn.clone();
-                let unit = unit.clone();
-                let k = k.clone();
-
-                if !task.built {
-                    all_built = false;
-                }
-
-                if task.buildable && !task.built && !task.building {
-                    all_built = false;
-                    let fut = tokio::spawn(async move {
-                        trace!(?unit, "Starting build task");
-                        (unit.build(false, &conn).await, k)
-                    });
-                    futs.push(fut);
-                    task.building = true;
-                }
-            }
-
-            while let Ok(Some((task_result, n))) = futs.try_next().await {
-                let task_result = task_result?;
-                debug!(?task_result, ?n, "Task finished");
-                let t = build_tasks.get_mut(&n).unwrap();
-                t.built = true;
-                // tokio::time::sleep(Duration::from_secs(1)).await;
-            }
-
-            if all_built {
-                break;
-            }
-
             if sentry > 3 {
-                bail!("Sentry reached!");
+                panic!("Sentry reached, something went wrong!")
             }
+
+            let mut graph_search = Dfs::new(&graph_reversed, root_index);
+
+            while let Some(index) = graph_search.next(&graph_reversed) {
+                let unit = &dag[index];
+                let span = span!(Level::TRACE, "Graph walk", ?unit, ?index);
+                let _enter = span.enter();
+
+                // If already building (or implied built), skip
+                let existing_task: Option<&BuildTask> = build_tasks.get(&unit);
+                trace!(?existing_task);
+                if let Some(BuildTask::Building) = existing_task {
+                    continue;
+                }
+
+                let mut task = BuildTask::Waiting;
+
+                if dag
+                    .parents(index)
+                    .iter(&dag)
+                    .all(|(_, parent_index)| match &build_tasks.get(&dag[parent_index]) {
+                        Some(BuildTask::Finished) => true,
+                        _ => false,
+                    })
+                {
+                    let _db_conn = db_conn.clone();
+                    let unit = unit.clone();
+                    let fut = tokio::spawn(async move {
+                        trace!("Starting build task");
+                        let res = unit.build(false, &_db_conn).await;
+                        (unit, res)
+                    });
+
+                    futs.push(fut);
+                    task = BuildTask::Building;
+                }
+
+                build_tasks.insert(unit, task);
+            }
+
+            while let Some((unit, result)) = futs.try_next().await? {
+                let result = result?;
+                info!(?unit, ?result, "Task finished");
+                let t = build_tasks.get_mut(&unit).unwrap();
+                *t = BuildTask::Finished;
+            }
+
+            trace!(?build_tasks);
         }
         Ok(())
     }
@@ -214,9 +194,7 @@ impl Build for Fetch {
                 .output()?;
         }
 
-        // FIXME
         conn.lock().unwrap().add(&path)?;
-
         Ok(path)
     }
 }
@@ -269,7 +247,6 @@ impl Build for Package {
             Err(e) => bail!(e),
         }
 
-        // Fixme
         conn.lock().unwrap().add(&store_path)?;
         Ok(store_path)
     }

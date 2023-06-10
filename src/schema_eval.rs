@@ -63,7 +63,7 @@ pub trait Build {
     ) -> Result<MiqStorePath>;
 }
 
-#[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Hash, Delegate)]
+#[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Hash, Delegate, Eq)]
 #[delegate(Build)]
 #[educe(Debug)]
 // #[serde(untagged)]
@@ -75,7 +75,7 @@ pub enum Unit {
     FetchUnit(Fetch),
 }
 
-#[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Default, Hash)]
+#[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Default, Hash, Eq)]
 #[educe(Debug)]
 pub struct Package {
     #[educe(Debug(ignore))]
@@ -91,7 +91,7 @@ pub struct Package {
     pub env: BTreeMap<String, String>,
 }
 
-#[derive(Educe, PartialEq, Clone, Deserialize, Serialize, JsonSchema, Default, Hash)]
+#[derive(Educe, PartialEq, Clone, Deserialize, Serialize, JsonSchema, Default, Hash, Eq)]
 #[educe(Debug)]
 pub struct Fetch {
     #[educe(Debug(ignore))]
