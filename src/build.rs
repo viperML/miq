@@ -329,6 +329,7 @@ impl Bubblewrap<'_> {
     fn build_command(&self) -> Result<Command> {
         let resultdir = self.resultdir.to_str().unwrap();
         let mut args = vec![
+            "--clearenv",
             // Build directory
             "--bind",
             self.builddir.to_str().unwrap(),

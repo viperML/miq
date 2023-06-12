@@ -125,7 +125,7 @@ fn format_unit(unit: &Unit, paths: bool) -> String {
     if paths {
         let res: MiqResult = unit.clone().into();
         let eval: MiqEvalPath = (&res).into();
-        format!("{}", eval.as_ref().to_str().unwrap())
+        format!("label = \"{}\" ", eval.as_ref().to_str().unwrap())
     } else {
         match unit {
             Unit::PackageUnit(inner) => {

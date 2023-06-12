@@ -33,8 +33,8 @@ stage1.libc = bootstrap.stdenv {
 }
 
 stage1.cc = bootstrap.stdenv {
-  name = "stage1-cc",
-  script = f[[
+	name = "stage1-cc",
+	script = f [[
     set -eux
     mkdir -p $miq_out/bin
 
@@ -55,12 +55,12 @@ stage1.cc = bootstrap.stdenv {
     EOF
     chmod +x $miq_out/bin/$compiler
     done
-  ]]
+  ]],
 }
 
 stage1.ld = bootstrap.stdenv {
-  name = "stage1-ld",
-  script = f [[
+	name = "stage1-ld",
+	script = f [[
     mkdir -p $miq_out/bin
 
     tee $miq_out/bin/ld <<EOF
@@ -76,28 +76,29 @@ stage1.ld = bootstrap.stdenv {
       -L{{bootstrap.bootstrap}}/lib
     EOF
     chmod +x $miq_out/bin/ld
-  ]]
+  ]],
 }
 
 stage1.stdenv = function(input)
-  local stage1 = stage1
-  local bootstrap = bootstrap
-  input.env = {}
-  input.env.PATH = "{{stage1.cc}}/bin:{{stage1.ld}}/bin:{{bootstrap.bootstrap}}/bin"
-  input.env["CC"] = "gcc"
-  input.env["CXX"] = "g++"
-  input.env["LD"] = "ld"
+	local stage1 = stage1
+	local bootstrap = bootstrap
+	input.env = {}
+	input.env.PATH = f "{{stage1.cc}}/bin:{{stage1.ld}}/bin:{{bootstrap.bootstrap}}/bin"
+	input.env["CC"] = "gcc"
+	input.env["CXX"] = "g++"
+	input.env["LD"] = "ld"
 
-  return miq.package(input)
+	return miq.package(input)
 end
 
-stage1.test_stdenv = stage1.stdenv {
-  name = "test_stdenv",
-  script = f[[
+stage1.test = stage1.stdenv {
+	name = "test_stdenv",
+	script = f [[
     set -eux
-    printenv
+    echo $PWD
+    ls -la
     exit 2
-  ]]
+  ]],
 }
 
 return stage1

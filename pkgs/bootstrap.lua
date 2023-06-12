@@ -27,7 +27,6 @@ bootstrap.unpack_bootstrap_tools = fetch {
 
 bootstrap.bootstrap = package {
 	name = "bootstap",
-	version = "1.0",
 	deps = {},
 	script = f [[
     set -exu
