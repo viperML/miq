@@ -10,6 +10,7 @@ use std::{fs, io};
 
 use async_trait::async_trait;
 use bytes::Buf;
+use color_eyre::Help;
 use color_eyre::eyre::{bail, ensure, eyre, Context};
 use daggy::petgraph::visit::Dfs;
 use daggy::Walker;
@@ -23,7 +24,7 @@ use tokio_process_stream::{Item, ProcessLineStream};
 use tracing::{debug, info, span, trace, Level};
 
 use crate::db::DbConnection;
-use crate::eval::{MiqStorePath, RefToUnit, UnitRef};
+use crate::eval::{MiqStorePath, RefToUnit, UnitRef, MiqEvalPath, MiqResult};
 use crate::schema_eval::{Build, Fetch, Package, Unit};
 use crate::*;
 
@@ -181,7 +182,10 @@ impl Args {
             }
 
             while let Some((unit, result)) = futs.try_next().await? {
-                let result = result?;
+                let res: MiqResult = unit.clone().into();
+                let eval: MiqEvalPath = (&res).into();
+                let sugg = format!("Check the unit at {}", eval.as_ref().to_str().unwrap());
+                let result = result.suggestion(sugg)?;
                 debug!(?unit, ?result, "Task finished");
                 let t = build_tasks.get_mut(&unit).unwrap();
                 *t = BuildTask::Finished;

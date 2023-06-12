@@ -21,6 +21,7 @@ use tracing_subscriber::prelude::*;
 
 fn setup_logging() -> Result<()> {
     color_eyre::config::HookBuilder::default()
+        .add_default_filters()
         .display_location_section(true)
         .display_env_section(false)
         .install()?;
