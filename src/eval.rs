@@ -1,4 +1,5 @@
 use std::ffi::OsStr;
+use std::fmt::format;
 use std::fs::OpenOptions;
 use std::hash::Hash;
 use std::io::Write;
@@ -51,6 +52,9 @@ pub struct Args {
     output_file: Option<PathBuf>,
     #[arg(short, long)]
     no_dag: bool,
+    /// Print eval paths instead of names
+    #[arg(long,)]
+    eval_paths: bool,
 }
 
 #[delegatable_trait]
@@ -99,21 +103,13 @@ impl crate::Main for Args {
 
         let (dag, _) = dag(root_unit)?;
 
+        let node_formatter = |_, (_, weight)| format_unit(weight, self.eval_paths);
         let dot = Dot::with_attr_getters(
             // -
             &dag,
             &[Config::EdgeNoLabel, Config::NodeNoLabel],
             &|_, _| String::new(),
-            &|_, (_, weight)| match weight {
-                Unit::PackageUnit(inner) => {
-                    if let Some(ref v) = inner.version {
-                        format!("label = \"{}-{}\" ", inner.name, v)
-                    } else {
-                        format!("label = \"{}\" ", inner.name)
-                    }
-                }
-                Unit::FetchUnit(inner) => format!("label = \"{}\" ", inner.name),
-            },
+            &node_formatter,
         );
         println!("{:?}", dot);
 
@@ -122,6 +118,25 @@ impl crate::Main for Args {
         }
 
         Ok(())
+    }
+}
+
+fn format_unit(unit: &Unit, paths: bool) -> String {
+    if paths {
+        let res: MiqResult = unit.clone().into();
+        let eval: MiqEvalPath = (&res).into();
+        format!("{}", eval.as_ref().to_str().unwrap())
+    } else {
+        match unit {
+            Unit::PackageUnit(inner) => {
+                if let Some(ref v) = inner.version {
+                    format!("label = \"{}-{}\" ", inner.name, v)
+                } else {
+                    format!("label = \"{}\" ", inner.name)
+                }
+            }
+            Unit::FetchUnit(inner) => format!("label = \"{}\" ", inner.name),
+        }
     }
 }
 
