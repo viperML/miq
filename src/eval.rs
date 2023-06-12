@@ -121,13 +121,6 @@ impl crate::Main for Args {
             std::fs::write(path, format!("{:?}", dot))?;
         }
 
-        let schedule = toposort(&dag, None).expect("Couldn't sort dag");
-        let schedule: Vec<_> = schedule
-            .iter()
-            .map(|&n| dag.node_weight(n).unwrap())
-            .collect();
-        info!(?schedule);
-
         Ok(())
     }
 }
