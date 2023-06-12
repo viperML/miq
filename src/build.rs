@@ -16,6 +16,7 @@ use daggy::Walker;
 use derive_builder::Builder;
 use futures::stream::futures_unordered;
 use futures::{StreamExt, TryStreamExt};
+use owo_colors::OwoColorize;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio_process_stream::{Item, ProcessLineStream};
@@ -181,9 +182,14 @@ impl Args {
 
             while let Some((unit, result)) = futs.try_next().await? {
                 let result = result?;
-                info!(?unit, ?result, "Task finished");
+                debug!(?unit, ?result, "Task finished");
                 let t = build_tasks.get_mut(&unit).unwrap();
                 *t = BuildTask::Finished;
+
+                // Pretty log
+                let p: &Path = result.as_ref();
+                let u = format!("{unit:?}");
+                eprintln!("{} <- {}", p.to_str().unwrap().bright_blue(), &u.bright_black());
             }
 
             trace!(?build_tasks);
@@ -194,7 +200,7 @@ impl Args {
 
 #[async_trait]
 impl Build for Fetch {
-    #[tracing::instrument(skip(conn), ret, err, level = "info")]
+    #[tracing::instrument(skip(conn), ret, err, level = "debug")]
     async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>) -> Result<MiqStorePath> {
         let path: MiqStorePath = (&self.result).into();
 
@@ -232,7 +238,7 @@ impl Build for Fetch {
 
 #[async_trait]
 impl Build for Package {
-    #[tracing::instrument(skip(conn), ret, err, level = "info")]
+    #[tracing::instrument(skip(conn), ret, err, level = "debug")]
     async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>) -> Result<MiqStorePath> {
         let store_path: MiqStorePath = (&self.result).into();
         let p: &Path = store_path.as_ref();

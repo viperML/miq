@@ -16,6 +16,7 @@ use std::path::PathBuf;
 use ambassador::{delegatable_trait, Delegate};
 use clap::Parser;
 use color_eyre::Result;
+use tracing::trace;
 use tracing_subscriber::prelude::*;
 
 fn setup_logging() -> Result<()> {
