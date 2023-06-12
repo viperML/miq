@@ -6,17 +6,19 @@ use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
 
-use color_eyre::eyre::{bail, Context};
+use color_eyre::eyre::{bail, ensure, Context};
 use color_eyre::{Report, Result};
 use daggy::petgraph::algo::toposort;
 use daggy::petgraph::dot::{Config, Dot};
 use daggy::petgraph::visit::Topo;
 use daggy::{petgraph, Dag, NodeIndex, Walker};
+use diesel::IntoSql;
 use schema_eval::Unit;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use tracing::{info, trace};
+use tracing::{info, instrument, span, trace};
 
+use crate::schema_eval::Package;
 use crate::*;
 
 #[derive(Debug, Clone)]
@@ -53,7 +55,7 @@ pub struct Args {
     #[arg(short, long)]
     no_dag: bool,
     /// Print eval paths instead of names
-    #[arg(long,)]
+    #[arg(long)]
     eval_paths: bool,
 }
 
@@ -140,86 +142,91 @@ fn format_unit(unit: &Unit, paths: bool) -> String {
     }
 }
 
+const MAX_DAG_CYCLES: u32 = 5;
+
 #[tracing::instrument(skip_all, ret, err, level = "trace")]
 pub fn dag(input: Unit) -> Result<(UnitDag, NodeIndex)> {
     let mut dag = UnitNodeDag::new();
-    // let root_n_weight: Unit = input.try_into()?;
     let root_n_weight = UnitNode::new(input);
     let root_n = dag.add_node(root_n_weight);
 
-    let max_cycles = 10;
     let mut cycle = 0;
-    let mut size: usize = 1;
 
-    while size > 0 && cycle <= max_cycles {
-        let old_dag = dag.clone();
-        let search = petgraph::visit::Dfs::new(&old_dag, root_n);
+    loop {
+        ensure!(cycle <= MAX_DAG_CYCLES, "Maximum dag eval cycles reached");
 
-        cycle_dag(&mut dag, root_n)?;
+        add_children(&mut dag, root_n)?;
 
-        size = search
-            .iter(&old_dag)
-            .fold(0, |acc, n| if !old_dag[n].visited { acc + 1 } else { acc });
+        let search = petgraph::visit::Dfs::new(&dag, root_n);
 
-        trace!(?size);
+        if search.iter(&dag).all(|index| {
+            let elem = &dag[index];
+            trace!(?elem);
+            elem.visited
+        }) {
+            trace!("All visited");
+            break;
+        }
 
         cycle += 1;
     }
 
+    trace!(?dag);
+
     let result = dag.map(
         // -
-        |_, unit_node| unit_node.inner.to_owned(),
+        |_, unit_node| unit_node.inner.clone(),
         |_, _| (),
     );
 
     Ok((result, root_n))
 }
 
-fn cycle_dag(dag: &mut UnitNodeDag, node: NodeIndex) -> Result<()> {
-    let old_dag = dag.clone();
-    trace!("Cycling at node {:?}", old_dag[node]);
-    let node_weight = old_dag.node_weight(node).unwrap();
+#[instrument(skip(dag), ret, err, level = "trace")]
+fn add_children(dag: &mut UnitNodeDag, index: NodeIndex) -> Result<()> {
+    let UnitNode {
+        inner: unit,
+        visited,
+    } = &dag[index].clone();
 
-    if !dag[node].visited {
-        dag[node].visit();
+    let _span = span!(tracing::Level::TRACE, "add_children", ?unit);
+    let _enter = _span.enter();
 
-        match &node_weight.inner {
-            Unit::PackageUnit(inner) => {
-                for elem in &inner.deps {
-                    trace!("I want to create {:?}", elem);
+    match unit {
+        Unit::FetchUnit(_) => {
+            trace!("Fetch unit, no children to add");
+        }
+        Unit::PackageUnit(package) => {
+            for dep in &package.deps {
+                let dep_unit: Unit = dep.try_into()?;
 
-                    // let target = Unit::from_result(elem)?;
-                    // let target = elem.read_unit()?;
-                    let target: Unit = elem.try_into()?;
+                trace!(?dep, "=> adding dep");
 
-                    for parent in Topo::new(&old_dag).iter(&old_dag) {
-                        let p = &old_dag[parent].inner;
-                        trace!("Examining G component {:?}", p);
+                let maybe_child_index: Option<NodeIndex> = dag
+                    .graph()
+                    .node_indices()
+                    .find(|&index| &dag[index].inner == &dep_unit);
 
-                        if p == &target.clone() {
-                            dag.add_edge(parent, node, ())?;
-
-                            return Ok(());
-                        }
+                let child_index: NodeIndex = match maybe_child_index {
+                    None => {
+                        let dep_unit_node = UnitNode::new(dep_unit);
+                        let (_, child_index) = dag.add_child(index, (), dep_unit_node);
+                        child_index
                     }
+                    Some(child_index) => {
+                        if !visited {
+                            dag.add_edge(index, child_index, ())?;
+                        }
+                        child_index
+                    }
+                };
 
-                    dag.add_parent(
-                        node,
-                        (),
-                        UnitNode {
-                            inner: target,
-                            visited: false,
-                        },
-                    );
-                }
+                add_children(dag, child_index)?;
             }
-            Unit::FetchUnit(_inner) => {}
         }
     }
 
-    for (_, n) in old_dag.parents(node).iter(&old_dag) {
-        cycle_dag(dag, n)?;
-    }
+    dag[index].visited = true;
 
     Ok(())
 }
@@ -265,7 +272,6 @@ impl TryFrom<&MiqResult> for Unit {
 
     fn try_from(value: &MiqResult) -> std::result::Result<Self, Self::Error> {
         let path: MiqEvalPath = value.into();
-        trace!(?path);
         let raw_text =
             std::fs::read_to_string(&path).wrap_err(format!("Reading eval path {:?}", path))?;
         let result = toml::from_str(&raw_text)?;
