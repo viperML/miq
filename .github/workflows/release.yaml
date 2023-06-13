@@ -1,3 +1,5 @@
+name: Build and release
+
 on:
   workflow_dispatch:
   push:
@@ -8,7 +10,7 @@ permissions:
 concurrency: build
 
 jobs:
-  build:
+  main:
     runs-on: ubuntu-latest
     steps:
       - name: Install Nix
