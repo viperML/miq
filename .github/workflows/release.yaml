@@ -22,8 +22,16 @@ jobs:
           mkdir release
           nix build .#pkgsCross.musl64.miq -L
           cp -vL ./result/bin/miq release
+
           nix build .#pkgsStatic.bubblewrap
           cp -vL ./result/bin/bwrap release
+
+          for file in pkgs/*.lua; do
+            cp -v "$file" release
+          done
+
+          cd release
+          tar -czvf release.tar.gz --sort=name --owner=root:0 --group=root:0 --mtime='1970-01-01' *
 
       - uses: ncipollo/release-action@v1
         name: Release
@@ -33,4 +41,4 @@ jobs:
           omitName: true
           allowUpdates: true
           replacesArtifacts: true
-          artifacts: "release/*"
+          artifacts: "release/release.tar.gz,release/miq"
