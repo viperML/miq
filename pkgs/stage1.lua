@@ -90,7 +90,7 @@ stage1.stdenv = function(input)
 end
 
 stage1.trivial = stage1.stdenv {
-	name = "test",
+	name = "trivial",
 	script = f [[
     tee main.c <<EOF
     #include <stdio.h>
