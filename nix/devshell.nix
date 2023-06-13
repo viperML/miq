@@ -15,22 +15,34 @@
       RUST_SRC_PATH = "${toolchain'}/lib/rustlib/src/rust/library";
       packages = with pkgs; [
         toolchain'
-        rust-bin.nightly.latest.rustfmt
-        rust-analyzer-unwrapped
         pkg-config
         diesel-cli
         sqlite-interactive.dev
+        bubblewrap
+
+        rust-analyzer-unwrapped
+        rust-bin.nightly.latest.rustfmt
 
         graph-easy
         lua5_4
         lua-language-server
         stylua
         graphviz-nox
-        bubblewrap
       ];
       NIX_DEBUG = "1";
       RUST_BACKTRACE = "0";
     };
+
+  devShells.nightly = pkgs.mkShell {
+    name = "nightly";
+    packages = with pkgs; [
+      (rust-bin.selectLatestNightlyWith (toolchain: toolchain.default))
+      pkg-config
+      diesel-cli
+      sqlite-interactive.dev
+      cargo-udeps
+    ];
+  };
 
   packages = {
     # toolchain' = with config.packages;
