@@ -133,7 +133,7 @@ fn graphviz_unit_format(unit: &Unit, use_paths: bool) -> String {
                     format!("label = \"{}\" ", inner.name)
                 }
             }
-            Unit::FetchUnit(inner) => format!("label = \"{}\" ", inner.name),
+            Unit::FetchUnit(inner) => format!("label = \"{}\", shape=box, color=gray70 ", inner.name),
         }
     }
 }

@@ -43,6 +43,10 @@ pub struct Args {
     #[arg(long, short)]
     rebuild: bool,
 
+    /// Rebuild all packages in the dependency tree
+    #[arg(long, short = 'R')]
+    rebuild_all: bool,
+
     /// Maximum number of concurrent build jobs. Fetch jobs are parallelized automatically.
     #[arg(long = "jobs", short = 'j', default_value = "1")]
     max_jobs: usize,
@@ -158,7 +162,16 @@ impl Args {
                 let task_status = if all_deps_built && can_add_to_tasks {
                     let _db_conn = db_conn.clone();
                     let unit = unit.clone();
-                    let rebuild = (unit == root_node) && self.rebuild;
+                    let rebuild = match (self, &unit) {
+                        (Args { rebuild: true, .. }, _) => unit == root_node,
+                        (
+                            Args {
+                                rebuild_all: true, ..
+                            },
+                            Unit::PackageUnit(_),
+                        ) => true,
+                        _ => false,
+                    };
                     let fut = tokio::spawn(async move {
                         trace!("Starting build task");
                         let res = unit.build(rebuild, &_db_conn).await;
