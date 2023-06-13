@@ -1,5 +1,4 @@
 use std::ffi::OsStr;
-use std::fmt::format;
 use std::fs::OpenOptions;
 use std::hash::Hash;
 use std::io::Write;
@@ -8,39 +7,31 @@ use std::str::FromStr;
 
 use color_eyre::eyre::{bail, ensure, Context};
 use color_eyre::{Report, Result};
-use daggy::petgraph::algo::toposort;
 use daggy::petgraph::dot::{Config, Dot};
-use daggy::petgraph::visit::Topo;
 use daggy::{petgraph, Dag, NodeIndex, Walker};
-use diesel::IntoSql;
 use schema_eval::Unit;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use tracing::{info, instrument, span, trace};
+use tracing::{instrument, span, trace};
 
-use crate::schema_eval::Package;
 use crate::*;
 
 #[derive(Debug, Clone)]
-pub struct UnitNode {
-    inner: Unit,
+pub struct Weight<T> {
+    inner: T,
     visited: bool,
 }
 
-impl UnitNode {
-    fn new(inner: Unit) -> Self {
+impl<T> Weight<T> {
+    fn new(inner: T) -> Self {
         Self {
             inner,
             visited: false,
         }
     }
-
-    fn visit(&mut self) {
-        self.visited = true;
-    }
 }
 
-type UnitNodeDag = Dag<UnitNode, ()>;
+type UnitNodeDag = Dag<Weight<Unit>, ()>;
 type UnitDag = Dag<Unit, ()>;
 
 #[derive(Debug, clap::Args)]
@@ -66,6 +57,7 @@ pub trait RefToUnit {
 
 #[derive(Debug, Clone, Delegate)]
 #[delegate(RefToUnit)]
+/// A reference to derive a Unit from
 pub enum UnitRef {
     /// Already evaluated unit.toml
     Serialized(PathBuf),
@@ -75,7 +67,9 @@ pub enum UnitRef {
 
 impl RefToUnit for PathBuf {
     fn ref_to_unit(&self) -> Result<Unit> {
-        todo!();
+        let file_contents = std::fs::read_to_string(self)?;
+        let deserialized = toml::from_str(&file_contents)?;
+        Ok(deserialized)
     }
 }
 
@@ -87,11 +81,13 @@ impl FromStr for UnitRef {
             return Ok(Self::Serialized(PathBuf::from(s)));
         };
 
-        if s.contains("#") {
-            return Ok(Self::Lua(lua::LuaRef::from_str(s)?));
+        if s.contains(".lua") {
+            return Ok(Self::Lua(
+                lua::LuaRef::from_str(s).context("Evaluating LuaRef")?,
+            ));
         }
 
-        bail!(format!("Couldn't match {} as a valid UnitRef", s));
+        bail!(format!("Couldn't match {} as a known UnitRef", s));
     }
 }
 
@@ -105,7 +101,7 @@ impl crate::Main for Args {
 
         let (dag, _) = dag(root_unit)?;
 
-        let node_formatter = |_, (_, weight)| format_unit(weight, self.eval_paths);
+        let node_formatter = |_, (_, weight)| graphviz_unit_format(weight, self.eval_paths);
         let dot = Dot::with_attr_getters(
             // -
             &dag,
@@ -123,8 +119,8 @@ impl crate::Main for Args {
     }
 }
 
-fn format_unit(unit: &Unit, paths: bool) -> String {
-    if paths {
+fn graphviz_unit_format(unit: &Unit, use_paths: bool) -> String {
+    if use_paths {
         let res: MiqResult = unit.clone().into();
         let eval: MiqEvalPath = (&res).into();
         format!("label = \"{}\" ", eval.as_ref().to_str().unwrap())
@@ -142,54 +138,43 @@ fn format_unit(unit: &Unit, paths: bool) -> String {
     }
 }
 
-const MAX_DAG_CYCLES: u32 = 5;
+const MAX_DAG_CYCLES: u32 = 20;
 
 #[tracing::instrument(skip_all, ret, err, level = "trace")]
 pub fn dag(input: Unit) -> Result<(UnitDag, NodeIndex)> {
     let mut dag = UnitNodeDag::new();
-    let root_n_weight = UnitNode::new(input);
-    let root_n = dag.add_node(root_n_weight);
+    let root_index = dag.add_node(Weight::new(input));
 
     let mut cycle = 0;
 
-    loop {
+    while dag
+        .raw_nodes()
+        .iter()
+        .any(|node| node.weight.visited == false)
+    {
         ensure!(cycle <= MAX_DAG_CYCLES, "Maximum dag eval cycles reached");
-
-        add_children(&mut dag, root_n)?;
-
-        let search = petgraph::visit::Dfs::new(&dag, root_n);
-
-        if search.iter(&dag).all(|index| {
-            let elem = &dag[index];
-            trace!(?elem);
-            elem.visited
-        }) {
-            trace!("All visited");
-            break;
-        }
-
         cycle += 1;
+
+        add_children_recursive(&mut dag, root_index)?;
     }
 
-    trace!(?dag);
-
     let result = dag.map(
-        // -
-        |_, unit_node| unit_node.inner.clone(),
+        // format guard
+        |_, node| node.inner.clone(),
         |_, _| (),
     );
 
-    Ok((result, root_n))
+    Ok((result, root_index))
 }
 
 #[instrument(skip(dag), ret, err, level = "trace")]
-fn add_children(dag: &mut UnitNodeDag, index: NodeIndex) -> Result<()> {
-    let UnitNode {
+fn add_children_recursive(dag: &mut UnitNodeDag, index: NodeIndex) -> Result<()> {
+    let Weight {
         inner: unit,
         visited,
-    } = &dag[index].clone();
+    } = dag[index].clone();
 
-    let _span = span!(tracing::Level::TRACE, "add_children", ?unit);
+    let _span = span!(tracing::Level::TRACE, "adding children", ?unit);
     let _enter = _span.enter();
 
     match unit {
@@ -209,7 +194,7 @@ fn add_children(dag: &mut UnitNodeDag, index: NodeIndex) -> Result<()> {
 
                 let child_index: NodeIndex = match maybe_child_index {
                     None => {
-                        let dep_unit_node = UnitNode::new(dep_unit);
+                        let dep_unit_node = Weight::new(dep_unit);
                         let (_, child_index) = dag.add_child(index, (), dep_unit_node);
                         child_index
                     }
@@ -221,7 +206,7 @@ fn add_children(dag: &mut UnitNodeDag, index: NodeIndex) -> Result<()> {
                     }
                 };
 
-                add_children(dag, child_index)?;
+                add_children_recursive(dag, child_index)?;
             }
         }
     }
