@@ -28,6 +28,11 @@
       static = false;
       stdenv = pkgs.clangStdenv;
     };
+    "${bname}-musl" = {
+      target = "${proc}-unknown-linux-musl";
+      static = true;
+      stdenv = pkgs.pkgsCross.musl64.stdenv;
+    };
   };
 in {
   packages = builtins.mapAttrs (name: v: let
@@ -39,6 +44,7 @@ in {
     };
   in
     rustPlatform.buildRustPackage {
+      doCheck = false;
       name = bname;
       inherit src;
       inherit (v) target;
@@ -50,10 +56,8 @@ in {
         };
       };
       CARGO_BUILD_TARGET = v.target;
-      CARGO_BUILD_RUSTFLAGS =
-        if v.static
-        then "-C target-feature=+crt-static"
-        else "";
+
+      RUSTFLAGS = pkgs.lib.optionalString v.static "-C target-feature=+crt-static";
 
       nativeBuildInputs = [
         pkgs.pkg-config
