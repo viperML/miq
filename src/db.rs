@@ -135,7 +135,7 @@ pub struct DbConnection {
 
 impl DbConnection {
     pub fn new() -> Result<Self> {
-        let database_url = std::env::var("DATABASE_URL")?;
+        let database_url = std::env::var("MIQ_DATABASE_URL").unwrap_or_else(|_| String::from("/miq/db.sqlite"));
         trace!("DATABASE_URL: {:?}", database_url);
         let mut conn = diesel::SqliteConnection::establish(&database_url)?;
 
