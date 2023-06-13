@@ -267,8 +267,11 @@ impl Build for Package {
         }
 
         clean_path(&store_path)?;
-        let tempdir = tempfile::tempdir()?;
-        let builddir = tempdir.path();
+        let _builddir = tempfile::tempdir()?;
+        let builddir = _builddir.path();
+
+        let _tmpdir = tempfile::tempdir()?;
+        let tmpdir = _tmpdir.path().to_str().unwrap();
 
         let wrapped_cmd = ["/bin/sh", "-c", &self.script];
 
@@ -277,6 +280,10 @@ impl Build for Package {
             .resultdir(p)
             .cmd(&wrapped_cmd)
             .env(&self.env)
+            .extra_bwrap(&[
+                "--bind", tmpdir, tmpdir, "--setenv", "TMP", tmpdir, "--setenv", "TMPDIR", tmpdir,
+                "--setenv", "TEMP", tmpdir, "--setenv", "TEMPDIR", tmpdir,
+            ])
             .build()?
             .build_command()?;
 
@@ -334,6 +341,7 @@ struct Bubblewrap<'a> {
     builddir: &'a Path,
     resultdir: &'a Path,
     cmd: &'a [&'a str],
+    extra_bwrap: &'a [&'a str],
     env: &'a BTreeMap<String, String>,
 }
 
@@ -368,6 +376,9 @@ impl Bubblewrap<'_> {
             "--bind",
             "/run",
             "/run",
+            "--bind",
+            "/tmp",
+            "/tmp",
             "--ro-bind",
             "/etc",
             "/etc",
@@ -395,6 +406,7 @@ impl Bubblewrap<'_> {
 
         let mut command = Command::new("bwrap");
         command.args(args);
+        command.args(self.extra_bwrap);
         command.args(self.cmd);
         trace!(?command);
         Ok(command)

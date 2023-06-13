@@ -106,4 +106,31 @@ stage1.trivial = stage1.stdenv {
   ]],
 }
 
+local dash_src = fetch {
+  url = "http://gondor.apana.org.au/~herbert/dash/files/dash-0.5.12.tar.gz"
+}
+
+stage1.dash_src = stage1.stdenv {
+  name = "dash_src",
+  script = f [[
+    set -eux
+    mkdir -pv $miq_out
+    cd $miq_out
+
+    tar -xvf {{dash_src}} --strip-components=1 --no-same-permissions --no-same-owner
+  ]]
+}
+
+stage1.dash = stage1.stdenv {
+  name = "dash",
+  script = f[[
+    {{stage1.dash_src}}/configure --prefix=$miq_out
+    ls -la
+
+    make -j$(nproc)
+    make install -j$(nproc)
+  ]]
+}
+
+
 return stage1
