@@ -15,36 +15,14 @@
         "x86_64-linux"
         "aarch64-linux"
       ];
-      perSystem = {
-        system,
-        pkgs,
-        ...
-      }: {
-        _module.args.pkgs = import inputs.nixpkgs {
-          inherit system;
-          overlays = [
-            inputs.rust-overlay.overlays.default
-          ];
-        };
 
-        _module.args.src = inputs.nix-filter.lib {
-          root = inputs.self;
-          include = [
-            (inputs.nix-filter.lib.inDirectory "src")
-            "Cargo.toml"
-            "Cargo.lock"
-            "build.rs"
-            "migrations"
-          ];
-        };
+      imports = [
+        ./nix/packages.nix
+      ];
 
-        legacyPackages = pkgs;
-
-        imports = [
-          ./devshell.nix
-          ./packages.nix
-          ./pkgs
-        ];
-      };
+      perSystem.imports = [
+        ./nix/devshell.nix
+        ./pkgs
+      ];
     };
 }

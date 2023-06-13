@@ -1,5 +1,5 @@
 {pkgs, ...}: {
-  packages.trivial = with pkgs.pkgsMusl;
+  packages.trivial = with pkgs.pkgsCross.musl64;
     stdenv.mkDerivation {
       name = "trivial";
       src = ./.;
