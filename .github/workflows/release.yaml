@@ -1,0 +1,36 @@
+on:
+  workflow_dispatch:
+  push:
+
+permissions:
+  contents: write
+
+concurrency: build
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build
+        run: |
+          mkdir release
+          nix build .#pkgsCross.musl64.miq -L
+          cp -vL ./result/bin/miq release
+          nix build .#pkgsStatic.bubblewrap
+          cp -vL ./result/bin/bwrap release
+
+      - uses: ncipollo/release-action@v1
+        name: Release
+        with:
+          tag: latest
+          omitBody: true
+          omitName: true
+          allowUpdates: true
+          replacesArtifacts: true
+          artifacts: "release/*"
