@@ -18,6 +18,7 @@ use clap::Parser;
 use color_eyre::Result;
 use tracing::trace;
 use tracing_subscriber::prelude::*;
+use tracing_subscriber::EnvFilter;
 
 fn setup_logging() -> Result<()> {
     color_eyre::config::HookBuilder::default()
@@ -25,10 +26,6 @@ fn setup_logging() -> Result<()> {
         .display_location_section(true)
         .display_env_section(false)
         .install()?;
-
-    let layer_filter = tracing_subscriber::EnvFilter::from_default_env()
-        .add_directive("info".parse()?)
-        .add_directive("miq=debug".parse()?);
 
     let layer_fmt = tracing_subscriber::fmt::layer()
         .with_writer(std::io::stderr)
@@ -39,7 +36,7 @@ fn setup_logging() -> Result<()> {
     let layer_error = tracing_error::ErrorLayer::default();
 
     tracing_subscriber::registry()
-        .with(layer_filter)
+        .with(EnvFilter::from_default_env())
         .with(layer_error)
         .with(layer_fmt)
         .init();

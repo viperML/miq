@@ -90,9 +90,10 @@ enum BuildTask {
     Finished,
 }
 
+const MAX_BUILD_ITERATIONS: u32 = 100;
+
 impl Args {
     async fn _main(&self) -> Result<()> {
-        trace!("Starting async");
         let root_node = self.unit_ref.ref_to_unit()?;
         let (dag, _) = eval::dag(root_node.clone())?;
 
@@ -109,16 +110,16 @@ impl Args {
             BuildTask::Finished => true,
             _ => false,
         }) {
-            // Avoid blowing up
-            sentry = sentry + 1;
-            ensure!(
-                sentry <= 10,
-                "Sentry reached, something might have gone wrong!"
-            );
+            for index in dag.graph().node_indices() {
+                // Avoid blowing up
+                ensure!(
+                    sentry <= MAX_BUILD_ITERATIONS,
+                    "Build sentry reached, something might have gone wrong!"
+                );
+                sentry = sentry + 1;
 
-            // let mut graph_search = Dfs::new(&graph_reversed, root_index);
+                let unit = &dag[index];
 
-            while let Some((index, unit)) = dag.node_references().next() {
                 let span = span!(Level::TRACE, "Graph walk", ?unit, ?index);
                 let _enter = span.enter();
 
@@ -153,12 +154,6 @@ impl Args {
                     _ => true,
                 };
 
-                trace!(
-                    ?number_packages_building,
-                    ?can_add_to_tasks,
-                    ?all_deps_built
-                );
-
                 let task_status = if all_deps_built && can_add_to_tasks {
                     let _db_conn = db_conn.clone();
                     let unit = unit.clone();
@@ -182,6 +177,13 @@ impl Args {
                 } else {
                     BuildTask::Waiting
                 };
+
+                trace!(
+                    ?number_packages_building,
+                    ?can_add_to_tasks,
+                    ?all_deps_built,
+                    ?task_status
+                );
 
                 build_tasks.insert(unit, task_status);
             }
@@ -264,6 +266,7 @@ impl Build for Package {
             }
         }
 
+        clean_path(&store_path)?;
         let tempdir = tempfile::tempdir()?;
         let builddir = tempdir.path();
 
