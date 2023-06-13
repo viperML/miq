@@ -42,16 +42,13 @@ stage1.cc = bootstrap.stdenv {
     tee $miq_out/bin/$compiler <<EOF
     #!{{bootstrap.bootstrap}}/bin/bash
     set -eux
-    exec {{bootstrap.bootstrap}}/bin/$compiler $CFLAGS \
-      -Wl,-dynamic-linker \
+    exec {{bootstrap.bootstrap}}/bin/$compiler \
+      $CFLAGS \
+      -Wl,-dynamic-linker={{stage1.libc}}/lib/ld-musl-x86_64.so.1 \
       "\$@" \
       -B{{stage1.libc}}/lib \
-      -B{{bootstrap.bootstrap}}/lib \
-      -idirafter {{stage1.libc}}/include-libc \
-      -idirafter {{bootstrap.bootstrap}}/include-libc \
-      -isystem /miq/store/AABB-bootstrap/include-libc
-      -isystem {{stage1.libc}}/include-libc \
-      -isystem {{bootstrap.bootstrap}}/include-libc
+      -idirafter {{stage1.libc}}/include \
+      -isystem {{stage1.libc}}/include
     EOF
     chmod +x $miq_out/bin/$compiler
     done
@@ -66,15 +63,15 @@ stage1.ld = bootstrap.stdenv {
     tee $miq_out/bin/ld <<EOF
     #!{{bootstrap.bootstrap}}/bin/bash
     set -eux
-    echo "miq ld wrapper"
+    echo "miq ld wrapper running"
+
     exec {{bootstrap.bootstrap}}/bin/ld \
       -dynamic-linker {{stage1.libc}}/lib/ld-musl-x86_64.so.1 \
       "\$@" \
       -rpath {{stage1.libc}}/lib \
-      -rpath {{bootstrap.bootstrap}}/lib \
       -L{{stage1.libc}}/lib \
-      -L{{bootstrap.bootstrap}}/lib
     EOF
+
     chmod +x $miq_out/bin/ld
   ]],
 }
@@ -87,17 +84,25 @@ stage1.stdenv = function(input)
 	input.env["CC"] = "gcc"
 	input.env["CXX"] = "g++"
 	input.env["LD"] = "ld"
+  input.env["CFLAGS"] = "-O2 -pipe -pie -fPIE -fPIC"
 
 	return miq.package(input)
 end
 
-stage1.test = stage1.stdenv {
-	name = "test_stdenv",
+stage1.trivial = stage1.stdenv {
+	name = "test",
 	script = f [[
-    set -eux
-    echo $PWD
-    ls -la
-    exit 2
+    tee main.c <<EOF
+    #include <stdio.h>
+    #include <stdlib.h>
+    int main() {
+      printf("Hello World");
+      return(0);
+    }
+    EOF
+
+    mkdir -p $miq_out/bin
+    $CC main.c -o $miq_out/bin/hello
   ]],
 }
 
