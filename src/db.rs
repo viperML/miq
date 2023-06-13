@@ -52,6 +52,10 @@ struct RemoveArgs {
     /// Remove all known paths (wipe store)
     #[arg(long)]
     all: bool,
+
+    /// Remove all packages
+    #[arg(long)]
+    all_packages: bool,
 }
 
 #[derive(Debug, clap::Args)]
@@ -82,22 +86,27 @@ impl crate::Main for Args {
                 info!("{:?}", result);
             }
             CliSubcommand::Remove(args) => {
-                match (&args.path, &args.all) {
-                    (Some(path), _) => {
+                match args {
+                    RemoveArgs {
+                        path: Some(path), ..
+                    } => {
                         let path_normalized = fix_dir_trailing_slash(&path);
                         conn.remove(path_normalized)?;
                     }
-                    (None, true) => {
+                    RemoveArgs { all: true, .. } => {
                         let all = conn.list()?;
                         debug!(?all);
                         for elem in all {
                             info!(?elem, "Removing");
                             conn.remove(&elem.store_path)?;
                         }
-                    }
+                    },
+                    RemoveArgs {all_packages: true, ..} => {
+                        todo!();
+                    },
                     _ => {
                         let err = eyre!(clap::error::ErrorKind::TooFewValues)
-                            .wrap_err("Either use a store path or --all");
+                            .wrap_err("Read the --help section for usage");
                         return Err(err);
                     }
                 };

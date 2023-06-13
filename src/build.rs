@@ -10,9 +10,10 @@ use std::{fs, io};
 
 use async_trait::async_trait;
 use bytes::Buf;
-use color_eyre::Help;
 use color_eyre::eyre::{bail, ensure, eyre, Context};
-use daggy::petgraph::visit::Dfs;
+use color_eyre::Help;
+use daggy::petgraph::graph::Node;
+use daggy::petgraph::visit::{Dfs, IntoNodeReferences};
 use daggy::Walker;
 use derive_builder::Builder;
 use futures::stream::futures_unordered;
@@ -24,7 +25,7 @@ use tokio_process_stream::{Item, ProcessLineStream};
 use tracing::{debug, info, span, trace, Level};
 
 use crate::db::DbConnection;
-use crate::eval::{MiqStorePath, RefToUnit, UnitRef, MiqEvalPath, MiqResult};
+use crate::eval::{MiqEvalPath, MiqResult, MiqStorePath, RefToUnit, UnitRef};
 use crate::schema_eval::{Build, Fetch, Package, Unit};
 use crate::*;
 
@@ -43,8 +44,8 @@ pub struct Args {
     rebuild: bool,
 
     /// Maximum number of concurrent build jobs. Fetch jobs are parallelized automatically.
-    #[arg(long, short, default_value = "1")]
-    jobs: usize,
+    #[arg(long = "jobs", short = 'j', default_value = "1")]
+    max_jobs: usize,
 }
 
 pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
@@ -80,7 +81,7 @@ impl crate::Main for Args {
 
 #[derive(Debug, PartialEq, Eq)]
 enum BuildTask {
-    Pending,
+    Waiting,
     Building,
     Finished,
 }
@@ -89,14 +90,7 @@ impl Args {
     async fn _main(&self) -> Result<()> {
         trace!("Starting async");
         let root_node = self.unit_ref.ref_to_unit()?;
-        let (dag, root_index) = eval::dag(root_node.clone())?;
-
-        // There is no reverse search algo, so use regular search on reversed graph
-        let graph_reversed = {
-            let mut g = dag.graph().clone();
-            g.reverse();
-            g
-        };
+        let (dag, _) = eval::dag(root_node.clone())?;
 
         let db_conn = Arc::new(Mutex::new(crate::db::DbConnection::new()?));
 
@@ -105,7 +99,7 @@ impl Args {
 
         let mut sentry = 0;
 
-        build_tasks.insert(&root_node, BuildTask::Pending);
+        build_tasks.insert(&root_node, BuildTask::Waiting);
 
         while !build_tasks.iter().all(|(_, task)| match task {
             BuildTask::Finished => true,
@@ -118,24 +112,21 @@ impl Args {
                 "Sentry reached, something might have gone wrong!"
             );
 
-            let mut graph_search = Dfs::new(&graph_reversed, root_index);
+            // let mut graph_search = Dfs::new(&graph_reversed, root_index);
 
-            while let Some(index) = graph_search.next(&graph_reversed) {
-                let unit = &dag[index];
+            while let Some((index, unit)) = dag.node_references().next() {
                 let span = span!(Level::TRACE, "Graph walk", ?unit, ?index);
                 let _enter = span.enter();
 
                 let existing_task = build_tasks.get(&unit);
                 trace!(?existing_task);
                 match existing_task {
-                    None | Some(BuildTask::Pending) => {}
+                    None | Some(BuildTask::Waiting) => {}
                     _ => continue,
                 };
 
-                let mut task = BuildTask::Pending;
-
-                let all_parents_built = dag.parents(index).iter(&dag).all(|(_, parent_index)| {
-                    match &build_tasks.get(&dag[parent_index]) {
+                let all_deps_built = dag.children(index).iter(&dag).all(|(_, dep_index)| {
+                    match &build_tasks.get(&dag[dep_index]) {
                         Some(BuildTask::Finished) => true,
                         _ => false,
                     }
@@ -154,17 +145,17 @@ impl Args {
                     .count();
 
                 let can_add_to_tasks = match unit {
-                    Unit::PackageUnit(_) => number_packages_building < self.jobs,
+                    Unit::PackageUnit(_) => number_packages_building < self.max_jobs,
                     _ => true,
                 };
 
                 trace!(
                     ?number_packages_building,
                     ?can_add_to_tasks,
-                    ?all_parents_built
+                    ?all_deps_built
                 );
 
-                if all_parents_built && can_add_to_tasks {
+                let task_status = if all_deps_built && can_add_to_tasks {
                     let _db_conn = db_conn.clone();
                     let unit = unit.clone();
                     let rebuild = (unit == root_node) && self.rebuild;
@@ -173,12 +164,13 @@ impl Args {
                         let res = unit.build(rebuild, &_db_conn).await;
                         (unit, res)
                     });
-
                     futs.push(fut);
-                    task = BuildTask::Building;
-                }
+                    BuildTask::Building
+                } else {
+                    BuildTask::Waiting
+                };
 
-                build_tasks.insert(unit, task);
+                build_tasks.insert(unit, task_status);
             }
 
             while let Some((unit, result)) = futs.try_next().await? {
@@ -193,7 +185,11 @@ impl Args {
                 // Pretty log
                 let p: &Path = result.as_ref();
                 let u = format!("{unit:?}");
-                eprintln!("{} <- {}", p.to_str().unwrap().bright_blue(), &u.bright_black());
+                eprintln!(
+                    "{} <- {}",
+                    p.to_str().unwrap().bright_blue(),
+                    &u.bright_black()
+                );
             }
 
             trace!(?build_tasks);
