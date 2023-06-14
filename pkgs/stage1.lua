@@ -108,7 +108,6 @@ stage1.stdenv = function(input)
 	end
 	input.depend = nil
 
-	miq.trace(input)
 	return miq.package(input)
 end
 

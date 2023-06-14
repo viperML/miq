@@ -1,6 +1,4 @@
 local miq = require "miq"
-local package = miq.package
-local f = miq.f
 
 ---@param first table<string, any>
 ---@param second table<string, any>
@@ -19,19 +17,8 @@ local pkgs = {}
 -- merge(pkgs, require "bootstrap")
 -- merge(pkgs, require "stage1")
 
-pkgs.bootstrap = require("bootstrap")
-pkgs.stage1 = require("stage1")
-
-pkgs.foo = pkgs.bootstrap.stdenv {
-  name = "foo",
-  script = [[
-    set -ex
-    echo $PATH
-
-    printenv
-
-    exit 2
-  ]]
-}
+-- pkgs.bootstrap = require("bootstrap")
+-- pkgs.stage1 = require("stage1")
+pkgs.stage0 = require("stage0")
 
 return pkgs

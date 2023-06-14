@@ -8,7 +8,7 @@ use color_eyre::{Help, Report, Result};
 use mlua::prelude::*;
 use mlua::{chunk, StdLib, Table, Value};
 use serde::{Deserialize, Serialize};
-use tracing::{instrument, trace};
+use tracing::{instrument, span, trace, Level};
 
 use crate::eval::{MiqResult, MiqStorePath, RefToUnit};
 use crate::schema_eval::Unit;
@@ -193,6 +193,7 @@ fn load_from_bundle(ctx: &Lua, module: &Table, name: &str) -> Result<()> {
     Ok(())
 }
 
+#[instrument(skip(ctx, input), level = "trace")]
 fn luatrace<'value, 'lua, V: mlua::prelude::IntoLua<'value>>(
     ctx: &'lua Lua,
     input: V,
@@ -208,23 +209,37 @@ where
 
     let inspected: LuaString = inspect.call(input)?;
     let s = inspected.to_str()?;
+    // let span = span!(Level::TRACE, "luatrace");
+    // let _enter = span.enter();
     trace!("luatrace>> {}", s);
     Ok(())
 }
 
+#[instrument(ret, err, level = "trace")]
 fn interpolate<'lua>(
     ctx: &'lua Lua,
     value: Value<'lua>,
 ) -> Result<(Value<'lua>, Value<'lua>), LuaError> {
     match value {
         table @ Value::Table(_) => {
-            if let Ok(unit) = ctx.from_value::<Unit>(table) {
+            if let Ok(unit) = ctx.from_value::<Unit>(table.clone()) {
                 let miq_result: MiqResult = unit.into();
                 let store_path: MiqStorePath = (&miq_result).into();
                 let store_path: &Path = store_path.as_ref();
                 let left = store_path.to_str().unwrap().to_owned();
                 let right = miq_result.deref().clone();
                 Ok((ctx.pack(left)?, ctx.pack(right)?))
+            } else if let Ok(mt) = ctx.from_value::<MetaText>(table) {
+                let right = mt
+                    .deps
+                    .into_iter()
+                    .map(|r| {
+                        let r: &str = r.as_ref();
+                        r.to_owned()
+                    })
+                    .collect::<Vec<String>>();
+                let left = mt.value;
+                Ok((ctx.pack(left).unwrap(), ctx.pack(right).unwrap()))
             } else {
                 Err(LuaError::DeserializeError("Can't interpolate value".into()))
             }

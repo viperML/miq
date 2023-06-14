@@ -1,4 +1,4 @@
-local miq = require("miq")
+local miq = require "miq"
 
 ---@alias MetaText
 ---| { value: string, deps: string[] }
@@ -16,7 +16,7 @@ local f = function(raw_text)
 	result.deps = {}
 
 	local substituted = raw_text:gsub("%b{}", function(block)
-		local code = block:match("{{(.*)}}")
+		local code = block:match "{{(.*)}}"
 		-- Workaround: we are matching {FOO}, skip if we do
 		-- miq.trace("Got block: "..block)
 		-- Check if code is nil
@@ -48,11 +48,23 @@ local f = function(raw_text)
 		if fn then
 			local lua_value = fn()
 
-      local text, dep = miq.interpolate(lua_value)
-      if dep ~= nil then
-        table.insert(result.deps, dep)
-      end
-      return text
+			local text, d = miq.interpolate(lua_value)
+
+			if d ~= nil then
+				if d[1] ~= nil then
+					-- d is a list of deps
+					for _, dep in ipairs(d) do
+						table.insert(result.deps, dep)
+					end
+				else
+					-- d is a single dep
+					table.insert(result.deps, d)
+				end
+			end
+
+      miq.trace(result)
+
+			return text
 		else
 			error(err, 0)
 		end
@@ -61,7 +73,7 @@ local f = function(raw_text)
 	result.value = substituted
 
 	-- Serde doesn't like an empty list for deser
-  -- Enum variant fails if deps is empty
+	-- Enum variant fails if deps is empty
 	if next(result.deps) == nil then
 		return result.value
 	else
