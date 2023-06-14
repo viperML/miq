@@ -42,7 +42,7 @@ stage1.cc = bootstrap.stdenv {
 
     tee $miq_out/bin/$compiler <<EOF
     #!{{bootstrap.bootstrap}}/bin/bash
-    echo "MIQ_CFLAGS: >> \$MIQ_CFLAGS <<"
+    echo "MIQ_CFLAGS: \$MIQ_CFLAGS" >&2
 
     set -x
     exec {{bootstrap.bootstrap}}/bin/$compiler \\
@@ -65,7 +65,7 @@ stage1.ld = bootstrap.stdenv {
 
     tee $miq_out/bin/ld <<EOF
     #!{{bootstrap.bootstrap}}/bin/bash
-    echo -n "MIQ_LDFLAGS: \$MIQ_LDFLAGS"
+    echo "MIQ_LDFLAGS: \$MIQ_LDFLAGS" >&2
 
     exec {{bootstrap.bootstrap}}/bin/ld \\
       -dynamic-linker {{stage1.libc}}/lib/ld-musl-x86_64.so.1 \\
@@ -243,11 +243,12 @@ do
     },
     script = f[[
       set -x
-      mkdir $miq_out
+      mkdir -p $miq_out
       export PREFIX=$miq_out
       {{stage1.libmpc.src}}/configure \
         --prefix="$PREFIX" \
-        --disable-dependency-tracking
+        --disable-dependency-tracking \
+        --with-pic
       make -j$(nproc)
       make install -j$(nproc)
     ]]
