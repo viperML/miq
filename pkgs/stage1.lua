@@ -39,17 +39,20 @@ stage1.cc = bootstrap.stdenv {
     mkdir -p $miq_out/bin
 
     for compiler in gcc g++ cpp; do
+
     tee $miq_out/bin/$compiler <<EOF
     #!{{bootstrap.bootstrap}}/bin/bash
-    set -eux
-    exec {{bootstrap.bootstrap}}/bin/$compiler \
-      $CFLAGS \
-      -Wl,-dynamic-linker={{stage1.libc}}/lib/ld-musl-x86_64.so.1 \
-      "\$@" \
-      -B{{stage1.libc}}/lib \
-      -idirafter {{stage1.libc}}/include \
+    echo "MIQ_CFLAGS: >> \$MIQ_CFLAGS <<"
+
+    set -x
+    exec {{bootstrap.bootstrap}}/bin/$compiler \\
+      -Wl,-dynamic-linker={{stage1.libc}}/lib/ld-musl-x86_64.so.1 \\
+      "\$@" \\
+      -B{{stage1.libc}}/lib \\
+      -idirafter {{stage1.libc}}/include \\
       -isystem {{stage1.libc}}/include
     EOF
+
     chmod +x $miq_out/bin/$compiler
     done
   ]],
@@ -62,14 +65,14 @@ stage1.ld = bootstrap.stdenv {
 
     tee $miq_out/bin/ld <<EOF
     #!{{bootstrap.bootstrap}}/bin/bash
-    set -eux
-    echo "miq ld wrapper running"
+    echo -n "MIQ_LDFLAGS: \$MIQ_LDFLAGS"
 
-    exec {{bootstrap.bootstrap}}/bin/ld \
-      -dynamic-linker {{stage1.libc}}/lib/ld-musl-x86_64.so.1 \
-      "\$@" \
-      -rpath {{stage1.libc}}/lib \
-      -L{{stage1.libc}}/lib \
+    exec {{bootstrap.bootstrap}}/bin/ld \\
+      -dynamic-linker {{stage1.libc}}/lib/ld-musl-x86_64.so.1 \\
+      "\$@" \\
+      -rpath {{stage1.libc}}/lib \\
+      -L{{stage1.libc}}/lib \\
+      \$MIQ_LDFLAGS
     EOF
 
     chmod +x $miq_out/bin/ld
@@ -84,27 +87,41 @@ stage1.stdenv = function(input)
 	input.env["CC"] = "gcc"
 	input.env["CXX"] = "g++"
 	input.env["LD"] = "ld"
-	input.env["CFLAGS"] = "-O2 -pipe -pie -fPIE -fPIC"
+	local cflags = "-O2 -pipe -pie -fPIE -fPIC"
 
+	if input.depend ~= nil then
+    local metatexti = {
+      deps = {},
+      value = cflags
+    }
+		for i, dep in ipairs(input.depend) do
+			local dep = dep
+      local m = f " -B{{dep}}/lib -idirafter {{dep}}/include -isystem {{dep}}/include"
+      for _, d in ipairs(m.deps) do
+        table.insert(metatexti.deps, d)
+      end
+      metatexti.value = metatexti.value .. m.value
+		end
+    input.env["CFLAGS"] = metatexti
+	else
+			input.env["CFLAGS"] = cflags
+  end
+	input.depend = nil
+
+	miq.trace(input)
 	return miq.package(input)
 end
 
-stage1.trivial = stage1.stdenv {
-	name = "trivial",
-	script = f [[
-    tee main.c <<EOF
-    #include <stdio.h>
-    #include <stdlib.h>
-    int main() {
-      printf("Hello World");
-      return(0);
-    }
-    EOF
-
-    mkdir -p $miq_out/bin
-    $CC main.c -o $miq_out/bin/hello
-  ]],
-}
+-- stage1.trivial = stage1.stdenv {
+-- 	name = "trivial",
+-- 	depend = {
+-- 		bootstrap.bootstrap,
+-- 	},
+-- 	script = f [[
+--     gcc --version
+--     exit 2
+--   ]],
+-- }
 
 local dash_src = fetch {
 	url = "http://gondor.apana.org.au/~herbert/dash/files/dash-0.5.12.tar.gz",
@@ -169,39 +186,109 @@ gmp.pkg = stage1.stdenv {
 }
 stage1.gmp = gmp
 
-local gcc_version = "12.2.0"
+do
+  stage1.mpfr = {}
+  local version = "4.2.0"
+  local src = fetch {
+    url = f "https://ftp.gnu.org/gnu/mpfr/mpfr-{{version}}.tar.bz2"
+  }
+  stage1.mpfr.src = bootstrap.stdenv {
+    name = "mpfr_src",
+    version = version,
+    script = f [[
+      mkdir $miq_out
+      cd $miq_out
+      tar -xvf {{src}} --strip-components=1 --no-same-permissions --no-same-owner
+    ]]
+  }
+  stage1.mpfr.pkg = stage1.stdenv {
+    name = "mpfr",
+    version = version,
+    depend = {
+      stage1.gmp.pkg
+    },
+    script = f[[
+      mkdir $miq_out
+      export PREFIX=$miq_out
+      {{stage1.mpfr.src}}/configure \
+        --prefix="$PREFIX" \
+        --with-pic
+      make -j$(nproc)
+      make install -j$(nproc)
+    ]]
+  }
+end
 
-local gcc_src_raw = fetch {
-	url = f "https://mirrorservice.org/sites/sourceware.org/pub/gcc/releases/gcc-{{gcc_version}}/gcc-{{gcc_version}}.tar.xz",
-}
+do
+  stage1.libmpc = {}
+  local version = "1.3.1"
+  local src = fetch {
+    url = f "https://ftp.gnu.org/gnu/mpc/mpc-{{version}}.tar.gz"
+  }
+  stage1.libmpc.src = bootstrap.stdenv {
+    name = "libmpc_src",
+    version = version,
+    script = f [[
+      mkdir $miq_out
+      cd $miq_out
+      tar -xvf {{src}} --strip-components=1 --no-same-permissions --no-same-owner
+    ]]
+  }
+  stage1.libmpc.pkg = stage1.stdenv {
+    name = "libmpc",
+    version = version,
+    depend = {
+      stage1.gmp.pkg,
+      stage1.mpfr.pkg
+    },
+    script = f[[
+      set -x
+      mkdir $miq_out
+      export PREFIX=$miq_out
+      {{stage1.libmpc.src}}/configure \
+        --prefix="$PREFIX" \
+        --disable-dependency-tracking
+      make -j$(nproc)
+      make install -j$(nproc)
+    ]]
+  }
+end
 
-stage1.gcc_src = stage1.stdenv {
-	name = "gcc_src",
-	version = gcc_version,
-	script = f [[
-    mkdir $miq_out
-    cd $miq_out
+do
+	local version = "12.2.0"
+	local src_raw = fetch {
+		url = f "https://mirrorservice.org/sites/sourceware.org/pub/gcc/releases/gcc-{{version}}/gcc-{{version}}.tar.xz",
+	}
+	stage1.gcc = {}
+	stage1.gcc.src = bootstrap.stdenv {
+		name = "gcc_src",
+		version = version,
+		script = f [[
+      mkdir $miq_out
+      cd $miq_out
+      tar -xvf {{src_raw}} --strip-components=1 --no-same-permissions --no-same-owner
+    ]],
+	}
+	stage1.gcc.pkg = stage1.stdenv {
+		name = "gcc",
+		version = version,
+    depend = {
+      stage1.gmp.pkg
+    },
+		script = f [[
+      export PREFIX=$miq_out
+      mkdir $miq_out
 
-    tar -xvf {{gcc_src_raw}} --strip-components=1 --no-same-permissions --no-same-owner
-  ]],
-}
+      {{stage1.gcc.src}}/configure \
+        --prefix="$PREFIX" \
+        --disable-nls \
+        --enable-languages=c,c++ \
+        --disable-bootstrap
 
-stage1.gcc = stage1.stdenv {
-	name = "gcc",
-	version = gcc_version,
-	script = f [[
-    export PREFIX=$miq_out
-    mkdir $miq_out
-    cd $miq_out
-
-    {{stage1.gcc_src}}/configure \
-      --prefix="$PREFIX" \
-      --disable-nls \
-      --enable-languages=c,c++
-
-    make -j$(nproc)
-    make install -j$(nproc)
-  ]],
-}
+      make -j$(nproc)
+      make install -j$(nproc)
+    ]],
+	}
+end
 
 return stage1
