@@ -192,10 +192,13 @@ impl Args {
             while let Some((unit, result)) = futs.try_next().await? {
                 let res: MiqResult = unit.clone().into();
                 let eval: MiqEvalPath = (&res).into();
+                let store: MiqStorePath= (&res).into();
+                let store: &Path = store.as_ref();
                 let sugg = format!("Check the unit at {}", eval.as_ref().to_str().unwrap());
                 let res: &str = res.as_ref();
                 let sugg2 = format!("Build logs available at /miq/log/{}.log", res);
-                let result = result.suggestion(sugg).suggestion(sugg2)?;
+                let sugg3 = format!("Intermetidate results at {}", store.to_str().unwrap());
+                let result = result.suggestion(sugg).suggestion(sugg2).suggestion(sugg3)?;
                 debug!(?unit, ?result, "Task finished");
                 let t = build_tasks.get_mut(&unit).unwrap();
                 *t = BuildTask::Finished;
@@ -270,6 +273,7 @@ impl Build for Package {
         }
 
         clean_path(&store_path)?;
+        std::fs::create_dir(&store_path)?;
         let _builddir = tempfile::tempdir()?;
         let builddir = _builddir.path();
 
@@ -353,6 +357,16 @@ impl Bubblewrap<'_> {
         let resultdir = self.resultdir.to_str().unwrap();
         let mut args = vec![
             "--clearenv",
+            // Store and result
+            "--ro-bind",
+            "/miq",
+            "/miq",
+            "--bind",
+            resultdir,
+            resultdir,
+            "--setenv",
+            "miq_out",
+            resultdir,
             // Build directory
             "--bind",
             self.builddir.to_str().unwrap(),
@@ -362,14 +376,6 @@ impl Bubblewrap<'_> {
             "--setenv",
             "HOME",
             "/build",
-            // Store
-            "--bind",
-            "/miq",
-            "/miq",
-            // Output directory
-            "--setenv",
-            "miq_out",
-            resultdir,
             // Global environent
             "--dev-bind",
             "/dev",
