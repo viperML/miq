@@ -90,7 +90,7 @@ enum BuildTask {
     Finished,
 }
 
-const MAX_BUILD_ITERATIONS: u32 = 100;
+const MAX_BUILD_ITERATIONS: u32 = 1000;
 
 impl Args {
     async fn _main(&self) -> Result<()> {
@@ -182,7 +182,8 @@ impl Args {
                     ?number_packages_building,
                     ?can_add_to_tasks,
                     ?all_deps_built,
-                    ?task_status
+                    ?task_status,
+                    ?sentry
                 );
 
                 build_tasks.insert(unit, task_status);
@@ -192,7 +193,9 @@ impl Args {
                 let res: MiqResult = unit.clone().into();
                 let eval: MiqEvalPath = (&res).into();
                 let sugg = format!("Check the unit at {}", eval.as_ref().to_str().unwrap());
-                let result = result.suggestion(sugg)?;
+                let res: &str = res.as_ref();
+                let sugg2 = format!("Build logs available at /miq/log/{}.log", res);
+                let result = result.suggestion(sugg).suggestion(sugg2)?;
                 debug!(?unit, ?result, "Task finished");
                 let t = build_tasks.get_mut(&unit).unwrap();
                 *t = BuildTask::Finished;
