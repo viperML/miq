@@ -256,6 +256,24 @@ do
 end
 
 do
+  stage1.can_build = stage1.stdenv {
+    name = "can_build",
+    script = f[[
+      tee main.cpp <<EOF
+      int
+      main()
+      {
+        ;
+        return(0);
+      }
+      EOF
+
+      $CXX main.cpp -o $miq_out/output $CFLAGS
+    ]]
+  }
+end
+
+do
 	local version = "12.2.0"
 	local src_raw = fetch {
 		url = f "https://mirrorservice.org/sites/sourceware.org/pub/gcc/releases/gcc-{{version}}/gcc-{{version}}.tar.xz",
@@ -276,17 +294,26 @@ do
 		depend = {
 			stage1.gmp.pkg,
 			stage1.mpfr.pkg,
-			stage1.libmpc.src,
+			stage1.libmpc.pkg,
 		},
 		script = f [[
       export PREFIX=$miq_out
-      mkdir $miq_out
+      mkdir $miq_out/build
+      cd $miq_out/build
 
       {{stage1.gcc.src}}/configure \
         --prefix="$PREFIX" \
         --disable-nls \
         --enable-languages=c,c++ \
-        --disable-bootstrap
+        --disable-multilib \
+        --disable-bootstrap \
+        --disable-libmpx \
+        --disable-libsanitizer \
+        --with-gmp-include={{stage1.gmp.pkg}}/include \
+        --with-gmp-lib={{stage1.gmp.pkg}}/lib \
+        --with-mpfr-include={{stage1.mpfr.pkg}}/include \
+        --with-mpfr-lib={{stage1.mpfr.pkg}}/lib \
+        --with-mpc={{stage1.libmpc.pkg}}
 
       make -j$(nproc)
       make install -j$(nproc)

@@ -18,11 +18,11 @@
 
       imports = [
         ./nix/packages.nix
+        ./pkgs
       ];
 
       perSystem.imports = [
         ./nix/devshell.nix
-        ./pkgs
       ];
     };
 }

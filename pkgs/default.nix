@@ -1,14 +1,20 @@
-{pkgs, ...}: {
-  packages.trivial = with pkgs.pkgsCross.musl64;
-    stdenv.mkDerivation {
-      name = "trivial";
-      src = ./.;
-      NIX_DEBUG = "1";
+{inputs, ...}: {
+  perSystem = {
+    pkgs,
+    system,
+    ...
+  }: {
+    packages.trivial = with pkgs.pkgsCross.musl64;
+      stdenv.mkDerivation {
+        name = "trivial";
+        src = ./.;
+        NIX_DEBUG = "1";
 
-      buildPhase = ''
-        $CC trivial.c -o $out
-      '';
+        buildPhase = ''
+          $CC trivial.c -o $out
+        '';
 
-      dontInstall = true;
-    };
+        dontInstall = true;
+      };
+  };
 }
