@@ -90,22 +90,22 @@ stage1.stdenv = function(input)
 	local cflags = "-O2 -pipe -pie -fPIE -fPIC"
 
 	if input.depend ~= nil then
-    local metatexti = {
-      deps = {},
-      value = cflags
-    }
+		local metatexti = {
+			deps = {},
+			value = cflags,
+		}
 		for i, dep in ipairs(input.depend) do
 			local dep = dep
-      local m = f " -B{{dep}}/lib -idirafter {{dep}}/include -isystem {{dep}}/include"
-      for _, d in ipairs(m.deps) do
-        table.insert(metatexti.deps, d)
-      end
-      metatexti.value = metatexti.value .. m.value
+			local m = f " -B{{dep}}/lib -idirafter {{dep}}/include -isystem {{dep}}/include"
+			for _, d in ipairs(m.deps) do
+				table.insert(metatexti.deps, d)
+			end
+			metatexti.value = metatexti.value .. m.value
 		end
-    input.env["CFLAGS"] = metatexti
+		input.env["CFLAGS"] = metatexti
 	else
-			input.env["CFLAGS"] = cflags
-  end
+		input.env["CFLAGS"] = cflags
+	end
 	input.depend = nil
 
 	miq.trace(input)
@@ -187,27 +187,27 @@ gmp.pkg = stage1.stdenv {
 stage1.gmp = gmp
 
 do
-  stage1.mpfr = {}
-  local version = "4.2.0"
-  local src = fetch {
-    url = f "https://ftp.gnu.org/gnu/mpfr/mpfr-{{version}}.tar.bz2"
-  }
-  stage1.mpfr.src = bootstrap.stdenv {
-    name = "mpfr_src",
-    version = version,
-    script = f [[
+	stage1.mpfr = {}
+	local version = "4.2.0"
+	local src = fetch {
+		url = f "https://ftp.gnu.org/gnu/mpfr/mpfr-{{version}}.tar.bz2",
+	}
+	stage1.mpfr.src = bootstrap.stdenv {
+		name = "mpfr_src",
+		version = version,
+		script = f [[
       mkdir $miq_out
       cd $miq_out
       tar -xvf {{src}} --strip-components=1 --no-same-permissions --no-same-owner
-    ]]
-  }
-  stage1.mpfr.pkg = stage1.stdenv {
-    name = "mpfr",
-    version = version,
-    depend = {
-      stage1.gmp.pkg
-    },
-    script = f[[
+    ]],
+	}
+	stage1.mpfr.pkg = stage1.stdenv {
+		name = "mpfr",
+		version = version,
+		depend = {
+			stage1.gmp.pkg,
+		},
+		script = f [[
       mkdir $miq_out
       export PREFIX=$miq_out
       {{stage1.mpfr.src}}/configure \
@@ -215,33 +215,33 @@ do
         --with-pic
       make -j$(nproc)
       make install -j$(nproc)
-    ]]
-  }
+    ]],
+	}
 end
 
 do
-  stage1.libmpc = {}
-  local version = "1.3.1"
-  local src = fetch {
-    url = f "https://ftp.gnu.org/gnu/mpc/mpc-{{version}}.tar.gz"
-  }
-  stage1.libmpc.src = bootstrap.stdenv {
-    name = "libmpc_src",
-    version = version,
-    script = f [[
+	stage1.libmpc = {}
+	local version = "1.3.1"
+	local src = fetch {
+		url = f "https://ftp.gnu.org/gnu/mpc/mpc-{{version}}.tar.gz",
+	}
+	stage1.libmpc.src = bootstrap.stdenv {
+		name = "libmpc_src",
+		version = version,
+		script = f [[
       mkdir $miq_out
       cd $miq_out
       tar -xvf {{src}} --strip-components=1 --no-same-permissions --no-same-owner
-    ]]
-  }
-  stage1.libmpc.pkg = stage1.stdenv {
-    name = "libmpc",
-    version = version,
-    depend = {
-      stage1.gmp.pkg,
-      stage1.mpfr.pkg
-    },
-    script = f[[
+    ]],
+	}
+	stage1.libmpc.pkg = stage1.stdenv {
+		name = "libmpc",
+		version = version,
+		depend = {
+			stage1.gmp.pkg,
+			stage1.mpfr.pkg,
+		},
+		script = f [[
       set -x
       mkdir -p $miq_out
       export PREFIX=$miq_out
@@ -251,8 +251,8 @@ do
         --with-pic
       make -j$(nproc)
       make install -j$(nproc)
-    ]]
-  }
+    ]],
+	}
 end
 
 do
@@ -273,9 +273,11 @@ do
 	stage1.gcc.pkg = stage1.stdenv {
 		name = "gcc",
 		version = version,
-    depend = {
-      stage1.gmp.pkg
-    },
+		depend = {
+			stage1.gmp.pkg,
+			stage1.mpfr.pkg,
+			stage1.libmpc.src,
+		},
 		script = f [[
       export PREFIX=$miq_out
       mkdir $miq_out
