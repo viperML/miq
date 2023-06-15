@@ -43,25 +43,32 @@ x.bootstrap = miq.package {
   ]],
 }
 
--- x.stdenv = function(input)
--- 	local bootstrap = bootstrap
--- 	input.env = {
--- 		PATH = f "{{x.bootstrap}}/bin",
--- 		CC = f "{{x.bootstrap}}/bin/gcc",
--- 		CFLAGS = "-O2 -pipe -pie -fPIE -fPIC",
--- 	}
--- 	return miq.package(input)
--- end
 x.cc = utils.ccBuilder {
 	coreutils = x.bootstrap,
 	shell = x.bootstrap,
-	cc = x.bootstrap,
+	cc = f [[
+    exec {{x.bootstrap}}/bin/$compiler \\
+      -Wl,-dynamic-linker={{x.bootstrap}}/lib/ld-musl-x86_64.so.1 \\
+      "\$@" \\
+      -O2 -pipe -pie -fPIE -fPIC \\
+      -B{{x.bootstrap}}/lib \\
+      -idirafter {{x.bootstrap}}/include \\
+      -isystem {{x.bootstrap}}/include \\
+      -idirafter {{x.bootstrap}}/include-libc \\
+      -isystem {{x.bootstrap}}/include-libc
+  ]],
 }
 
 x.ld = utils.ldBuilder {
 	coreutils = x.bootstrap,
 	shell = x.bootstrap,
-	ld = x.bootstrap,
+	ld = f [[
+    exec {{x.bootstrap}}/bin/ld \\
+      -dynamic-linker {{x.bootstrap}}/lib/ld-musl-x86_64.so.1 \\
+      "\$@" \\
+      -rpath {{x.bootstrap}}/lib \\
+      -L{{x.bootstrap}}/lib
+  ]],
 }
 
 x.stdenv = utils.stdenvBuilder {
@@ -69,68 +76,116 @@ x.stdenv = utils.stdenvBuilder {
 	cc = x.cc,
 	ld = x.ld,
 	coreutils = x.bootstrap,
-	extra = f [[
-    export CFLAGS="\$CFLAGS \
-    -idirafter {{x.bootstrap}}/include-libc \
-    -isystem {{x.bootstrap}}/include-libc"
-  ]],
-	-- extra = ""
-}
-
-x.test = x.stdenv {
-	name = "test",
-	depend = {},
-	script = f [[
-    gcc --version > $miq_out/result
-  ]],
+	extra = "",
 }
 
 x.fetchTar = utils.fetchTarBuilder {
 	PATH = f "{{x.bootstrap}}/bin",
 }
 
-x.cpp_test = x.stdenv {
-	name = "cpp_test",
+x.test = x.stdenv {
+	name = "test",
 	script = f [[
-    tee main.cpp <<EOF
-    #include <iostream>
-    int
-    main()
-    {
-      std::cout << "Hello world!" << std::endl;
-      return(69);
-    }
+    tee main.c <<EOF
+    int main() { return(69); }
     EOF
-
-    $CXX main.cpp -o $miq_out/result $CFLAGS
+    $CC $CFLAGS main.c -o $miq_out/result
   ]],
 }
 
+-- do
+-- 	local version = "1.2.3"
+-- 	local src = x.fetchTar {
+-- 		url = f "https://musl.libc.org/releases/musl-{{version}}.tar.gz",
+-- 	}
+-- 	x.libc = x.stdenv {
+-- 		name = "musl",
+-- 		version = version,
+-- 		script = f [[
+--       {{src}}/configure \
+--           --prefix=$miq_out \
+--           --disable-static \
+--           --enable-wrapper=all \
+--           --syslibdir="$miq_out/lib"
+
+--       make -j$(nproc)
+--       make install
+
+--       ln -vs $miq_out/lib/libc.so $miq_out/bin/ldd
+--     ]],
+-- 	}
+-- end
+
 do
-	local libc = {}
-	x.libc = libc
-	local version = "1.2.3"
-
-  libc.src = x.fetchTar {
-		url = f "https://musl.libc.org/releases/musl-{{version}}.tar.gz",
-  }
-
-	libc.pkg = x.stdenv {
-		name = "musl",
+	local version = "1.4.19"
+	local src = x.fetchTar {
+		url = f "https://ftp.gnu.org/gnu/m4/m4-{{version}}.tar.bz2",
+	}
+	x.m4 = x.stdenv {
+		name = "m4",
 		version = version,
 		script = f [[
-      {{libc.src}}/configure \
-          --prefix=$miq_out \
-          --disable-static \
-          --enable-wrapper=all \
-          --syslibdir="$miq_out/lib"
+      {{src}}/configure \
+        --prefix=$miq_out \
+        --with-syscmd-shell={{x.bootstrap}}
 
       make -j$(nproc)
-      make install
-
-      ln -vs $miq_out/lib/libc.so $miq_out/bin/ldd
+      make install -j$(nproc)
     ]],
 	}
 end
+
+do
+	local version = "6.2.1"
+	local src = x.fetchTar {
+		url = f "https://ftp.gnu.org/gnu/gmp/gmp-{{version}}.tar.bz2",
+	}
+	x.gmp = x.stdenv {
+		name = "gmp",
+		version = version,
+    depend = {
+      x.m4
+    },
+		script = f [[
+      {{src}}/configure \
+        --prefix=$PREFIX \
+        --with-pic \
+        --with-cxx
+
+      make -j$(nproc)
+      make install -j$(nproc)
+    ]],
+	}
+end
+
+-- do
+-- 	local version = "12.2.0"
+-- 	local src = x.fetchTar {
+-- 		url = f "https://ftp.gnu.org/gnu/gcc/gcc-{{version}}/gcc-{{version}}.tar.gz",
+-- 	}
+-- 	x.gcc_src = src
+-- 	x.gcc = x.stdenv {
+-- 		name = "gcc",
+-- 		version = version,
+-- 		script = f [[
+--       mkdir -p $miq_out/build
+--       cd $miq_out/build
+--       {{src}}/configure \
+--         --prefix="$PREFIX" \
+--         --disable-nls \
+--         --enable-languages=c,c++ \
+--         --disable-multilib \
+--         --disable-bootstrap \
+--         --disable-libmpx \
+--         --disable-libsanitizer \
+--         --with-gmp-include={{x.bootstrap}}/include \
+--         --with-gmp-lib={{x.bootstrap}}/lib \
+--         --with-mpfr-include={{x.bootstrap}}/include \
+--         --with-mpfr-lib={{x.bootstrap}}/lib \
+--         --with-mpc-include={{x.bootstrap}}/include \
+--         --with-mpc-lib={{x.bootstrap}}/lib
+--     ]],
+-- 	}
+-- end
 
 return x
