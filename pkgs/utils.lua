@@ -27,7 +27,6 @@ x.ccBuilder = function(input)
 
       tee $miq_out/bin/$compiler <<EOF
       #!{{shell}}/bin/bash
-      echo "MIQ_CFLAGS: \$MIQ_CFLAGS" >&2
 
       set -x
       exec {{cc}}/bin/$compiler \\
@@ -88,12 +87,12 @@ x.stdenvBuilder = function(input)
 		},
 		script = f [[
       set -x
-      tee $miq_out/builder.sh <<EOF
-      #!{{input.shell}}/bin/bash
+      tee $miq_out/stdenv.sh <<EOF
+      echo "stdenv setup" >&2
       export PATH="{{input.cc}}/bin:{{input.ld}}/bin:{{input.coreutils}}/bin"
-      exec {{input.shell}}/bin/bash -c "\$@"
+      export CC="gcc"
+      export CXX="g++"
       EOF
-      chmod +x $miq_out/builder.sh
     ]],
 	}
 
@@ -104,7 +103,12 @@ x.stdenvBuilder = function(input)
     local pkg = pkg
 
 		args.script = f [[
-      {{pkg}}/builder.sh -c "{{args.script}}"
+      source {{pkg}}/stdenv.sh
+      set -x
+      set -e
+      printenv
+
+      {{args.script}}
     ]]
 
 		return miq.package(args)

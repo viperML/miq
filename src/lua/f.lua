@@ -11,6 +11,7 @@ local miq = require "miq"
 ---@return MetaTextInput
 local f = function(raw_text)
 	local outer_env = _ENV
+  raw_text = miq.dedent(raw_text)
 
 	local result = {}
 	result.deps = {}

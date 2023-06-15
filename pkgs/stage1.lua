@@ -2,7 +2,6 @@ local miq = require "miq"
 local package = miq.package
 local fetch = miq.fetch
 local f = miq.f
-local trace = miq.trace
 
 local bootstrap = require "bootstrap"
 

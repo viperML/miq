@@ -169,6 +169,7 @@ fn create_lua_env() -> Result<Lua> {
         lua.create_function(|ctx, val: Value| luatrace(ctx, val))?,
     )?;
     module.set("interpolate", lua.create_function(interpolate)?)?;
+    module.set("dedent", lua.create_function(dedent)?)?;
 
     load_from_bundle(&lua, &module, "f")?;
 
@@ -229,8 +230,6 @@ fn interpolate<'lua>(
                 let store_path: &Path = store_path.as_ref();
                 let left = store_path.to_str().unwrap().to_owned();
                 let right = miq_result.deref().clone();
-
-                let left = textwrap::dedent(&left);
                 Ok((ctx.pack(left)?, ctx.pack(right)?))
             } else if let Ok(mt) = ctx.from_value::<MetaText>(table) {
                 let right = mt
@@ -242,8 +241,6 @@ fn interpolate<'lua>(
                     })
                     .collect::<Vec<String>>();
                 let left = mt.value;
-
-                let left = textwrap::dedent(&left);
                 Ok((ctx.pack(left).unwrap(), ctx.pack(right).unwrap()))
             } else {
                 Err(LuaError::DeserializeError("Can't interpolate value".into()))
@@ -252,6 +249,14 @@ fn interpolate<'lua>(
         s @ Value::String(_) => Ok((s, Value::Nil)),
         _ => Err(LuaError::DeserializeError("Can't interpolate value".into())),
     }
+}
+
+#[instrument(ret, err, level = "trace")]
+fn dedent<'lua>(ctx: &'lua Lua, s: LuaString<'lua>) -> Result<Value<'lua>, LuaError> {
+    let s = s.to_str()?;
+    let s_dedent = textwrap::dedent(s);
+    let result = ctx.pack(s_dedent)?;
+    Ok(result)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Educe)]

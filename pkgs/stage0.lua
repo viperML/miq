@@ -79,11 +79,26 @@ x.test = x.stdenv {
 	name = "test",
 	depend = {},
 	script = f [[
-    gcc --version
-    ls -la
-    pwd
-    exit 2
+    gcc --version > $miq_out/result
   ]],
+}
+
+local foo ="bar"
+
+x.cpp_test = x.stdenv {
+  name = "cpp_test",
+  script = f [[
+    tee main.cpp <<EOF
+    int
+    main()
+    {
+      return(0);
+    }
+    EOF
+    {{foo}}
+
+    $CXX main.cpp -o $miq_out/result $CFLAGS
+  ]]
 }
 
 return x
