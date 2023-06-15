@@ -219,6 +219,7 @@ where
 fn interpolate<'lua>(
     ctx: &'lua Lua,
     value: Value<'lua>,
+    //       Text         Deps
 ) -> Result<(Value<'lua>, Value<'lua>), LuaError> {
     match value {
         table @ Value::Table(_) => {
@@ -228,6 +229,8 @@ fn interpolate<'lua>(
                 let store_path: &Path = store_path.as_ref();
                 let left = store_path.to_str().unwrap().to_owned();
                 let right = miq_result.deref().clone();
+
+                let left = textwrap::dedent(&left);
                 Ok((ctx.pack(left)?, ctx.pack(right)?))
             } else if let Ok(mt) = ctx.from_value::<MetaText>(table) {
                 let right = mt
@@ -239,6 +242,8 @@ fn interpolate<'lua>(
                     })
                     .collect::<Vec<String>>();
                 let left = mt.value;
+
+                let left = textwrap::dedent(&left);
                 Ok((ctx.pack(left).unwrap(), ctx.pack(right).unwrap()))
             } else {
                 Err(LuaError::DeserializeError("Can't interpolate value".into()))
