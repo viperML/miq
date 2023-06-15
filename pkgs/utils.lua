@@ -22,6 +22,7 @@ x.ccBuilder = function(input)
       for compiler in gcc g++ cpp; do
       tee $miq_out/bin/$compiler <<EOF
       #!{{input.shell}}/bin/bash
+      echo MIQ_CFLAGS: \$MIQ_CFLAGS 1>&2
       set -x
       {{input.cc}}
       EOF
@@ -44,6 +45,7 @@ x.ldBuilder = function(input)
 
       tee $miq_out/bin/ld <<EOF
       #!{{input.shell}}/bin/bash
+      echo MIQ_LDFLAGS: \$MIQ_LDFLAGS 1>&2
       set -x
       {{input.ld}}
       EOF
@@ -76,6 +78,8 @@ x.stdenvBuilder = function(input)
 
       export LD="ld"
 
+      export NIX_DEBUG=1
+
       {{input.extra}}
       EOF
     ]],
@@ -96,9 +100,8 @@ x.stdenvBuilder = function(input)
 			for _, dep in ipairs(args.depend) do
 				local dep = dep
 				local text = f [[
-          export CFLAGS="$CFLAGS -B{{dep}}/lib -isystem {{dep}}/include"
-          export CXXFLAGS="$CXXFLAGS -B{{dep}}/lib -isystem {{dep}}/include"
-          export LDFLAGS="-L{{dep}}/lib"
+          export MIQ_CFLAGS="$MIQ_CFLAGS -isystem {{dep}}/include -L{{dep}}/lib"
+          export MIQ_LDFLAGS="$MIQ_LDFLAGS -L{{dep}}/lib"
           export PATH="{{dep}}/bin:$PATH"
         ]]
 				for _, d in ipairs(text.deps) do
