@@ -64,8 +64,8 @@ x.cc = utils.ccBuilder {
   ]],
 }
 
-      -- -U_FORTIFY_SOURCE \\
-      -- -D_FORTIFY_SOURCE=2 \\
+-- -U_FORTIFY_SOURCE \\
+-- -D_FORTIFY_SOURCE=2 \\
 
 x.ld = utils.ldBuilder {
 	coreutils = x.bootstrap,
@@ -91,7 +91,6 @@ x.stdenv = utils.stdenvBuilder {
     -idirafter {{x.bootstrap}}/include-libc \
     -idirafter {{x.bootstrap}}/lib/gcc/x86_64-unknown-linux-musl/7.3.0/include-fixed \
     -B{{x.bootstrap}}/bin \
-    -Wl,-rpath \
     -L{{x.bootstrap}}/lib \
     -L{{x.bootstrap}}/lib/gcc/x86_64-unknown-linux-musl/7.3.0 \
     "
@@ -101,6 +100,8 @@ x.stdenv = utils.stdenvBuilder {
     "
   ]],
 }
+
+-- -Wl,-rpath \
 -- -plugin-opt=-pass-through=-lgcc \
 -- -plugin-opt=-pass-through=-lgcc_s \
 -- -plugin-opt=-pass-through=-lc \
@@ -142,153 +143,35 @@ x.test = x.stdenv {
   ]],
 }
 
--- do
--- 	local version = "1.2.3"
--- 	local src = x.fetchTar {
--- 		url = f "https://musl.libc.org/releases/musl-{{version}}.tar.gz",
--- 	}
--- 	x.libc = x.stdenv {
--- 		name = "musl",
--- 		version = version,
--- 		script = f [[
---       {{src}}/configure \
---           --prefix=$miq_out \
---           --disable-static \
---           --enable-wrapper=all \
---           --syslibdir="$miq_out/lib"
-
---       make -j$(nproc)
---       make install
-
---       ln -vs $miq_out/lib/libc.so $miq_out/bin/ldd
---     ]],
--- 	}
--- end
-
 do
-	local version = "1.4.19"
+	local version = "1.2.3"
 	local src = x.fetchTar {
-		url = f "https://ftp.gnu.org/gnu/m4/m4-{{version}}.tar.bz2",
+		url = f "https://musl.libc.org/releases/musl-{{version}}.tar.gz",
 	}
-	x.m4 = x.stdenv {
-		name = "m4",
+	x.libc = x.stdenv {
+		name = "musl",
 		version = version,
 		script = f [[
       {{src}}/configure \
-        --prefix=$miq_out \
-        --with-syscmd-shell={{x.bootstrap}}
+          --prefix=$PREFIX \
+          --disable-static \
+          --enable-wrapper=all \
+          --syslibdir=$PREFIX/lib
 
       make -j$(nproc)
-      make install -j$(nproc)
+      make -j$(nproc) install
+
+      ln -vs $miq_out/lib/libc.so $miq_out/bin/ldd
     ]],
 	}
 end
 
-do
-	local version = "6.2.1"
-	local src = x.fetchTar {
-		url = f "https://ftp.gnu.org/gnu/gmp/gmp-{{version}}.tar.bz2",
-	}
-	x.gmp = x.stdenv {
-		name = "gmp",
-		version = version,
-		depend = {
-			x.m4,
-		},
-		script = f [[
-      {{src}}/configure \
-        --prefix=$PREFIX \
-        --with-pic
 
-      make -j$(nproc)
-      make install -j$(nproc)
-    ]],
-	}
-end
 
-do
-	local version = "4.2.0"
-	local src = x.fetchTar {
-		url = f "https://ftp.gnu.org/gnu/mpfr/mpfr-{{version}}.tar.bz2",
-	}
-	x.mpfr = x.stdenv {
-		name = "mpfr",
-		version = version,
-		depend = {
-      x.gmp
-		},
-		script = f [[
-      {{src}}/configure \
-        --prefix=$PREFIX \
-        --with-pic
 
-      make -j$(nproc)
-      make install -j$(nproc)
-    ]],
-	}
-end
 
-do
-	local version = "1.3.1"
-	local src = x.fetchTar {
-		url = f "https://ftp.gnu.org/gnu/mpc/mpc-{{version}}.tar.gz",
-	}
-	x.libmpc = x.stdenv {
-		name = "libmpc",
-		version = version,
-		depend = {
-      x.gmp,
-      x.mpfr
-		},
-		script = f [[
-      {{src}}/configure \
-        --prefix="$PREFIX" \
-        --disable-dependency-tracking \
-        --with-pic
 
-      make -j$(nproc)
-      make install -j$(nproc)
-    ]],
-	}
-end
 
-do
-	local version = "12.2.0"
-	local src = x.fetchTar {
-		url = f "https://ftp.gnu.org/gnu/gcc/gcc-{{version}}/gcc-{{version}}.tar.gz",
-	}
-	x.gcc = x.stdenv {
-		name = "gcc",
-		version = version,
-		script = f [[
-      mkdir -p $miq_out/build
-      cd $miq_out/build
-      {{src}}/configure \
-        --prefix="$PREFIX" \
-        --disable-nls \
-        --enable-languages=c,c++ \
-        --disable-multilib \
-        --disable-libmpx \
-        --disable-libsanitizer \
-        --disable-symvers \
-        --disable-libcc1 \
-        libat_cv_have_ifunc=no \
-        --disable-gnu-indirect-function \
-        --with-gmp-include={{x.gmp}}/include \
-        --with-gmp-lib={{x.gmp}}/lib \
-        --with-mpfr-include={{x.mpfr}}/include \
-        --with-mpfr-lib={{x.mpfr}}/lib \
-        --with-mpc-include={{x.libmpc}}/include \
-        --with-mpc-lib={{x.libmpc}}/lib \
-        --with-native-system-header-dir={{x.bootstrap}}/include-libc \
-        --with-build-sysroot=/
-
-        make
-        make -j$(nproc) install
-    ]],
-	}
-end
-
-        --disable-bootstrap \
+--disable-bootstrap \
 
 return x

@@ -19,6 +19,6 @@ local pkgs = {}
 
 -- pkgs.bootstrap = require("bootstrap")
 pkgs.stage0 = require("stage0")
--- pkgs.stage1 = require("stage1")
+pkgs.stage1 = require("stage1")
 
 return pkgs
