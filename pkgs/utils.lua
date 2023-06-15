@@ -61,6 +61,7 @@ x.ldBuilder = function(input)
       tee $miq_out/bin/ld <<EOF
       #!{{shell}}/bin/bash
       echo "MIQ_LDFLAGS: \$MIQ_LDFLAGS" >&2
+      set -x
 
       exec {{ld}}/bin/ld \\
         -dynamic-linker {{ld}}/lib/ld-musl-x86_64.so.1 \\
@@ -76,7 +77,7 @@ x.ldBuilder = function(input)
 	return result
 end
 
----@param input {cc: Package, ld: Package, depend: table<Package>, name: string, shell: Package, coreutils: Package}
+---@param input {cc: Package, ld: Package, name: string, coreutils: Package, extra: any}
 ---@return fun(table): Package
 x.stdenvBuilder = function(input)
 	local input = input
@@ -90,8 +91,14 @@ x.stdenvBuilder = function(input)
       tee $miq_out/stdenv.sh <<EOF
       echo "stdenv setup" >&2
       export PATH="{{input.cc}}/bin:{{input.ld}}/bin:{{input.coreutils}}/bin"
+
       export CC="gcc"
       export CXX="g++"
+      export CFLAGS="-O2 -pipe -pie -fPIE -fPIC"
+
+      export LD="ld"
+
+      {{input.extra}}
       EOF
     ]],
 	}
@@ -115,6 +122,28 @@ x.stdenvBuilder = function(input)
 	end
 
 	return result
+end
+
+x.fetchTarBuilder = function(input)
+  local input = input
+
+  local fn_result = function(args)
+    local args = args
+    local input = input
+
+    local fetch = miq.fetch(args)
+    local pkg = miq.package {
+      name = f"{{fetch.name}}-unpack",
+      script = f[[
+        export PATH="{{input.PATH}}"
+        cd $miq_out
+        tar -xvf {{fetch}} --strip-components=1 --no-same-permissions --no-same-owner
+      ]]
+    }
+    return pkg
+  end
+
+  return fn_result
 end
 
 return x

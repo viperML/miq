@@ -65,14 +65,16 @@ x.ld = utils.ldBuilder {
 }
 
 x.stdenv = utils.stdenvBuilder {
-  name = "stage0-stdenv",
+	name = "stage0-stdenv",
 	cc = x.cc,
 	ld = x.ld,
-  shell = x.bootstrap,
-  coreutils = x.bootstrap,
-	depend = {
-		x.bootstrap,
-	},
+	coreutils = x.bootstrap,
+	extra = f [[
+    export CFLAGS="\$CFLAGS \
+    -idirafter {{x.bootstrap}}/include-libc \
+    -isystem {{x.bootstrap}}/include-libc"
+  ]],
+	-- extra = ""
 }
 
 x.test = x.stdenv {
@@ -83,22 +85,52 @@ x.test = x.stdenv {
   ]],
 }
 
-local foo ="bar"
+x.fetchTar = utils.fetchTarBuilder {
+	PATH = f "{{x.bootstrap}}/bin",
+}
 
 x.cpp_test = x.stdenv {
-  name = "cpp_test",
-  script = f [[
+	name = "cpp_test",
+	script = f [[
     tee main.cpp <<EOF
+    #include <iostream>
     int
     main()
     {
-      return(0);
+      std::cout << "Hello world!" << std::endl;
+      return(69);
     }
     EOF
-    {{foo}}
 
     $CXX main.cpp -o $miq_out/result $CFLAGS
-  ]]
+  ]],
 }
+
+do
+	local libc = {}
+	x.libc = libc
+	local version = "1.2.3"
+
+  libc.src = x.fetchTar {
+		url = f "https://musl.libc.org/releases/musl-{{version}}.tar.gz",
+  }
+
+	libc.pkg = x.stdenv {
+		name = "musl",
+		version = version,
+		script = f [[
+      {{libc.src}}/configure \
+          --prefix=$miq_out \
+          --disable-static \
+          --enable-wrapper=all \
+          --syslibdir="$miq_out/lib"
+
+      make -j$(nproc)
+      make install
+
+      ln -vs $miq_out/lib/libc.so $miq_out/bin/ldd
+    ]],
+	}
+end
 
 return x

@@ -63,8 +63,6 @@ local f = function(raw_text)
 				end
 			end
 
-      miq.trace(result)
-
 			return text
 		else
 			error(err, 0)
