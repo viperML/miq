@@ -195,10 +195,54 @@ do
 			x.m4,
 		},
 		script = f [[
-      mkdir -p $miq_out/build
-      cd $miq_out/build
       {{src}}/configure \
         --prefix=$PREFIX \
+        --with-pic
+
+      make -j$(nproc)
+      make install -j$(nproc)
+    ]],
+	}
+end
+
+do
+	local version = "4.2.0"
+	local src = x.fetchTar {
+		url = f "https://ftp.gnu.org/gnu/mpfr/mpfr-{{version}}.tar.bz2",
+	}
+	x.mpfr = x.stdenv {
+		name = "mpfr",
+		version = version,
+		depend = {
+      x.gmp
+		},
+		script = f [[
+      {{src}}/configure \
+        --prefix=$PREFIX \
+        --with-pic
+
+      make -j$(nproc)
+      make install -j$(nproc)
+    ]],
+	}
+end
+
+do
+	local version = "1.3.1"
+	local src = x.fetchTar {
+		url = f "https://ftp.gnu.org/gnu/mpc/mpc-{{version}}.tar.gz",
+	}
+	x.libmpc = x.stdenv {
+		name = "libmpc",
+		version = version,
+		depend = {
+      x.gmp,
+      x.mpfr
+		},
+		script = f [[
+      {{src}}/configure \
+        --prefix="$PREFIX" \
+        --disable-dependency-tracking \
         --with-pic
 
       make -j$(nproc)
