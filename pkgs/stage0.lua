@@ -57,14 +57,15 @@ x.cc = utils.ccBuilder {
       -fstack-protector-strong \\
       --param ssp-buffer-size=4 \\
       -O2 \\
-      -U_FORTIFY_SOURCE \\
-      -D_FORTIFY_SOURCE=2 \\
       -fno-strict-overflow \\
       -Wl,-dynamic-linker={{x.bootstrap}}/lib/ld-musl-x86_64.so.1 \\
       "\$@" \\
       \$MIQ_CFLAGS
   ]],
 }
+
+      -- -U_FORTIFY_SOURCE \\
+      -- -D_FORTIFY_SOURCE=2 \\
 
 x.ld = utils.ldBuilder {
 	coreutils = x.bootstrap,
@@ -251,34 +252,43 @@ do
 	}
 end
 
--- do
--- 	local version = "12.2.0"
--- 	local src = x.fetchTar {
--- 		url = f "https://ftp.gnu.org/gnu/gcc/gcc-{{version}}/gcc-{{version}}.tar.gz",
--- 	}
--- 	x.gcc_src = src
--- 	x.gcc = x.stdenv {
--- 		name = "gcc",
--- 		version = version,
--- 		script = f [[
---       mkdir -p $miq_out/build
---       cd $miq_out/build
---       {{src}}/configure \
---         --prefix="$PREFIX" \
---         --disable-nls \
---         --enable-languages=c,c++ \
---         --disable-multilib \
---         --disable-bootstrap \
---         --disable-libmpx \
---         --disable-libsanitizer \
---         --with-gmp-include={{x.bootstrap}}/include \
---         --with-gmp-lib={{x.bootstrap}}/lib \
---         --with-mpfr-include={{x.bootstrap}}/include \
---         --with-mpfr-lib={{x.bootstrap}}/lib \
---         --with-mpc-include={{x.bootstrap}}/include \
---         --with-mpc-lib={{x.bootstrap}}/lib
---     ]],
--- 	}
--- end
+do
+	local version = "12.2.0"
+	local src = x.fetchTar {
+		url = f "https://ftp.gnu.org/gnu/gcc/gcc-{{version}}/gcc-{{version}}.tar.gz",
+	}
+	x.gcc = x.stdenv {
+		name = "gcc",
+		version = version,
+		script = f [[
+      mkdir -p $miq_out/build
+      cd $miq_out/build
+      {{src}}/configure \
+        --prefix="$PREFIX" \
+        --disable-nls \
+        --enable-languages=c,c++ \
+        --disable-multilib \
+        --disable-libmpx \
+        --disable-libsanitizer \
+        --disable-symvers \
+        --disable-libcc1 \
+        libat_cv_have_ifunc=no \
+        --disable-gnu-indirect-function \
+        --with-gmp-include={{x.gmp}}/include \
+        --with-gmp-lib={{x.gmp}}/lib \
+        --with-mpfr-include={{x.mpfr}}/include \
+        --with-mpfr-lib={{x.mpfr}}/lib \
+        --with-mpc-include={{x.libmpc}}/include \
+        --with-mpc-lib={{x.libmpc}}/lib \
+        --with-native-system-header-dir={{x.bootstrap}}/include-libc \
+        --with-build-sysroot=/
+
+        make
+        make -j$(nproc) install
+    ]],
+	}
+end
+
+        --disable-bootstrap \
 
 return x
