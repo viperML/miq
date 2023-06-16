@@ -169,8 +169,18 @@ end
 
 do
 	local version = "12.2.0"
+	local patches = {
+		no_sys_dirs = miq.fetch {
+			url = "https://raw.githubusercontent.com/NixOS/nixpkgs/ddf4688dc7aeb14e8a3c549cb6aa6337f187a884/pkgs/development/compilers/gcc/gcc-12-no-sys-dirs.patch",
+		},
+	}
 	local src = x.fetchTar {
 		url = f "https://ftp.gnu.org/gnu/gcc/gcc-{{version}}/gcc-{{version}}.tar.gz",
+		post = f [[
+      set -ex
+      patch -p1 < {{patches.no_sys_dirs}}
+      sed -i gcc/config/linux.h -e '1i#undef LOCAL_INCLUDE_DIR'
+    ]],
 	}
 	x.gcc = x.stdenv {
 		name = "gcc",
@@ -181,8 +191,10 @@ do
 			x.libmpc,
 		},
 		script = f [[
+      set -ex
       mkdir -p $miq_out/build
       cd $miq_out/build
+
       {{src}}/configure \
         --prefix="$PREFIX" \
         --disable-multilib \
@@ -202,8 +214,14 @@ do
         --with-native-system-header-dir={{stage0.libc}}/include \
         --with-build-sysroot=/
 
-        make
-        make -j$(nproc) install
+        makeFlags="\
+        NATIVE_SYSTEM_HEADER_DIR={{stage0.libc}}/include \
+        SYSTEM_HEADER_DIR={{stage0.libc}} \
+        BUILD_SYSTEM_HEADER_DIR={{stage0.libc}} \
+        "
+
+        make $makeFlags
+        make $makeFlags -j$(nproc) install
       ]],
 	}
 end

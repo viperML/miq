@@ -48,8 +48,6 @@ x.cc = utils.ccBuilder {
 	shell = x.bootstrap,
 	cc = f [[
     exec {{x.bootstrap}}/bin/$compiler \\
-      -pie \\
-      -fPIE \\
       -fPIC \\
       -Wformat \\
       -Wformat-security \\
@@ -64,6 +62,8 @@ x.cc = utils.ccBuilder {
   ]],
 }
 
+-- -pie \\
+-- -fPIE \\
 -- -U_FORTIFY_SOURCE \\
 -- -D_FORTIFY_SOURCE=2 \\
 
@@ -73,12 +73,12 @@ x.ld = utils.ldBuilder {
 	ld = f [[
     exec {{x.bootstrap}}/bin/ld \\
       -z relro \\
-      -pie \\
       -z now \\
       "\$@" \\
       \$MIQ_LDFLAGS
   ]],
 }
+-- -pie \\
 
 x.stdenv = utils.stdenvBuilder {
 	name = "stage0-stdenv",

@@ -140,13 +140,24 @@ x.fetchTarBuilder = function(input)
 		local args = args
 		local input = input
 
+    local post
+    if args.post ~= nil then
+      post = args.post
+    else
+      post = "# No post unpack"
+    end
+
+
 		local fetch = miq.fetch(args)
 		local pkg = miq.package {
 			name = f "{{fetch.name}}-unpack",
 			script = f [[
+        set -ex
         export PATH="{{input.PATH}}"
         cd $miq_out
         tar -xvf {{fetch}} --strip-components=1 --no-same-permissions --no-same-owner
+
+        {{post}}
       ]],
 		}
 		return pkg
