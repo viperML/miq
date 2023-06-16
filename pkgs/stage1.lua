@@ -64,7 +64,13 @@ x.test = x.stdenv {
 	name = "test",
 	script = f [[
     tee main.c <<EOF
-    int main() { return(69); }
+    #include <limits.h>
+    #include <stdio.h>
+    long foo = LONG_MIN;
+    int main() {
+      printf("Hello World: %ld", foo);
+      return(69);
+    }
     EOF
     $CC main.c -o $miq_out/result
   ]],
@@ -169,11 +175,11 @@ do
 	x.gcc = x.stdenv {
 		name = "gcc",
 		version = version,
-    depend = {
-      x.gmp,
-      x.mpfr,
-      x.libmpc
-    },
+		depend = {
+			x.gmp,
+			x.mpfr,
+			x.libmpc,
+		},
 		script = f [[
       mkdir -p $miq_out/build
       cd $miq_out/build
@@ -198,11 +204,10 @@ do
 
         make
         make -j$(nproc) install
-    ]],
+      ]],
 	}
 end
-
-
-        --disable-nls \
-        --enable-languages=c,c++ \
+--disable-bootstrap \
+--disable-nls \
+--enable-languages=c,c++ \
 return x

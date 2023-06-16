@@ -166,12 +166,4 @@ do
 	}
 end
 
-
-
-
-
-
-
---disable-bootstrap \
-
 return x
