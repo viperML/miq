@@ -1,1 +1,24 @@
-\lipsum[3]
+Package management is an invariant of all Linux distributions, as it is a
+necessary piece to building the software that runs on them. For this reason,
+optimizing the package management process is a key factor in the correctness and
+performance of the resulting system. Traditional Linux distributions, like
+\textit{Debian} or \textit{Fedora} --- and their respective
+package managers \textit{apt} and \textit{dnf} --- rely on a
+model of sharing every dependency as much as possible, the so-called File
+Hierarchy Standard . This model of software
+deployment traces back to the early days of Unix in the seventies, and has not
+received any fundamental changes since then. As software grows in complexity as
+time passes, this models starts to show its limitations. The most notable
+solution to this, is the containers deployment model, in which a Operating
+System is encapsulated from the host, but looking like a standard OS from the inside.
+
+
+In this work, a new approach to classical package
+management is presented, based on the concepts of immutability and
+Directed Acyclic Graphs. This data structure is used to represent the tree of dependencies
+that the package manager resolves. With the usage of a special filesystem
+layout, many problems of the classical software distribution model are solved,
+such as the Diamond Dependency Problem or software rollbacks.
+The ideas presented on this documents are inspired by the nix package manager,
+from which many concepts are borrowed. As a result, the package manager miq was
+developed, which implements this new approach.

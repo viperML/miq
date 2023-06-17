@@ -12,6 +12,9 @@
           trimspaces
           transparent
           lipsum
+          acronym
+          bigfoot
+          xstring
           ;
       })
     ];

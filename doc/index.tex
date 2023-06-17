@@ -1,4 +1,7 @@
-\documentclass[a4paper,twoside]{report}
+\documentclass[
+  a4paper,
+  % twoside
+]{report}
 
 \title{Inmutable package management in Linux}
 \author{Fernando Ayats Llamas}
@@ -20,25 +23,54 @@
 \usepackage[backend=biber]{biblatex}
 \addbibresource{miq.bib}
 
-% Clickable links
-\usepackage{hyperref}
-\hypersetup{pdfborder = {0 0 0}} % no boxes around links
-
-% Insertions
+\usepackage{graphicx}
 \usepackage{svg}
+
+\usepackage{url}
+
+\usepackage[colorlinks]{hyperref}
+\usepackage{xcolor}
+% \hypersetup{pdfborder = {0 0 0}} % no boxes around links
+\definecolor{MK_One_One}{RGB}{140,81,10}
+\definecolor{MK_One_Two}{RGB}{216,179,101}
+\definecolor{MK_One_Three}{RGB}{246,232,195}
+\definecolor{MK_One_Four}{RGB}{199,234,229}
+\definecolor{MK_One_Five}{RGB}{90,180,172}
+\definecolor{MK_One_Six}{RGB}{1,102,94}
+\hypersetup{
+ linkcolor=MK_One_One
+,citecolor=MK_One_Two
+,filecolor=MK_One_Three
+,urlcolor= MK_One_Six
+,menucolor=MK_One_Five
+,runcolor=MK_One_Four
+,linkbordercolor=MK_One_One
+,citebordercolor=MK_One_Two
+,filebordercolor=MK_One_Three
+,urlbordercolor=MK_One_Six
+,menubordercolor=MK_One_Five
+,runbordercolor=MK_One_Four
+}
 
 \usepackage{lipsum}
 
+\usepackage{acronym}
+
+\usepackage{listings}
+\lstMakeShortInline[columns=fixed]|
+\lstset{basicstyle=\fontfamily{pcr}\footnotesize}
+
 % custom headings
-\usepackage{fancyhdr}
-\pagestyle{fancy}
-\fancyhf{}
-% \lhead{\rightmark}
-% \rhead{Página \thepage}
-%% \cfoot{\today}
-\fancyhead[LE,RO]{\rightmark}
-\fancyhead[RE,LO]{Page \thepage}
-\fancyfoot[CE,CO]{Fernando Ayats Llamas - \today}
+% \usepackage{fancyhdr}
+% \pagestyle{fancy}
+% \fancyhf{}
+% % \lhead{\rightmark}
+% % \rhead{Página \thepage}
+% %% \cfoot{\today}
+% \fancyhead[LE,RO]{\rightmark}
+% \fancyhead[RE,LO]{Page \thepage}
+% \fancyfoot[CE,CO]{Fernando Ayats Llamas - \today}
+
 
 
 \begin{document}
@@ -49,17 +81,17 @@
 \end{abstract}
 \newpage
 
-\renewcommand{\abstractname}{Acknowledgements}
-\begin{abstract}
-  \input{_acknowledgements.tex}
-\end{abstract}
-\newpage
+% \renewcommand{\abstractname}{Acknowledgements}
+% \begin{abstract}
+%   \input{_acknowledgements.tex}
+% \end{abstract}
+% \newpage
 
 
 \begin{titlepage}
   \tableofcontents
   \listoffigures
-  \listoftables
+  % \listoftables
 \end{titlepage}
 
 
@@ -70,5 +102,21 @@
 \input{_development.tex}
 
 \input{_conclusions.tex}
+
+\newpage
+\addcontentsline{toc}{chapter}{Bibliography}
+\printbibliography[title=Bibliography]
+
+\begin{titlepage}
+  \chapter*{List of Acronyms}
+  \begin{acronym}
+      \acro{DAG}{Directed Acyclic Graph}
+      \acro{FHS}{Filesystem Hierarchy Standard}
+      \acro{CLI}{Command Line Interface}
+      \acro{Dep}{Dependency}
+      \acro{HPC}{High-performance computing}
+  \end{acronym}
+\end{titlepage}
+
 
 \end{document}
