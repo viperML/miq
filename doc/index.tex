@@ -1,9 +1,9 @@
-\documentclass{article}
-\title{My Title}
+\documentclass[a4paper,twoside]{report}
 
-\usepackage{biblatex}
-\addbibresource{miq.bib}
+\title{Inmutable package management in Linux}
+\author{Fernando Ayats Llamas}
 
+% Better fonts
 \usepackage{fontspec}
 \setmainfont{texgyrepagella}[
   Extension = .otf,
@@ -11,26 +11,64 @@
   BoldFont = *-bold,
   ItalicFont = *-italic,
   BoldItalicFont = *-bolditalic,
-]
+  ]
 \setmonofont{iosevka-normal-medium.ttf}[
   SizeFeatures={Size=10},
 ]
 
+% Bibliography (no bibtex)
+\usepackage[backend=biber]{biblatex}
+\addbibresource{miq.bib}
+
+% Clickable links
+\usepackage{hyperref}
+\hypersetup{pdfborder = {0 0 0}} % no boxes around links
+
+% Insertions
+\usepackage{svg}
+
+\usepackage{lipsum}
+
+% custom headings
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+% \lhead{\rightmark}
+% \rhead{Página \thepage}
+%% \cfoot{\today}
+\fancyhead[LE,RO]{\rightmark}
+\fancyhead[RE,LO]{Page \thepage}
+\fancyfoot[CE,CO]{Fernando Ayats Llamas - \today}
+
+
 \begin{document}
 
 
-\tableofcontents
+\begin{abstract}
+  \input{_abstract.tex}
+\end{abstract}
+\newpage
 
-\section*{Acknowledgements}
+\renewcommand{\abstractname}{Acknowledgements}
+\begin{abstract}
+  \input{_acknowledgements.tex}
+\end{abstract}
+\newpage
 
-Hola
 
-\section{Introduction}
+\begin{titlepage}
+  \tableofcontents
+  \listoffigures
+  \listoftables
+\end{titlepage}
 
-\section{State of the art}
 
-\section{Development}
+\input{_introduction.tex}
 
-\section{Conclusions}
+\input{_state_art.tex}
+
+\input{_development.tex}
+
+\input{_conclusions.tex}
 
 \end{document}

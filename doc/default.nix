@@ -8,6 +8,10 @@
           scheme-medium
           biblatex
           biber
+          svg
+          trimspaces
+          transparent
+          lipsum
           ;
       })
     ];

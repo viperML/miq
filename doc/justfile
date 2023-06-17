@@ -6,3 +6,10 @@ build:
 
 watch:
   latexmk -xelatex -synctex=1 -interaction=nonstopmode -file-line-error -pvc -view=none -outdir=builddir index.tex
+
+clean:
+  latexmk -C -outdir=builddir index.tex
+
+copy-bib:
+  cp -vfL ~/Documents/miq.bib miq.bib
+  chmod 644 miq.bib
