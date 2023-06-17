@@ -1,0 +1,33 @@
+{
+    "vim.disableExtension": false,
+    "latex-workshop.latex.tools": [
+        {
+            "name": "just-build",
+            "command": "just",
+            "args": [
+                "build"
+            ],
+        },
+        {
+            "name": "just-watch",
+            "command": "just",
+            "args": [
+                "watch"
+            ],
+        },
+    ],
+    "latex-workshop.latex.recipes": [
+        {
+            "name": "build",
+            "tools": [
+                "just-build"
+            ]
+        },
+        {
+            "name": "watch",
+            "tools": [
+                "just-watch"
+            ]
+        },
+    ]
+}

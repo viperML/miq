@@ -23,6 +23,7 @@
 
       perSystem.imports = [
         ./nix/devshell.nix
+        ./doc
       ];
     };
 }

@@ -1,0 +1,8 @@
+default:
+  just --list
+
+build:
+  latexmk -xelatex -synctex=1 -interaction=nonstopmode -file-line-error -outdir=builddir index.tex
+
+watch:
+  latexmk -xelatex -synctex=1 -interaction=nonstopmode -file-line-error -pvc -view=none -outdir=builddir index.tex
