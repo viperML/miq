@@ -8,6 +8,7 @@ devel
 *.dot
 /miq
 *.svg
+!/doc/**/*.svg
 build*
 .obsidian
 *.pdf
