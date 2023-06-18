@@ -22,3 +22,6 @@ copy-bib:
 
 sync:
   rsync -arvP --no-perms --no-owner --no-group --delete --no-times ~/Documents/miq-share/ assets
+
+graph:
+  

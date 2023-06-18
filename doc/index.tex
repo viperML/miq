@@ -25,6 +25,7 @@
 
 \usepackage{graphicx}
 \usepackage{svg}
+\svgsetup{inkscapelatex=false}
 
 \usepackage{url}
 
@@ -75,6 +76,15 @@
 % \fancyfoot[CE,CO]{Fernando Ayats Llamas - \today}
 
 \usepackage[outputdir=aux]{minted}
+
+% https://tex.stackexchange.com/questions/16582/center-figure-that-is-wider-than-textwidth
+\makeatletter
+\newcommand*{\centerfloat}{%
+  \parindent \z@
+  \leftskip \z@ \@plus 1fil \@minus \textwidth
+  \rightskip\leftskip
+  \parfillskip \z@skip}
+\makeatother
 
 \begin{document}
 

@@ -6,6 +6,7 @@
         p.pygments
       ]))
       pkgs.inkscape
+      pkgs.graphviz-nox
       (pkgs.texlive.combine {
         inherit
           (pkgs.texlive)

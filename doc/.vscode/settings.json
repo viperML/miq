@@ -16,11 +16,19 @@
                 "watch"
             ],
         },
+        {
+            "name": "just-sync",
+            "command": "just",
+            "args": [
+                "sync"
+            ],
+        },
     ],
     "latex-workshop.latex.recipes": [
         {
             "name": "build",
             "tools": [
+                "just-sync",
                 "just-build"
             ]
         },
