@@ -3,7 +3,7 @@
   % twoside
 ]{report}
 
-\title{Inmutable package management in Linux}
+\title{Immutable package management for Linux}
 \author{Fernando Ayats Llamas}
 
 % Better fonts
@@ -21,7 +21,7 @@
 
 % Bibliography (no bibtex)
 \usepackage[backend=biber]{biblatex}
-\addbibresource{miq.bib}
+\addbibresource{assets/miq.bib}
 
 \usepackage{graphicx}
 \usepackage{svg}
@@ -58,7 +58,10 @@
 
 \usepackage{listings}
 \lstMakeShortInline[columns=fixed]|
-\lstset{basicstyle=\fontfamily{pcr}\footnotesize}
+\lstset{
+  basicstyle=\ttfamily,
+  basewidth=0.5em
+}
 
 % custom headings
 % \usepackage{fancyhdr}
@@ -71,7 +74,7 @@
 % \fancyhead[RE,LO]{Page \thepage}
 % \fancyfoot[CE,CO]{Fernando Ayats Llamas - \today}
 
-
+\usepackage[outputdir=aux]{minted}
 
 \begin{document}
 
@@ -90,9 +93,9 @@
 
 \begin{titlepage}
   \tableofcontents
-  \listoffigures
-  % \listoftables
 \end{titlepage}
+
+
 
 
 \input{_introduction.tex}
@@ -107,16 +110,25 @@
 \addcontentsline{toc}{chapter}{Bibliography}
 \printbibliography[title=Bibliography]
 
+
 \begin{titlepage}
-  \chapter*{List of Acronyms}
-  \begin{acronym}
-      \acro{DAG}{Directed Acyclic Graph}
-      \acro{FHS}{Filesystem Hierarchy Standard}
-      \acro{CLI}{Command Line Interface}
-      \acro{Dep}{Dependency}
-      \acro{HPC}{High-performance computing}
-  \end{acronym}
+  \addcontentsline{toc}{chapter}{List of Figures}
+  \listoffigures
+
+  % \listoftables
+
+  \newpage
+  \addcontentsline{toc}{chapter}{Acronyms}
+  \chapter*{Acronyms}
+    \begin{acronym}
+        \acro{DAG}{Directed Acyclic Graph}
+        \acro{FHS}{Filesystem Hierarchy Standard}
+        \acro{CLI}{Command Line Interface}
+        \acro{Dep}{Dependency}
+        \acro{HPC}{High-performance computing}
+    \end{acronym}
 \end{titlepage}
 
+\input{_annex.tex}
 
 \end{document}

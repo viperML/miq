@@ -2,6 +2,10 @@
   devShells.doc = pkgs.mkShellNoCC {
     packages = [
       pkgs.just
+      (pkgs.python3.withPackages (p: [
+        p.pygments
+      ]))
+      pkgs.inkscape
       (pkgs.texlive.combine {
         inherit
           (pkgs.texlive)
@@ -15,6 +19,7 @@
           acronym
           bigfoot
           xstring
+          minted
           ;
       })
     ];

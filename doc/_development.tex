@@ -1,12 +1,53 @@
 \chapter{Development}
 
+The result of this research was the development of |miq|, a package manager and
+build system for Linux.
 
-\subsection{High level overview}
+miq is a single-file executable that handles the full lifecycle of the build
+process of the packages it manages. This stages include:
 
-\subsection{Builder}
+\begin{enumerate}
+    \item Evaluating the expressions that describe packages
+    \item Calculating the dependency graph
+    \item Fetching the necessary source code
+    \item Performing the described build process
+    \item Handling the storage and tracking of the installed packages
+\end{enumerate}
 
-\subsection{Intermediate-representation evaluator}
+Therefore, the following sections will all the components that make up miq, and
+their interactions.
 
-\subsection{Lua evaluator}
+\section{High level overview}
 
-\subsection{Other components}
+The development of miq aimed for a modular design, such that
+each component didn't have much coupling with the others.
+This allows for easy refactoring of parts of the source
+code, while leaving the rest of the system untouched. As
+such the components of miq can be layed out as the following
+diagram:
+
+\begin{figure}
+    \centering
+    \includesvg{assets/overview.svg}
+    \caption{Components of miq}
+    \label{fig:miq-components}
+\end{figure}
+
+\subsection{Graph based dependencies}
+
+\subsection{Immutability}
+
+\subsection{Stages}
+
+\subsection{Atomic changes}
+
+
+
+\section{Builder}
+
+\section{Graph evaluator}
+
+\section{Lua evaluator}
+
+\section{Other components}
+

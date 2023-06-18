@@ -15,3 +15,7 @@ build*
 *latexmk
 *.log
 *.fls
+out
+aux
+_minted*
+*inkscape

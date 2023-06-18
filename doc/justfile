@@ -1,15 +1,24 @@
+# -*- mode: plaintext -*-
+
 default:
   just --list
 
+flags := "-xelatex -synctex=1 -interaction=nonstopmode -file-line-error --shell-escape -outdir=out -aux-directory=aux"
+
+file := "index.tex"
+
 build:
-  latexmk -xelatex -synctex=1 -interaction=nonstopmode -file-line-error -outdir=builddir index.tex
+  latexmk {{flags}} {{file}}
 
 watch:
-  latexmk -xelatex -synctex=1 -interaction=nonstopmode -file-line-error -pvc -view=none -outdir=builddir index.tex
+  latexmk {{flags}} -pvc -view=none {{file}}
 
 clean:
-  latexmk -C -outdir=builddir index.tex
+  latexmk {{flags}} -C {{file}}
 
 copy-bib:
   cp -vfL ~/Documents/miq.bib miq.bib
   chmod 644 miq.bib
+
+sync:
+  rsync -arvP --no-perms --no-owner --no-group --delete --no-times ~/Documents/miq-share/ assets

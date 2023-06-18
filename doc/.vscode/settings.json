@@ -1,5 +1,6 @@
 {
-    "vim.disableExtension": false,
+    "vim.disableExtension": true,
+    "latex-workshop.latex.outDir": "%DIR%/out",
     "latex-workshop.latex.tools": [
         {
             "name": "just-build",
