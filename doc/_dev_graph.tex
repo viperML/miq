@@ -1,0 +1,70 @@
+\FloatBarrier
+\subsection{Graph-based dependency resolution}
+
+In software deployment, one of the main goals is to have be
+able to reproduce a deployment environment as reliably as
+possible. This means that any external factors should be
+reduced to a minimum, such that the end result is as close
+to the expected as possible. The reality of system
+deployments is that not all environments are the same, such
+that the same deployment can be applied to different systems
+with different hardware -- for example, different network
+cards, hard drives or even different architectures.
+
+On the software side, the same problem exists. Any
+deployment is composed of different parts of software which
+interact with each other. To reduce any external factors,
+a possible solution is to try to control the entire software
+stack -- from the kernel, to the operating system and
+libraries and finally to the application to be deployed.
+This can be seen in the deployment of an entire \ac{VM}, that
+contain the specific OS required for the application. But
+this is not always possible, for example in a managed
+environment from a cloud provider. Or it may not be desired
+for the cost of implementation and maintenance. One of the
+most popular solution nowadays is the use of containers
+\cite{DockerAcceleratedContainerized2022}. A container is a
+collection of files packaged into an \textit{image}, which is
+run by a \textit{container runtime}. The runtime is able to
+isolate the main process of the container by using special
+Linux capabilities, such as \textit{namespaces}
+\cite{NamespacesLinuxManualb}. By isolating the ``child''
+process from the host, the container is able to bundle its
+entire dependency tree without conflicts with the host.
+
+What is proposed in this project is the usage of the hashing
+techniques discussed in the previous section to achieve
+isolation of the dependency tree of a child process from the
+host. Each file which lives in the miq store, has a unique
+path according to its hash.
+
+\begin{minted}{bash}
+gcc-e3591c92b6d130e5        =>  /miq/store/gcc-e3591c92b6d130e5
+bootstrap-5f87f2800c8c639e  =>  /miq/store/bootstrap-5f87f2800c8c639e
+\end{minted}
+
+For this reason, a runtime to isolate a process (what is
+done with containers) is not needed. Instead, each process
+can directly reference the absolute path to the exact
+dependency in the store. If package A requires dependency B,
+it does not matter if the host \ac{OS} uses also B. If it is
+a different version, it will be reflected on its hash -- and
+path. If it is exactly the same package B, then the
+dependency will be able to be shared across the applications.
+
+\begin{figure}[hbtp]
+    \centerfloat
+    \includesvg[width=250pt]{assets/depshare.svg}
+    \caption{Dependency sharing between applications.}
+    \label{fig:dep_share}
+\end{figure}
+
+As figure \ref{fig:dep_share} shows, if a there is a
+dependency A which is used by two applications, if A is not
+the same, the will be no conflict in the file system, as it
+will use a different path.
+
+\begin{minted}{bash}
+A-1.0.0 => A-1.0.0-1f0d1c2b => /miq/store/A-1.0.0-1f0d1c2b
+A-1.0.1 => A-1.0.1-a2b3c4d5 => /miq/store/A-1.0.1-a2b3c4d5
+\end{minted}

@@ -21,6 +21,7 @@
           bigfoot
           xstring
           minted
+          placeins
           ;
       })
     ];

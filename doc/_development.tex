@@ -26,7 +26,7 @@ code, while leaving the rest of the system untouched. As
 such the components of miq can be layed out in figure
 \ref{fig:miq-components} .
 
-\begin{figure}
+\begin{figure}[hbtp]
     \centerfloat
     % \includegraphics{assets/overview.png}
     \includesvg[width = 450pt]{assets/overview.svg}
@@ -60,7 +60,7 @@ a unique hash is generated, that is the result from hashing
 all the fields of the struct. Finally, the hash (an unsigned
 32-bit integer) is encoded into text, to form the name of
 the package. For this application, the algorithm used is the
-\textit{Fowler-Noll-V}o hash function, which is implemented
+\textit{Fowler-Noll-Vo} hash function, which is implemented
 in the |fnv| create \cite{FnvRust} . This hash function is
 not cryptographically secure, but this was not one of the
 design requirements of miq (and can be swapped out for any
@@ -80,7 +80,7 @@ struct PackageInput {
 }
 \end{minted}
 
-\begin{figure}
+\begin{figure}[hbtp]
     \centerfloat
     \includesvg[width = 300pt]{assets/hash.svg}
     \caption{Overview of the hashing algorithm}
@@ -108,7 +108,7 @@ tree has changed, and therefore the name of the output
 package. This means that a package "foo" does not really
 exist in miq, but rather a package "foo" with a specific hash.
 
-\begin{figure}
+\begin{figure}[hbtp]
     \centerfloat
     \includesvg[width = 200pt]{assets/depswap.svg}
     \caption{Change of dependencies for a package for a conventional package manager}
@@ -116,14 +116,14 @@ exist in miq, but rather a package "foo" with a specific hash.
 \end{figure}
 
 % insert depswap-miq.svg
-\begin{figure}
+\begin{figure}[hbtp]
     \centerfloat
     \includesvg[width = 200pt]{assets/depswap_miq.svg}
     \caption{Change of dependencies for a package for miq}
     \label{fig:depswap_miq}
 \end{figure}
 
-\subsection{Graph based dependencies}
+\input{_dev_graph.tex}
 
 \subsection{Immutability}
 
