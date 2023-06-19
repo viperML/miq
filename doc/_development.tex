@@ -82,7 +82,7 @@ struct PackageInput {
 
 \begin{figure}[hbtp]
     \centerfloat
-    \includesvg[width = 300pt]{assets/hash.svg}
+    \includesvg[width = 0.7\paperwidth ]{assets/hash.svg}
     \caption{Overview of the hashing algorithm}
     \label{fig:hash}
 \end{figure}
@@ -124,15 +124,17 @@ exist in miq, but rather a package "foo" with a specific hash.
 \end{figure}
 
 \input{_dev_graph.tex}
-
-\subsection{Immutability}
+\input{_dev_immut.tex}
 
 \subsection{Stages}
 
-\subsection{Atomic changes}
+
 
 \subsection{ELF format}
 
+\subsection{The bootstrapping problem}
+
+\subsection{libc}
 
 \section{Builder}
 

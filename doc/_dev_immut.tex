@@ -1,0 +1,42 @@
+\subsection{Immutability}
+
+To build reliable system deployments, it is important to reduce the
+number of variables that can affect the outcome. From the
+software perspective, this means that the system should
+either be reliant to changes in the environment, or minimize
+the factors from the host that can affect the application.
+In Linux, one of the main factors that can affect the
+environment are the libraries that are installed on the
+system.
+
+On the previous section it was discussed how a different
+approach to tagging the packages on the filesystem can be
+used to achieve a consistent environment. What this
+filesystem layout naturally leads into, is a system where
+there is no mutation of the existing packages. On a
+classical system, to upgrade a package, the following steps
+are taken:
+
+\begin{enumerate}
+    \item Download the new update for package |foo|, and unpack it
+    \item Replace file |/usr/bin/foo| with the new version
+    \item Replace file |/usr/share/foo-bar| with the new version
+    \item \ldots
+    \item Register the new version in the database
+\end{enumerate}
+
+As can be seen, the process of upgrading a package involves
+multiple in-place modifications of the existing package.
+This operation can be qualified as ``surgical'', as it may
+involve many operations which can fail -- and always
+eventually fail. A failure in the middle of a upgrade
+process can leave the system on a inconsistent state.
+
+\begin{enumerate}
+    \item Download the new update for package |foo|, and unpack it
+    \item Replace file |/usr/bin/foo| with the new version
+    \item Failed to upgrade |/usr/share/foo-bar|, aborting
+\end{enumerate}
+
+
+\subsection{Atomicity}

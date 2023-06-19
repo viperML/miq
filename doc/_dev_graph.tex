@@ -38,7 +38,7 @@ isolation of the dependency tree of a child process from the
 host. Each file which lives in the miq store, has a unique
 path according to its hash.
 
-\begin{minted}{bash}
+\begin{minted}{text}
 gcc-e3591c92b6d130e5        =>  /miq/store/gcc-e3591c92b6d130e5
 bootstrap-5f87f2800c8c639e  =>  /miq/store/bootstrap-5f87f2800c8c639e
 \end{minted}
@@ -62,9 +62,149 @@ dependency will be able to be shared across the applications.
 As figure \ref{fig:dep_share} shows, if a there is a
 dependency A which is used by two applications, if A is not
 the same, the will be no conflict in the file system, as it
-will use a different path.
+will use a different path. By using this technique, we are
+able to share the dependencies of multiple application
+without the need for containers or namespaces, towards a
+more ``native'' approach.
 
-\begin{minted}{bash}
-A-1.0.0 => A-1.0.0-1f0d1c2b => /miq/store/A-1.0.0-1f0d1c2b
-A-1.0.1 => A-1.0.1-a2b3c4d5 => /miq/store/A-1.0.1-a2b3c4d5
+\begin{minted}{text}
+identifier => id+hash          => path
+A-1.0.0    => A-1.0.0-1f0d1c2b => /miq/store/A-1.0.0-1f0d1c2b
+A-1.0.1    => A-1.0.1-a2b3c4d5 => /miq/store/A-1.0.1-a2b3c4d5
+A-2.0.0    => A-2.0.0-1f0d1c2b => /miq/store/A-2.0.0-1f0d1c2b
 \end{minted}
+
+For the sake of simplicity, the result hash is stripped of
+identifiers. Internally, these hashes would be tracked by
+the package manager. But for the representation of the
+dependency graphs, they are assumed to be computed by miq,
+but not displayed. As said in previous sections, the design
+decision of tracking each package with a unique hash,
+implies that when a node is displayed with a name ``A'', it
+is a unique package based on its dependencies and definition
+of the package itself.
+
+The data structure used to represent the dependency graph of
+a given node ``N'', is a \acl{DAG}. A directed graph
+consists of a non-empty finite set of elements called nodes
+and a finite set of ordered pairs of distinct nodes called
+edges. A directed graph with no cycles is called a \ac{DAG}
+\cite{bang-jensenDigraphs2009} . The representation of this
+is simply a list of nodes and edges such as the following.
+
+\begin{figure}[hbtp]
+    \centering
+    \begin{minipage}[t]{0.5\textwidth}
+
+    \begin{minted}{dot}
+        digraph G {
+          // Nodes
+          a;
+          b;
+          c;
+          // Edges
+          a -> b;
+          a -> c;
+          b -> c;
+        }
+    \end{minted}
+    \end{minipage}
+   \caption{\texttt{dot} language for describing graphs.}
+   \label{fig:dot_graph}
+\end{figure}
+
+\begin{figure}[hbtp]
+    \centerfloat
+    \includesvg[width=70pt]{graph/sample.dot.svg}
+    \caption{Resulting visualization for the graph in figure \ref{fig:dot_graph}.}
+\end{figure}
+
+For a generic \ac{DAG}, we can define the nodes and edges as
+``weighted''. A weight is a value attached to the element.
+Common examples of weighted nodes are ``labels'' -- like
+|a,b,c| in figure \ref{fig:dot_graph} -- numeric values,
+that can represent a cost or a distance, depending on the
+application of the graph. Edges can also be weighted, with
+also the common use of numeric values. For the topic of
+package management, on first instance the edges are not
+weighted -- or implemented as a |null| value. The nodes then
+can represent an identifier for a package. Because in the
+miq software deployment model, we can identify a package by
+its path in the store
+(|/miq/store/<name>-<version>-<hash>|), a node weight can be
+represented just by a |String| type in Rust. Therefore, the
+edge directions represent a dependency between two packages,
+read like:
+
+\begin{minted}{text}
+"A depends on B"
+ A    ==>     B
+\end{minted}
+
+For the purpose of this application, the term "to depend on"
+is flattened over any type of dependency. Instead of
+specifying whether a dependency occurs at ``runtime'' or
+``buildtime'', this is simplified to just ``depend''. An
+example of how dependencies can be split into different
+categories is present in \textit{Gentoo's Ebuild system}
+\cite{DependenciesGentooDevelopment}. In Gentoo,
+dependencies are split in 3 categories: |BDEPEND| (required
+at build-time in the build machine), |DEPEND| (required at
+build-time, for the target machine) and |RDEPEND| (required
+at run-time, for the target machine) (figure \ref{fig:dep_categories} ). Many Linux
+distributions implement the same 3 variants, with different
+naming conventions. What this allows it stripping packages
+once the package has been built. This is specially useful on
+binary-based distributions, where you don't need to
+distribute the compiler for a package, but only its
+link-time dependencies and run-time dependencies. As noted
+before, these differences are not considered in miq, and
+just a generic ``dependency'' is used for both run-time and build-time.
+
+\begin{figure}[hbtp]
+    \centerfloat
+    \begin{tabular}{lll}
+        \hline
+        & Build-time & Run-time \\
+        \hline
+        Build machine & |BDEPEND| & - \\
+        Target machine & |DEPEND| & |RDEPEND| \\
+        \hline
+    \end{tabular}
+    \caption{Dependency categories in Gentoo \cite{DependenciesGentooDevelopment} .}
+    \label{fig:dep_categories}
+\end{figure}
+
+Finally, one of the properties of a \ac{DAG} is that there
+is always an acyclic ordering of the nodes
+\cite{bang-jensenDigraphs2009}. This means, that we can get
+an ordered list of all the nodes starting from a root node,
+without cycles. A cycle in package management is an
+undesirable entity. What it is translated to, is that ``a
+package depends on itself''. For a binary based
+distribution, this is not a hard problem to solve, as the
+packages are usually applied into the system in any order.
+But for a source-based distribution, a cycle in the
+dependency graph is impossible to solve: to be able to build
+a package, we require the package itself as an input,
+leading to a paradox. This is usually solved by introducing
+multiple ``intermediate'' packages -- for example, a package
+A without less features, such that it doesn't depend on
+itself.
+
+The usage of a \ac{DAG} is also very useful to represent the
+dependencies in a manifest on disk. As instead of committing
+multiple actions into the live system, a manifest can be
+used to declare all dependencies front-loaded.
+
+In the following sections, it is described how the dependency
+graphs are implemented in miq, and how they are used to walk
+the dependency tree to build all packages in parallel.
+
+\begin{figure}[hbtp]
+    \centerfloat
+    \includesvg[width=0.7\paperwidth]{graph/libc.dot.svg}
+    \caption{Dependency graph for the package
+    \texttt{stage0.libc}, hashes stripped.}
+    \label{fig:m4_graph}
+\end{figure}

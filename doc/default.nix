@@ -22,6 +22,9 @@
           xstring
           minted
           placeins
+          tabularray
+ninecolors
+xurl
           ;
       })
     ];
