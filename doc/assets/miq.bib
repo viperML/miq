@@ -191,6 +191,23 @@
   file = {C\:\\Users\\ayats\\Zotero\\storage\\MA76PIPG\\namespaces.7.html}
 }
 
+@inproceedings{neelakantamHardwareAtomicityReliable2007,
+  title = {Hardware Atomicity for Reliable Software Speculation},
+  booktitle = {Proceedings of the 34th Annual International Symposium on {{Computer}} Architecture},
+  author = {Neelakantam, Naveen and Rajwar, Ravi and Srinivas, Suresh and Srinivasan, Uma and Zilles, Craig},
+  date = {2007-06-09},
+  pages = {174--185},
+  publisher = {{ACM}},
+  location = {{San Diego California USA}},
+  doi = {10.1145/1250662.1250684},
+  url = {https://dl.acm.org/doi/10.1145/1250662.1250684},
+  urldate = {2023-06-20},
+  abstract = {Speculative compiler optimizations are effective in improving both single-thread performance and reducing power consumption, but their implementation introduces significant complexity, which can limit their adoption, limit their optimization scope, and negatively impact the reliability of the compilers that implement them. To eliminate much of this complexity, as well as increase the effectiveness of these optimizations, we propose that microprocessors provide architecturally-visible hardware primitives for atomic execution. These primitives provide to the compiler the ability to optimize the program's hot path in isolation, allowing the use of non-speculative formulations of optimization passes to perform speculative optimizations. Atomic execution guarantees that if a speculation invariant does not hold, the speculative updates are discarded, the register state is restored, and control is transferred to a non-speculative version of the code, thereby relieving the compiler from the responsibility of generating compensation code.  We demonstrate the benefit of hardware atomicity in the context of a Java virtual machine. We find incorporating the notion of atomic regions into an existing compiler intermediate representation to be natural, requiring roughly 3,000 lines of code (\textasciitilde 3\% of a JVM's optimizing compiler), most of which were for region formation. Its incorporation creates new opportunities for existing optimization passes, as well as greatly simplifying the implementation of additional optimizations (e.g., partial inlining, partial loop unrolling, and speculative lock elision). These optimizations reduce dynamic instruction count by 11\% on average and result in a 10-15\% average speedup, relative to a baseline compiler with a similar degree of inlining.},
+  eventtitle = {{{SPAA07}}: 19th {{ACM Symposium}} on {{Parallelism}} in {{Algorithms}} and {{Architectures}}},
+  isbn = {978-1-59593-706-3},
+  langid = {english}
+}
+
 @article{raknesNsrootMinimalistProcess2016,
   title = {Nsroot: {{Minimalist Process Isolation Tool Implemented With Linux Namespaces}}},
   author = {Raknes, Inge Alexander and Fjukstad, Bjørn and Bongo, Lars Ailo},

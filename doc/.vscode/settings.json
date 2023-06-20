@@ -38,5 +38,11 @@
                 "just-watch"
             ]
         },
+    ],
+    "cSpell.words": [
+        "bootloader",
+        "libcrypto",
+        "nginx",
+        "openssl"
     ]
 }

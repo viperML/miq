@@ -1,3 +1,4 @@
+\FloatBarrier
 \subsection{Immutability}
 
 To build reliable system deployments, it is important to reduce the
@@ -29,14 +30,137 @@ As can be seen, the process of upgrading a package involves
 multiple in-place modifications of the existing package.
 This operation can be qualified as ``surgical'', as it may
 involve many operations which can fail -- and always
-eventually fail. A failure in the middle of a upgrade
-process can leave the system on a inconsistent state.
+eventually fail. This is discussed on section
+\ref{sec:atomicity} .
 
-\begin{enumerate}
-    \item Download the new update for package |foo|, and unpack it
-    \item Replace file |/usr/bin/foo| with the new version
-    \item Failed to upgrade |/usr/share/foo-bar|, aborting
-\end{enumerate}
+This modification of the global environment poses a problem
+to the running processes on the system. Giving names to the
+example packages, lets say that |openssl| is updated to a
+new version, which fixes some vulnerabilities. The update
+process on a classical system would involve replacing
+|libcrypto.so| \textbf{in-place} with the new version. But
+any running process -- unless it has some internal mechanism
+to detect this change -- will be unaware of this change.
+Let's say that a package that depends on |openssl| is
+|nginx|, which is linked against |libcrypto.so|. Then the
+system may be running a vulnerable version of |nginx|, even
+if the package was updated. From the perspective of the
+package itself, it hasn't changed, yet the underlying
+dependency graph as been altered. A solution to this, would
+be to track |openssl|'s ``reverse dependencies'', that is,
+all packages that depend on it. With this list of reverse
+dependencies, one could think that all you need is to
+iterate through it, killing every process that depends on
+the dependency. But this is not a trivial solution, as there
+is no direct connection of running processes to package
+versions. For example, the |nginx| package could declare
+some systemd service that is part of the package, and then
+restart this service in particular. But the system
+administrator could as well have written a custom systemd
+service, that is not tracked by the package manager. In the
+end, the ``safest'' solution, is to just reboot the entire
+system after an update has been applied.
+
+\begin{figure}[htb]
+    \centerfloat
+    \includesvg[width=250pt]{assets/nginx_classic.svg}
+    \caption{Tracking reverse dependencies on a classical Linux distribution.}
+    \label{fig:nginx_classic}
+\end{figure}
 
 
+So, if in a classical Linux distribution, tracking the files
+of the reverse dependencies is not a reliable way to know
+when to restart any service that depends on a mutated file,
+then the following step could be made: tracking process
+uniquely, with some hashing mechanism, such that it can be
+known if the reverse dependency (|nginx|) loaded the
+vulnerable dependency (|openssl|).
+
+
+What this naturally leans into, is the solution proposed in this project, of tracking
+every package by hashing its entire dependency tree. This
+simple change allows to know whether an affected |nginx| is
+running against a vulnerable |openssl|, because the
+dependency tree is statically known. Because we don't allow
+for mutability, every process always runs linked against the
+same exact versions of each library. Therefore, if
+|libcrypto.so| is updated, some |nginx| processes will still
+be linked to the exact path of the old |libcrypto.so| --
+|/miq/store/openssl-version-HASH/lib/libcrypto.so|. By
+re-evaluating the dependency graph, we can know that the
+hash of |nginx| has changed, because it now depends on a
+fixed version. Then, from an administrator's perspective,
+all you need yo know is to compare the hashes of the old and
+new nginx versions, and restart the service such that it
+points into the newly-built version.
+
+\begin{figure}[hbtp]
+    \centerfloat
+    \includesvg[width=250pt]{assets/nginx_miq.svg}
+    \caption{Tracking reverse dependencies by hashing the package paths.}
+    \label{fig:nginx_miq}
+\end{figure}
+
+\FloatBarrier
 \subsection{Atomicity}
+\label{sec:atomicity}
+
+As discussed in the previous section, the usage on mutable
+(in-place modifications) systems on Linux, is a serious
+source of problems, because of processing tracking a fixed
+path of a dependency, that changes under the hood with a
+system update. But a different problem that arises from
+mutation is the failure of a transaction, that is that a
+transaction is ``not atomic''.
+
+Atomicity in software development is a concept usually
+associated with memory management. In a multi-threaded
+environment, it is important that shared memory is not
+written to by two threads at the same time, but
+sequentially. For this purpose, the concept of an ``atomic''
+operation means that the operation is either not started, or
+completed -- there is no state ``in between''
+\cite{neelakantamHardwareAtomicityReliable2007} . Using the
+similarity with the physical world, an atomic operation is
+indivisible.
+In the context of package management, we can talk about if a
+package manager is atomic, if it can guarantee that a
+transaction (for example, updating or installing a package)
+is either completed or not, without any intermediate state.
+
+With the analogy of memory for a program, leaving the
+filesystem in a intermediate, inconsistent state is not
+acceptable for reliable systems. The most basic example is a
+package that is being updated, and some error occurs during
+the transaction, such that some files have been written, and
+some other not, as illustrated in figure
+\ref{fig:atomicity}.
+
+
+\begin{figure}[hbt]
+    \centerfloat
+    \includesvg[width=200pt]{assets/update_classic.svg}
+    \caption{Failure during an update transaction for a
+    classical \ac{PM}. Blue: files on the disk after the process.}
+    \label{fig:atomicity}
+\end{figure}
+
+By having the package manager not rely on the mutation for
+upgrades, then the problem of incomplete upgrades is solved
+by the root. If mutation is not used, then the way to
+upgrade a package is by using a different path on the
+filesystem. The upgrade can operate on this different path
+completely safely. Any interruption of the process will not
+leave the original package in this inconsistent state.
+Meanwhile, once the new package is in place, the update
+operation is a matter of changing the references of the old
+package to the new package.
+
+For the implementation of this concept, in Android the way
+to upgrade the system is via A/B updates. The system is partitioned
+such that a new update doesn't mutate the existing system,
+but rather copied into a different partition. When the
+transfer is complete, the user is prompted to reboot the
+system, and the bootloader will boot into the new partition.
+
