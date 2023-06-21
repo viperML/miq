@@ -19,12 +19,9 @@ clean:
   rm -rvf _minted-index
   rm -rvf svg-inkscape
 
-copy-bib:
-  cp -vfL ~/Documents/miq.bib miq.bib
-  chmod 644 miq.bib
-
 sync:
   rsync -arvP --no-perms --no-owner --no-group --delete --no-times ~/Documents/miq-share/ assets
+  ./graph/compile.sh
 
 graph:
 

@@ -42,17 +42,17 @@ update it. Some of the headers from libc include:
 
 \begin{figure}[hbt]
     \centerfloat
-    \begin{tabular}{ll}
-        \hline
-        |<string.h>| & String manipulation \\
-        \hline
-        |<stdio.h>| & Standard input/output \\
-        \hline
-        |<stdint.h>| & Standard integer types \\
-        \hline
+    \begin{tblr}{hlines, vlines}
+
+        <string.h> & String manipulation \\
+
+        <stdio.h> & Standard input/output \\
+
+        <stdint.h> & Standard integer types \\
+
         ... & ... \\
-        \hline
-    \end{tabular}
+
+    \end{tblr}
     \caption{Some of the headers from libc.}
 \end{figure}
 
@@ -84,31 +84,28 @@ of these componentes and their functionality.
 
 \begin{figure}[hbt]
     \centerfloat
-    \begin{tabular}{ll}
-        \hline
-        |libc| & C standard library \\
-        \hline
-        |gcc| & C and C++ compiler \\
-        \hline
-        |coreutils| & Basic terminal utilities, like |ls|,
-        |cat|, |cp|, etc. \\
-        \hline
-        |binutils| & Binary utilities, like |ld|, |as|,
-        |objdump|, etc. \\
-        \hline |make| & Build automation tool \\
-        \hline |sed| & Stream editor, text modification
+    \begin{tblr}{hlines, vlines}
+        libc & C standard library (glibc, musl) \\
+
+        gcc & C and C++ compiler \\
+        coreutils & Basic terminal utilities, like ls,
+        cat, cp, etc. \\
+        binutils & Binary utilities, like ld, as,
+        objdump, etc. \\
+         make & Build automation tool \\
+         sed & Stream editor, text modification
         program \\
-        \hline |bash| & POSIX shell implementation \\
-        \hline |tar| & Archive utility \\
-        \hline |grep| & Text search utility \\
-        \hline |findutils| & File search utilities, like
-        |find| or |findmnt| \\
-        \hline |diffutils| & File comparison utilities, like
-        |diff| \\
-        \hline |systemd| & System and service manager \\
-        \hline
-    \end{tabular}
+         bash & POSIX shell implementation \\
+         tar & Archive utility \\
+         grep & Text search utility \\
+         findutils & File search utilities, like
+        find or findmnt \\
+         diffutils & File comparison utilities, like
+        diff \\
+         systemd & System and service manager \\
+    \end{tblr}
     \caption{Some of the basic components of a Linux system.}
+    \label{tab:lsb}
 \end{figure}
 
 As a Linux distribution grows in scope, more and more
@@ -135,7 +132,7 @@ a different distribution. This is, running Linux packages
 that are not part of the distribution itself. For a
 classical system, this has never been common practice -- for
 example, installing apt (Debian's package manager) on a
-Gentoo system -- manily limited by the rules imposed by the
+Gentoo system -- mainly limited by the rules imposed by the
 \acl{FHS}. Basically, two package managers would interfere
 with each other, as they would try to manage files that were
 managed by the other package manager (any file on /usr/bin,
@@ -146,3 +143,97 @@ with it.
 
 \FloatBarrier
 \section{The bootstrapping problem}
+
+As discussed in the previous section, the scope of this work
+is to be able to demonstrate the viability of the deployment
+model of hashed paths instead of relying in the \ac{FHS}.
+So, as one of the core libraries, libc is the one to be
+compiled the first. As mentioned previously, libc is the C
+standard library, that in practice is used by every program
+written in C, which make up the core programs of a Linux
+operating system. To be able to compile libc, it is required
+a C compiler (from GCC), a POSIX shell (bash, for
+example) and other utilities. In this project, musl libc was used instead of
+glibc, as GNU's version contains some extra additions that
+are not part of the standard, which could introduce
+complexity. Then, a dependency graph for musl libc can be
+drawn as shown in figure \ref{fig:libc-deps}.
+
+\begin{figure}[hbt]
+    \centerfloat
+    \includesvg[width=150pt]{graph/libc-bs1.dot.svg}
+    \caption{Dependency graph for musl libc on first iteration.}
+    \label{fig:libc-deps}
+\end{figure}
+
+These GCC dependency in this graph is assumed to already
+"exist" in the system. But as already discussed, this is a
+source of impurity, as we don't know what C compiler was
+used, we can't hash the input to produce a hash for the musl
+output. This C compiler is ``external'' to the system.
+Therefore one of the objectives of any package manager is to
+be able to ``support'' itself, to be able to produce
+packages without any external interference. Then, this GCC
+must come from the package manager itself as well, and we
+can draw its dependency graph in figure \ref{fig:libc-deps2} .
+
+\begin{figure}[hbt]
+    \centerfloat
+    \includesvg[width=200pt]{graph/libc-bs2.dot.svg}
+    \caption{Dependency graph for musl libc on second iteration, recursive nature shows.}
+    \label{fig:libc-deps2}
+\end{figure}
+
+As can be seen, to be able to build libc, we need a C
+compiler, and to build a C compiler we need libc. This is a
+problem of a circular dependency, in particular the
+bootstrapping problem, because we need to ``base'' to be
+able to lift the entire system system from the ground.
+Moreover, if we try to draw a dependency from cyclically as
+in figure \ref{fig:libc-deps3}, we can see that graph is now
+\emph{cyclic}, this means that it is no longer a \ac{DAG} as
+discussed in the previous section, and we can no longer hash
+the nodes, as it would result in a infinite recursion. For
+this reason, cyclic dependencies are not allowed in miq, and
+using and checking for a proper \ac{DAG} is important.
+
+\begin{figure}[hbt]
+    \centerfloat
+    \includesvg[width=150pt]{graph/libc-bs3.dot.svg}
+    \caption{Cyclic dependency graph for musl libc and gcc.}
+    \label{fig:libc-deps3}
+\end{figure}
+
+To solve the bootstrapping problem, a solution is proposed
+of providing a set of bootstrap tools. This set of tools is
+downloaded from the internet, ready to use. By using it as a
+``fixed hash'' package, we can break the chain of recursive
+dependencies, as shown in figure \ref{fig:libc-deps4}. This
+set of bootstrap tools doesn't need to be updated ever. For
+example, they could contain a very old GCC, such that it is
+recent enough to be able to compile a newer GCC used for the
+rest of the packages on the system.
+
+\begin{figure}[hbt]
+    \centerfloat
+    \includesvg[width=150pt]{graph/libc-bs4.dot.svg}
+    \caption{Dependency graph for musl libc with a loop on gcc, solved with a bootstrap package.}
+    \label{fig:libc-deps4}
+\end{figure}
+
+In practice, the Linux distributions don't use the first
+iteration of this process. Instead, an iterative process is
+created, where libc and the C compiler (along any extra
+tools) are compiled in succession, using the result of the
+previous step to compile the next one. These are called
+``stages'', and the process ``distills'' the programs until
+an stable result is obtained. The final stage (from 0 to 1,
+2 , etc) is then used to build the system, instead of the
+zero-th stage.
+
+\begin{figure}[hbt]
+    \centerfloat
+    \includesvg[width=200pt]{graph/libc-bs5.dot.svg}
+    \caption{Bootstrap tower with 3 stages.}
+    \label{fig:libc-deps5}
+\end{figure}

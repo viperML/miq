@@ -46,6 +46,7 @@
         "MINIX",
         "nginx",
         "openssl",
+        "POSIX",
         "Ritchie",
         "userland"
     ]

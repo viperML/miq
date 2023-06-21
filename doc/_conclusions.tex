@@ -1,3 +1,85 @@
 \chapter{Conclusions}
-Test
-\lipsum[20]
+
+The development of miq has been a way to
+explore the possibilities of package management,
+and corner cases of the classical model. The
+historical baggage of Linux makes it very difficult
+to change its status quo, and all the technology
+that has been in development tries to perform
+incremental improvements over the decades-old
+model. With miq, it is shown that a different
+approach is possible, even if it means breaking
+compatibility with the current model. On the
+other hand, many aspects of miq are left not
+explored, but iterations over the idea of representing
+packages as a structure of independent hashed
+nodes, could lead to advantages in both Linux or
+any other package management system.
+
+This document could serve as the basis for any future project
+that wants to explore the same ideas as miq. The
+development of miq itself turned out to take some work
+and planification, but the ideas behind it are simple enough
+such that the implementation was straightforward. The
+process also served as an exploration of the Rust
+programming language, which proved to be a very good fit for
+this kind of application. The combination of Rust's type
+system, along with its ecosystem of libraries and easy
+development experience were key factors in the success of
+the implementation.
+
+\section{Future work}
+
+As mentioned previously, miq is was developed as proof of
+concept, without sacrificing much quality of the
+implementation or of the user experience. Still, many fields
+were left unexplored, and could lead to more research in the
+topic. The following list describes some of the possible
+future work that could be done in the area of miq:
+
+\begin{enumerate}
+    \item \textbf{Evaluator language}: Lua is the language
+    used to evaluate the packages defined by the user. Lua
+    turns the |.lua| input files into an intermediate
+    representation in |.toml| which follows an
+    specification. The usage of Lua was chosen because of
+    how easy is to embed, but the language doesn't provide
+    the best ergonomics and error messages. The
+    implementation of a custom-made domain specific language
+    could be considered if no language fulfills the
+    requirements needed for the evaluator, but also some
+    newer languages are being developed. Some of these
+    easily-embeddable languages that were
+    considered for this project were Rhai
+    \cite{RhaiEmbeddedScripting}, JavaScript (via
+    |deno_core| \cite{DenoCoreCrates2023}) or Dhall \cite{DhallConfigurationLanguage}.
+
+    \item \textbf{Builder language}: the POSIX shell is the
+    de-facto standard for building packages, as it is used
+    to define a list of sequential steps to be perfomed,
+    while interacting with other programs, the filesystem or
+    environment variables. However, any other program
+    capable of this task could be used. The usage of bash is
+    the norm, because it is often a dependency of the core
+    packages (libc, gcc), but a builder language might as
+    well be embedded into miq itself, such that no external
+    requirement is needed. In Guix, this is done by using
+    Scheme as both the language for the builder and
+    evaluator, which provides a consistent experience.
+
+    \item \textbf{Package toolchain}: miq served to package
+    some very simple applications, so one development are
+    would be to package more complex applications -- and
+    even package miq itself with miq. It is also of interest
+    the usage of different toolchains, such as using glibc
+    instead of musl, or the Clang/LLVM toolchain instead of GNU's.
+
+    \item \textbf{Cross compilation}: the current dependency
+    model of miq doesn't take into account dependencies
+    required at build time or at runtime. By adding support
+    for this differentiation, it would be possible to have
+    miq compile a package in a system A -- for example
+    |x86_64| and have it run in a |aarch64| system.
+
+
+\end{enumerate}
