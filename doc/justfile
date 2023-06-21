@@ -3,7 +3,7 @@
 default:
   just --list
 
-flags := "-xelatex -synctex=1 -interaction=nonstopmode -file-line-error --shell-escape -outdir=out -aux-directory=aux"
+flags := "-xelatex -synctex=1 -interaction=nonstopmode --file-line-error --shell-escape -outdir=out -aux-directory=aux"
 
 file := "index.tex"
 
@@ -14,7 +14,10 @@ watch:
   latexmk {{flags}} -pvc -view=none {{file}}
 
 clean:
-  latexmk {{flags}} -C {{file}}
+  rm -rvf out
+  rm -rvf aux
+  rm -rvf _minted-index
+  rm -rvf svg-inkscape
 
 copy-bib:
   cp -vfL ~/Documents/miq.bib miq.bib
@@ -24,4 +27,4 @@ sync:
   rsync -arvP --no-perms --no-owner --no-group --delete --no-times ~/Documents/miq-share/ assets
 
 graph:
-  
+

@@ -1,0 +1,148 @@
+\FloatBarrier
+\section{Base Linux packages}
+
+To understand the scope of a Linux package manager, we need
+to define what constitutes a Linux operating system. To
+answer this question, we can take a look at the past, on the
+inception on Linux. We can trace back to the UNIX system
+\cite{ritchieUNIXSystemEvolution1984} developed by Ken
+Thompson, Dennis Ritchie, and others. This operating system
+marked a milestone in the history of computing, and the work
+of its authors could be divided into 2 research fields: the
+development of the interfaces of the OS, and a new
+programming language to accompany it, the C programming
+language. The UNIX kernel was rewritten in this new
+language, and in 1978, the book
+``The C Programming Language''
+\cite{ritchieProgrammingLanguage1983} was
+released, setting the foundation of the language into the
+future. As UNIX started to gain popularity, the project
+increasingly started to lock users in. As an alternative to
+UNIX, the GNU (GNU is Not Unix) project started with the
+intention to provide a UNIX-compatible operating system that
+would not lock users in with proprietary software licenses.
+Finally, the Linux kernel was created by Linus Torvalds
+around 1991 as a research project to provide a substitute to
+the MINIX kernel, and finally the GNU components replaced
+any leftovers of MINIX \cite{OverviewGNUSystem}.
+
+The Linux kernel and all of the GNU components were written
+in C, so it became the de-facto language for system
+software. Therefore, the C language is intertwined with how
+a Linux operating system works, and all the packages that
+compose it from the kernel to userland. From the packager's
+perspective, there is one package that is the most
+important: \textbf{libc}. The C standard library (libc, or
+GNU's libc implementation, glibc) is a collection of C
+headers and library objects that provide interfaces to the
+operating system for programs written in C. Libc was
+standardized in 1999 by the ISO C committee under the C99
+language specification, and further revisions were made to
+update it. Some of the headers from libc include:
+
+\begin{figure}[hbt]
+    \centerfloat
+    \begin{tabular}{ll}
+        \hline
+        |<string.h>| & String manipulation \\
+        \hline
+        |<stdio.h>| & Standard input/output \\
+        \hline
+        |<stdint.h>| & Standard integer types \\
+        \hline
+        ... & ... \\
+        \hline
+    \end{tabular}
+    \caption{Some of the headers from libc.}
+\end{figure}
+
+For Linux, there are various implementations of libc, such
+GNU's glibc or musl libc \cite{MuslLibc}, being the former
+the predominant on all popular Linux distributions. Along
+with the headers required by the C ISO standard, the libc
+providers are implemented over the kernel's system calls and
+also provide UNIX-specific interfaces, namely |<unistd.h>|.
+Libc is also the provider of the link-loader discussed in
+previous sections (ld-linux.so), and also injects some
+loading code in every ELF file, before the main function
+execution takes over.
+
+Apart from libc, many programs and libraries are implemented
+on top of it, to provide what is called as the \acl{LSB}
+\cite{LinuxStandardBase} . This specification outlines some
+of the most important programs that compose a Linux system,
+such as ``coreutils'', which contains the most basic
+terminal utilities, like |ls|, |cat|, |cp|, etc. To be able
+to build the components, it is also needed a C compiler,
+which is also provided by the GNU project in form of GCC
+(GNU Compiler Collection). To
+be able to support the compilation and configuration of
+programs, some other tools are required like |make| or
+|sed|, and also a POSIX shell to interact with the system,
+in the form of |bash|. The table \ref{tab:lsb} outlines some
+of these componentes and their functionality.
+
+\begin{figure}[hbt]
+    \centerfloat
+    \begin{tabular}{ll}
+        \hline
+        |libc| & C standard library \\
+        \hline
+        |gcc| & C and C++ compiler \\
+        \hline
+        |coreutils| & Basic terminal utilities, like |ls|,
+        |cat|, |cp|, etc. \\
+        \hline
+        |binutils| & Binary utilities, like |ld|, |as|,
+        |objdump|, etc. \\
+        \hline |make| & Build automation tool \\
+        \hline |sed| & Stream editor, text modification
+        program \\
+        \hline |bash| & POSIX shell implementation \\
+        \hline |tar| & Archive utility \\
+        \hline |grep| & Text search utility \\
+        \hline |findutils| & File search utilities, like
+        |find| or |findmnt| \\
+        \hline |diffutils| & File comparison utilities, like
+        |diff| \\
+        \hline |systemd| & System and service manager \\
+        \hline
+    \end{tabular}
+    \caption{Some of the basic components of a Linux system.}
+\end{figure}
+
+As a Linux distribution grows in scope, more and more
+components are needed to build something that an end-user is
+able to use. Starting from graphical toolkits, like GTK or
+QT, to the X11 display server and desktop environments, like
+Gnome or KDE Plasma. And every component in-between, like
+proper service management via systemd, the package manager
+itself, network management, power management, peripherals
+support, and all the libraries that are required to build
+all the ``leaf'' packages of the full dependency tree.
+Finally, the kernel itself is also a package with special
+properties (as it doesn't depend on libc), but regardless of
+importance.
+
+The scope of this work has been limited to a basic terminal
+usage of Linux packages, so the focus won't be on building
+complex software, but rather building basic components to
+prove the viability of the deployment model. It is also
+important to note, that while packages can be put together
+to form a fully function independent operating system, a
+package manager of Linux packages can work as a ``guest'' on
+a different distribution. This is, running Linux packages
+that are not part of the distribution itself. For a
+classical system, this has never been common practice -- for
+example, installing apt (Debian's package manager) on a
+Gentoo system -- manily limited by the rules imposed by the
+\acl{FHS}. Basically, two package managers would interfere
+with each other, as they would try to manage files that were
+managed by the other package manager (any file on /usr/bin,
+/usr/lib, etc). However, with the usage of the special
+hash-based paths, this problem not an issue, as miq can be
+used on top of any Linux distribution, without interfering
+with it.
+
+\FloatBarrier
+\section{The bootstrapping problem}

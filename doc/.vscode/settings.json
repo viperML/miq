@@ -41,8 +41,12 @@
     ],
     "cSpell.words": [
         "bootloader",
+        "libc",
         "libcrypto",
+        "MINIX",
         "nginx",
-        "openssl"
+        "openssl",
+        "Ritchie",
+        "userland"
     ]
 }

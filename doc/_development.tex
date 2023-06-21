@@ -1,4 +1,4 @@
-\chapter{Development}
+\chapter{Overview}
 
 The result of this research was the development of |miq|, a package manager and
 build system for Linux.
@@ -17,7 +17,7 @@ process of the packages it manages. This stages include:
 Therefore, the following sections will all the components that make up miq, and
 their interactions.
 
-\section{High level overview}
+\section{Unique identifiers}
 
 The development of miq aimed for a modular design, such that
 each component didn't have much coupling with the others.
@@ -126,18 +126,18 @@ exist in miq, but rather a package "foo" with a specific hash.
 \input{_dev_graph.tex}
 \input{_dev_immut.tex}
 \input{_dev_elf.tex}
+\input{_dev_baselinux.tex}
 
-\subsection{Stages}
+\FloatBarrier
+\chapter{Implementation}
 
-\subsection{The bootstrapping problem}
+\section{Dependency solver}
 
-\subsection{Software components}
+\section{Recipe evaluator}
 
 \section{Builder}
 
-\section{Graph evaluator}
-
-\section{Lua evaluator}
 
 \section{Database}
+
 
