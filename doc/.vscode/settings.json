@@ -41,13 +41,18 @@
     ],
     "cSpell.words": [
         "bootloader",
+        "fetchable",
+        "Guix",
         "libc",
         "libcrypto",
+        "miku",
         "MINIX",
         "nginx",
         "openssl",
         "POSIX",
         "Ritchie",
+        "serde",
+        "structs",
         "userland"
     ]
 }
