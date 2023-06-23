@@ -22,3 +22,4 @@ _minted*
 *inkscape
 *.bkp
 *.dtmp
+.env
