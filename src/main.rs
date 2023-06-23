@@ -11,11 +11,15 @@ mod lua_package;
 mod schema_db;
 mod schema_eval;
 
+use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 
 use ambassador::{delegatable_trait, Delegate};
 use clap::Parser;
+use color_eyre::eyre::bail;
+use color_eyre::eyre::ContextCompat;
 use color_eyre::Result;
+use tracing::info;
 use tracing::trace;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
@@ -46,8 +50,41 @@ fn setup_logging() -> Result<()> {
 
 fn main() -> Result<()> {
     setup_logging()?;
+    check_dirs()?;
     let parsed = CliParser::parse();
     parsed.command.main()
+}
+
+fn check_dirs() -> Result<()> {
+    if !PathBuf::from("/miq").try_exists()? {
+        info!("Create /miq?");
+        if !dialoguer::Confirm::new().default(false).interact()? {
+            bail!("No confirmation");
+        };
+
+        std::process::Command::new("sudo")
+            .args(["mkdir", "/miq"])
+            .output()?;
+
+        let nix::unistd::User { name, gid, .. } =
+            nix::unistd::User::from_uid(nix::unistd::geteuid())?.unwrap();
+
+        let group = nix::unistd::Group::from_gid(gid)?.unwrap();
+
+        let mut cmd = std::process::Command::new("sudo");
+        cmd.args(["chown", "-R", &format!("{}:{}", name, group.name), "/miq"]);
+        info!(?cmd);
+        cmd.output()?;
+    };
+
+    for folder in ["/miq/store", "/miq/eval", "/miq/log"] {
+        if !PathBuf::from(folder).try_exists()? {
+            info!(?folder, "Creating directory");
+            std::fs::create_dir(folder)?;
+        };
+    }
+
+    Ok(())
 }
 
 #[delegatable_trait]

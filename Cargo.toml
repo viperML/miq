@@ -66,3 +66,5 @@ tokio = { version = "1.28.2", features = ["full"] }
 futures = "0.3.28"
 tokio-process-stream = "0.4.0"
 owo-colors = "3.5.0"
+dialoguer = { version = "0.10.4", default-features = false }
+nix = "0.26.2"
