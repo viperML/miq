@@ -52,6 +52,7 @@
         "POSIX",
         "Ritchie",
         "serde",
+        "stdenv",
         "structs",
         "userland"
     ]

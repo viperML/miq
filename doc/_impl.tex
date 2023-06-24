@@ -86,6 +86,7 @@ result is a single |20MB| binary, with no dependencies that can be
 run in any Linux system, no matter the distribution.
 
 \section{Units: the basic building blocks}
+\label{sec:unit}
 
 The main purpose of the package manager, is to build
 packages according to a dependency tree. Therefore, it is
@@ -254,7 +255,7 @@ user is free to include any custom functionality as needed.
 This is important, as the Package Unit tries to be as
 minimal as possible, by just providing the |script| phase,
 and letting the user construct any abstraction on top of it.
-In the example, musl depends on |stdenv|, which is a script
+In the example, musl depends on |stdenv| (standard environment), which is a script
 that sets some environment variables required for the build
 process, effectively implementing the concept of build
 stages in other package managers.
@@ -318,6 +319,76 @@ emerge:
 \end{itemize}
 
 \section{Dependency solver}
+
+The package dependencies are evaluated by constructing a
+\acl{DAG} on memory, by reading the intermediate
+representation Unit files in |toml| format. As mentioned in
+the previous chapter, a Unit is an abstraction over what a
+package is, that stores the instructions to perform the build
+or fetch process. The \ac{DAG} is
+composed of edges of no weight and nodes that are weighted
+with Unit's (after being deserialized). The root unit it
+selected by the user via the \ac{CLI}. The process to
+construct the graph is the following:
+
+\begin{enumerate}
+    \item Start at node $N$ with some Unit weight
+    \item Read the node's dependencies into a list of Nodes
+    \item For each child node $N'$
+    \begin{enumerate}
+        \item Search the graph for $N'$, and add it if it is
+        not present
+        \item Add an edge from the child to the parent, such as $N <- N'$
+        \item Recursively perform the algorithm for this
+        child node
+    \end{enumerate}
+\end{enumerate}
+
+This recursive process recursively performed, until one of
+the branches reach a Fetch Unit. Fetch Units don't have
+dependencies, so the stack returns and unfolds into the
+parent task that called it. A visual representation of this
+process is illustrated in figure \ref{fig:depbuild} .
+
+\begin{figure}[hbt]
+    \includesvg[width=300pt]{assets/dep_build.svg}
+    \caption{Process to build the dependency graph.}
+    \label{fig:depbuild}
+\end{figure}
+
+More in detail, the process that walks the children of a node
+performs the following computations:
+
+\begin{enumerate}
+    \item Read the |deps| field of (Package) Unit node.
+    |deps| is implemented as a |Vec<MiqResult>|. |MiqResult|
+    is a type-alias for a |String|, such that it can safely
+    be handled in the proper scenarios. A |MiqResult|
+    contains the portion of the store path |<name>-<hash>| .
+
+    \item The |MiqResult| is converted into a |MiqEvalPath|
+    . The evaluation paths points into the file that
+    produces the Unit, it can be considered a pointer to the
+    Unit. This means it is converted to the shape
+    |/miq/eval/<name>-<hash>.toml| .
+
+    \item The toml file contained in the |MiqEvalPath| is
+    automatically serialized into a Unit, as explained in
+    section \ref{sec:unit} .
+\end{enumerate}
+
+The \ac{DAG} is stored in memory by creating a mapping of
+Node ids to Units. To store the edges, it is used a mapping Node ids to
+Node ids 1-to-1, such that direction is preserved. The Rust
+crate ``daggy'' \cite{DaggyRust} is used to provide this
+data structure, and the required methods to manipulate the
+graph, such as reading or writing nodes and edges. On the
+type level, ut is
+constructed a simple type alias to store the result:
+
+\begin{minted}{rust}
+type UnitDag = daggy::Dag<Unit, ()>;
+\end{minted}
 
 \section{Recipe evaluator}
 \label{sec:lua}
