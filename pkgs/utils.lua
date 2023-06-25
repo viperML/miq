@@ -91,10 +91,10 @@ x.stdenvBuilder = function(input)
 		local args = args
 		local pkg = pkg
 
-    local extra_script = {
-      deps = {},
-      value = ""
-    }
+		local extra_script = {
+			deps = {},
+			value = "",
+		}
 
 		if args.depend ~= nil then
 			for _, dep in ipairs(args.depend) do
@@ -113,9 +113,9 @@ x.stdenvBuilder = function(input)
 		end
 		args.depend = nil
 
-    if not(extra_script.deps[1] ~= nil) then
-      extra_script = extra_script.value
-    end
+		if not (extra_script.deps[1] ~= nil) then
+			extra_script = extra_script.value
+		end
 
 		args.script = f [[
       source {{pkg}}/stdenv.sh
@@ -140,13 +140,12 @@ x.fetchTarBuilder = function(input)
 		local args = args
 		local input = input
 
-    local post
-    if args.post ~= nil then
-      post = args.post
-    else
-      post = "# No post unpack"
-    end
-
+		local post
+		if args.post ~= nil then
+			post = args.post
+		else
+			post = "# No post unpack"
+		end
 
 		local fetch = miq.fetch(args)
 		local pkg = miq.package {

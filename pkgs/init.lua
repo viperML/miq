@@ -18,7 +18,7 @@ local pkgs = {}
 -- merge(pkgs, require "stage1")
 
 -- pkgs.bootstrap = require("bootstrap")
-pkgs.stage0 = require("stage0")
-pkgs.stage1 = require("stage1")
+pkgs.stage0 = require "stage0"
+pkgs.stage1 = require "stage1"
 
 return pkgs

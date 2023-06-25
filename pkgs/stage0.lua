@@ -18,6 +18,10 @@ x.toybox = miq.fetch {
 	url = "http://landley.net/toybox/bin/toybox-x86_64",
 	executable = true,
 }
+miq.trace(x.toybox)
+
+local t = f "ls -la {{x.toybox}}"
+miq.trace(t)
 
 x.unpack_bootstrap_tools = miq.fetch {
 	url = "https://raw.githubusercontent.com/NixOS/nixpkgs/d6b863fd9b7bb962e6f9fdf292419a775e772891/pkgs/stdenv/linux/bootstrap-tools-musl/scripts/unpack-bootstrap-tools.sh",

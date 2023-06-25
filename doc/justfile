@@ -3,7 +3,7 @@
 default:
   just --list
 
-flags := "-xelatex -synctex=1 -interaction=nonstopmode --file-line-error --shell-escape -outdir=out -aux-directory=aux"
+flags := "-xelatex -synctex=1 -interaction=nonstopmode --file-line-error --shell-escape -outdir=out -aux-directory=aux --8bit"
 
 file := "index.tex"
 

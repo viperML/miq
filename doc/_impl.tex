@@ -351,6 +351,7 @@ parent task that called it. A visual representation of this
 process is illustrated in figure \ref{fig:depbuild} .
 
 \begin{figure}[hbt]
+    \centerfloat
     \includesvg[width=300pt]{assets/dep_build.svg}
     \caption{Process to build the dependency graph.}
     \label{fig:depbuild}
@@ -383,17 +384,436 @@ Node ids 1-to-1, such that direction is preserved. The Rust
 crate ``daggy'' \cite{DaggyRust} is used to provide this
 data structure, and the required methods to manipulate the
 graph, such as reading or writing nodes and edges. On the
-type level, ut is
+type level, it is
 constructed a simple type alias to store the result:
 
 \begin{minted}{rust}
 type UnitDag = daggy::Dag<Unit, ()>;
 \end{minted}
 
-\section{Recipe evaluator}
+\section{Package definitions and Lua evaluator}
 \label{sec:lua}
+
+Miq is a source-based package manager, which means that the
+user downloads a copy of a source tree, which includes all
+the definitions for all the packages. These definitions
+contain the instructions for the package manager to build
+the package into the user's disk. In contrast, a binary-based
+package manager has a list of just the packages available
+(usually in the form of a database that is synced -- |apt update|), and the user downloads the already built packages
+from the distribution's servers.
+
+Miq's deployment model, similarly to Nix's, is to have each
+definition of a package reference the exact paths of its
+dependencies. A Unit, the intermediate representation of a
+package definitions, contains a |deps| field, which lists the
+packages by its hashed name, and the |script| field may
+contain hardcoded paths to these packages. The following
+example shows these hardcoded paths:
+
+\begin{minted}{toml}
+# /miq/eval/musl-f0dd14ee1ca91c64.toml
+type = "PackageUnit"
+result = "musl-f0dd14ee1ca91c64"
+name = "musl"
+version = "1.2.3"
+deps = [
+    "musl-1.2.3.tar.gz-unpack-5f9d5116c4c83592",
+    "stage0-stdenv-d2ecc89c54b1b316",
+]
+script = '''
+source /miq/store/stage0-stdenv-d2ecc89c54b1b316/stdenv.sh
+set -ex
+/miq/store/musl-1.2.3.tar.gz-unpack-5f9d5116c4c83592/configure \
+    --prefix=$PREFIX \
+    --disable-static \
+    --enable-wrapper=all \
+    --syslibdir=$PREFIX/lib
+make -j$(nproc)
+make -j$(nproc) install
+ln -vs $PREFIX/lib/libc.so $PREFIX/bin/ldd
+'''
+\end{minted}
+
+The purpose of the package evaluator is to resolve these
+paths in a step before the build process. A user does not
+use the paths directly, as they are calculated by miq. By
+using an scripting language, the user would be able to
+declare the dependencies in a programmatic way.
+
+To do so, miq uses the Lua programming language. The
+previous Unit definition is compiled from the following Lua
+code (simplified):
+
+\begin{minted}{lua}
+do
+    local version = "1.2.3"
+    local src = x.fetchTar {
+        url = f "https://musl.libc.org/releases/musl-{{version}}.tar.gz",
+    }
+    x.libc = x.stdenv {
+        name = "musl",
+        version = version,
+        script = f [[
+            {{src}}/configure \
+                --prefix=$PREFIX \
+                --disable-static \
+                --enable-wrapper=all \
+                --syslibdir=$PREFIX/lib
+            make -j$(nproc)
+            make -j$(nproc) install
+            ln -vs $miq_out/lib/libc.so $miq_out/bin/ldd
+        ]],
+    }
+end
+\end{minted}
+
+By using a scripting language to build the intermediate
+representation, the absolute paths used by miq are
+abstracted away from the user, while still allowing for this
+filesystem model.
+
+The previous Lua example shows the usage of some functions
+built specifically for miq. To begin with, the |f| function
+is analogous to f-strings in Python, where one can insert
+the string representation of a variable into a string. This
+|f| function is exported by the |miq| library, which
+executes in Rust, and is automatically inserted into the
+runtime of the script executing, by using a |require|:
+
+\begin{minted}{lua}
+local miq = require("miq") -- added by the Rust runtime
+local f = miq.f
+
+local a = 1
+local b = f("a is {{a}}") -- => "a is 1"
+local c = f "a is {{a}}" -- => "a is 1" (different function calling syntax)
+\end{minted}
+
+|f| is implemented using Lua's debugging facilities, which
+comes with its drawbacks. The main issue is no editor knows
+about the custom syntax for a string (using the |{{}}|
+pattern), which means that the editor is not able to warn
+the user about a syntax error.
+
+More importantly, the |f| function not only is able to
+interpolate strings into strings, as shown in the previous
+snippet, but it is also able to interpolate Units. To create
+a Unit, a user is able to use the |miq| library to create a
+unit. By providing a user input, the fields are hashed and
+converted into a Unit, which then is serialized into a Lua
+table. The table is the only data structure in Lua, and
+holds a mapping of keys to values.
+
+\begin{minted}[obeytabs=true,tabsize=2]{lua}
+local miq = require("miq")
+
+local toybox = miq.fetch {
+	url = "http://landley.net/toybox/bin/toybox-x86_64",
+	executable = true,
+}
+--[[ => {
+  executable = true,
+  name = "toybox-x86_64",
+  result = "toybox-x86_64-69a4327d80d88104",
+  type = "FetchUnit",
+  url = "http://landley.net/toybox/bin/toybox-x86_64"
+}
+--]]
+\end{minted}
+
+When |f| is used to interpolate a Unit, instead of returning
+a new string, it returns a custom type called |MetaText|. A
+|MetaText| is a wrapping type around a string, that also
+holds the packages that depend on this text, with the
+following Rust type signature:
+
+\begin{minted}{rust}
+struct MetaText {
+    value: String,
+    deps: Vec<MiqResult>,
+}
+\end{minted}
+
+By interpolating a Unit into a string, the resulting
+|MetaText| is used to carry the packages that ``depend'' on
+this text. Instead of the user having to manually declare
+what dependencies are needed for the package, they can just
+directly interpolate the package into a MetaText, and the
+information about the dependency is carried over. The result
+of interpolating a Unit into a MetaText, is the store path
+of the unit (|/miq/store/name-hash|), as shown in the
+following Lua snippet:
+
+\begin{minted}{lua}
+local miq = require("miq")
+local f = miq.f
+toybox = miq.fetch {
+    url = "http://landley.net/toybox/bin/toybox-x86_64",
+    executable = true,
+}
+
+local t = f "ls -la {{toybox}}"
+--[[ => {
+  value = "ls -la /miq/store/toybox-x86_64-69a4327d80d88104",
+  deps = { "toybox-x86_64-69a4327d80d88104" }
+}
+--]]
+\end{minted}
+
+Putting everything together, the |f| functions allows the
+user to:
+
+\begin{itemize}
+    \item Declaratively define the relationships between packages.
+    \item Abstract away the absolute paths used by miq, in
+    the context of shell scripts.
+    \item Automatically append the interpolated packages
+    into the dependencies of a package.
+\end{itemize}
+
+The usage of Lua as a programming language for scripting the
+package definitions comes down to the fact that the language
+can be completely embedded into the Rust application. By
+using the |mlua| crate \cite{MluaRust} . This library allows
+to embed a complete Lua runtime inside a Rust application,
+and provides a safe interface to interact with it. Instead
+of using any other scripting language like Python, and
+relying on message passing and subprocess execution, the Lua
+runtime is able to directly communicate with the Rust code
+by sending and receiving data. The Rust code is able to call
+Lua functions, and the Lua code is similarly able to call
+Rust functions easily. While Lua is a dynamically typed
+language , the |mlua| crate provides type safety to the
+received values, and is able to serialize and deserialize
+Rust types into Lua tables. This seamless integration
+between the two languages allows for an application written
+in an ergonomic language for a big project, while letting
+the user the flexibility of a scripting language for the
+declaration of the packages.
+
+As a result of using a scripting language to declare the
+packages, the writer of the package tree is able to abstract
+away common components into smaller functions. Instead of
+having to write some boilerplate code around the primitives
+(|miq.f|, |miq.package| and |miq.fetch|), one is able to
+write ``wrappers'' around the built-in functions. This
+allows for a more ergonomic experience around the
+primitives, and extension of the functionality.
+
+For example,
+the primitive |miq.fetch| creates a Fetch Unit from its
+input. A Fetch Unit is simply fetched from the internet, and
+stored into the filesystem. Very commonly, this Fetch is a
+tarball that the package script unpacks to build it. So, a
+wrapper around |miq.fetch| can be created, such that it
+creates an intermediate package that unpacks the tarball.
+To implement this in Lua:
+
+\begin{minted}[obeytabs=true,tabsize=2]{lua}
+fetchTarBuilder = function(input)
+    local input = input
+
+    local fn_result = function(args)
+        local args = args
+        local input = input
+        local post
+        if args.post ~= nil then
+            post = args.post
+        else
+            post = "# No post unpack"
+        end
+        local fetch = miq.fetch(args)
+        local pkg = miq.package {
+            name = f "{{fetch.name}}-unpack",
+            script = f [[
+                set -ex
+                export PATH="{{input.PATH}}"
+                cd $miq_out
+                tar -xvf {{fetch}} \
+                    --strip-components=1 \
+                    --no-same-permissions \
+                    --no-same-owner
+
+                {{post}}
+            ]],
+        }
+        return pkg
+    end
+    return fn_result
+end
+
+fetchTar = fetchTarBuilder {
+    PATH = f "{{bootstrap}}/bin",
+}
+
+fetchTar {
+    url = f "https://musl.libc.org/releases/musl-{{version}}.tar.gz",
+}
+\end{minted}
+
+As can be seen, the |fetchTar| uses some base package that
+provides the |tar| executable (in this case from the
+|bootstrap|) package to unpack the input url, by using a
+Fetch Unit, and a Package Unit that depends on it. While Lua
+is not the most powerful language, it allows for some
+abstractions over the primitives.
+
+Finally, it should be noted how miq knows what file to
+evaluate in the first place. The user is able to provide a
+path to either a Unit file (|/miq/eval/name-hash.toml|) or
+to a Lua file. If the file extension is |.toml|, then the
+Unit is directly read, skipping the evaluator phase directly
+into the intermediate representation and dependency
+evaluator. Otherwise, the file is take as the ``top-level''
+Lua file. The top-level file should return a table, and the
+user is able to select which item to build from it. For
+example, if the user select the reference
+|./pkgs/init.lua#foo|, then |init.lua| is completely
+evaluated, and the |foo| key is selected from the resulting
+table. This method of references to files with different
+extensions could be extended to any other scripting language
+used to evaluate the packages, with minimal changes to the
+\ac{CLI} parser.
+
 
 \section{Builder}
 \label{sec:builder}
+As mentioned in previous sections, miq has a 2-stage package
+evaluator that produces a dependency graph of Units in
+memory. This dependency graph is consumed during the build
+process, executing the script of each Package Unit or
+fetching the necessary files of Fetch Units.
+
+\subsection{Sandbox}
+
+Fetch Units are trivially built, as it is only needed to do
+an http request to the selected |url|, and store the
+resulting file into the store path. Optionally, the user
+might select to change the permissions of the file to be executable.
+
+Package Units use a more involved process. To begin with,
+they are built in a build sandbox. The purpose of the
+sandbox is to isolate the execution of the script from the
+outside world. This means that the process only sees a
+limited view of the filesystem and network connection is
+limited. The sandbox isolates the filesystem by only giving
+the process views on essential paths, like |/dev|, |/proc|
+or |/tmp|. A view on |/miq/store| is also allowed, and the
+build scripts contain absolute paths into it. For this
+reason, it does not matter what the existing content of the
+store is from one machine to another, as only the
+``hardcoded'' paths into the dependencies are used. The
+development model of miq by hashing every package to provide
+a unique path completely bypasses the need to selectively
+mount specific packages into the build sandbox. To create
+this sandbox, miq relies on Linux namespaces
+\cite{NamespacesLinuxManualb} . Linux namespaces are an
+interface provided by the kernel itself, to change
+resources of a process. The resources that can be changed
+include: mount points, user ids, network, etc. While
+initially miq leveraged directly the namespaces interface
+via the |libc| crate, it was later changed to run the
+program bubblewrap as a subprocess . Bubblewrap \cite{Bubblewrap2023} is a C
+application that wraps the namespaces interface with a
+\ac{CLI}, such that the user can easily run processes in a
+sandboxed environment. Therefore, miq calls bubblewrap with
+the appropriate flags to provide a build sandbox for the
+build script.
+
+The usage of a sandbox is crucial for the reproducibility of
+the package builds. The development model of miq assumes
+that a package is uniquely identified by its hash, which in
+turn is derived from its inputs (build script and
+dependencies). If the package produces a result that is not
+reproducible, this means that a same hash potentially points
+to different results -- from one computer to another or
+rebuilds in the same computer. Some of the sources of
+``impurity'' are:
+
+\begin{enumerate}
+    \item Environment variables
+    \item User id, name and groups
+    \item Files that are not part of the miq store, like
+    |/etc|, |/home|, |/var|, etc.
+    \item Network connection (e.g. fetching from the
+    internet might fail or give different results)
+\end{enumerate}
+
+Environment variables are trivially cleaned by any
+subprocess invocation. Miq additionally inserts some extra
+environment variables, like |\$miq_out|, which points into
+the output directory or |\$HOME| pointing to the build
+directory.
+
+To isolate the user id, user namespaces are used. User
+namespaces allow to create a mapping of user ids outside the
+sandbox into user ids in the sandbox. In practice, the user
+running miq is mapped into the root user. The child process
+``sees'' that it is running as root, while it is being
+executed on behalf of the user (with all the limitations and
+permissions of the user, not of root).
+
+The filesystem can be isolated by using a mount namespace.
+It allows to mount a new root |/|,
+and then selectively mount the necessary paths into this
+blank slate. Some core paths are required, such as |/dev| or
+|/proc| to even be able to run any application. A mapping of
+a build directory into the sandbox at |/build| is created.
+It is also possible to mount |/miq/store| as read-only, such
+that the build script is not able to modify any existing
+package by accident.
+
+Finally, the network connection can be trivially
+disconnected by using network namespaces and the appropriate
+flags to bubblewrap. As mentioned before, Fetch Units are
+not built in a sandbox and rely on fetching files from the
+internet, which can potentially produce impure,
+non-deterministic results. This can be avoided by using a
+resource-integrity mechanism
+\cite{chapuisEmpiricalStudyUse2020} . What this would
+involve is checking that the received content matches
+against an already-known hash, that is derived from the file
+contents. The hash can be manually calculated by \acl{TOFU}
+and written in the package definition. This is currently not
+implemented into miq, but it is a planned feature.
+
+\subsection{Concurrency}
+
+As the source-based package managers NixOS's nix and
+Gentoo's emerge, miq is able to build package in parallel. A
+parallel build process implies that there the build is not
+sequential. In a sequential (or 1-job build), every package
+is built one after the other, waiting for the previous in
+the line to build the next one. Considering that the
+structure used to represent the dependency graph is a
+\acl{DAG}, on first iteration one solution is to compute the
+topological sort of the graph
+ . This sort
+involves converting the graph into a sequence of nodes, such
+that the ordering between the nodes is preserved
+\cite{erParallelComputationApproach1983} . Finally, a
+builder can travel the sequence to build each dependency in
+order on after the another.
+This process is not efficient, as a package only requires
+that its dependencies are built, but not every node in the
+topological sort. Figure \ref{fig:toposort} shows an example
+of a topological sort of a simple package that depends on 2
+Fetch Units. In this situation, only when one of the Fetch
+Unit finalizes the transaction, which involves downloading
+the file from the internet and saving it to the disk, can
+the next Fetch Unit start its process.
+
+\begin{figure}[hbt]
+    \centerfloat
+    \includesvg[width=280pt]{assets/toposort.svg}
+    \caption{Topological sort of a dependency graph.}
+    \label{fig:toposort}
+\end{figure}
+
+More convoluted examples can be constructed to show that
+topological sorting is not appropriate to perform the build process.
+
+\subsection{C flags}
 
 \section{Database}

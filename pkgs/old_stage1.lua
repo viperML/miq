@@ -255,9 +255,9 @@ do
 end
 
 do
-  stage1.can_build = stage1.stdenv {
-    name = "can_build",
-    script = f[[
+	stage1.can_build = stage1.stdenv {
+		name = "can_build",
+		script = f [[
       tee main.cpp <<EOF
       int
       main()
@@ -268,8 +268,8 @@ do
       EOF
 
       $CXX main.cpp -o $miq_out/output $CFLAGS
-    ]]
-  }
+    ]],
+	}
 end
 
 do
