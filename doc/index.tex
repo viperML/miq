@@ -94,6 +94,7 @@
 \usepackage[
   outputdir={aux}
 ]{minted}
+% \usemintedstyle{vs}
 
 % https://tex.stackexchange.com/questions/16582/center-figure-that-is-wider-than-textwidth
 \makeatletter
@@ -146,30 +147,34 @@
 
 \input{_development.tex}
 
+\input{_results.tex}
+
 \input{_conclusions.tex}
 
 \newpage
 \addcontentsline{toc}{chapter}{Bibliography}
 \printbibliography[title=Bibliography]
 
-\unchapter{List of figures}
+%\unchapter{List of figures}
+\addcontentsline{toc}{chapter}{List of figures}
 \listoffigures
 
-  \unchapter{Acronyms}
-    \begin{acronym}
-        \acro{DAG}{Directed Acyclic Graph}
-        \acro{FHS}{Filesystem Hierarchy Standard}
-        \acro{CLI}{Command Line Interface}
-        \acro{HPC}{High-performance computing}
-        \acro{VM}{Virtual Machine}
-        \acro{OS}{Operating System}
-        \acro{PM}{Package Manager}
-        \acro{PHT}{Program Header Table}
-        \acro{LSB}{Linux Standard Base}
-        \acro{CLI}{Command Line Interface}
-        \acro{TOFU}{Trust On First Use}
-        \acro{PID}{Process ID}
-    \end{acronym}
+\unchapter{List of acronyms}
+\begin{acronym}
+  \acro{DAG}{Directed Acyclic Graph}
+  \acro{FHS}{Filesystem Hierarchy Standard}
+  \acro{CLI}{Command Line Interface}
+  \acro{HPC}{High-performance computing}
+  \acro{VM}{Virtual Machine}
+  \acro{OS}{Operating System}
+  \acro{PM}{Package Manager}
+  \acro{PHT}{Program Header Table}
+  \acro{LSB}{Linux Standard Base}
+  \acro{CLI}{Command Line Interface}
+  \acro{TOFU}{Trust On First Use}
+  \acro{PID}{Process ID}
+  \acro{ELF}{Executable and Linkable Format}
+\end{acronym}
 
 
 \input{_annex.tex}
