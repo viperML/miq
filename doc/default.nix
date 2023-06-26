@@ -25,6 +25,7 @@
           tabularray
           ninecolors
           xurl
+          pdfpages
           ;
       })
     ];

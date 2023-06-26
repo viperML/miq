@@ -8,10 +8,11 @@ devel
 *.dot
 /miq
 *.svg
+*.pdf
 !/doc/**/*.svg
+!/doc/assets/*.pdf
 build*
 .obsidian
-*.pdf
 *.aux
 *latexmk
 *.log

@@ -119,8 +119,17 @@
 }
 \makeatother
 
+\usepackage{pdfpages}
+
 \begin{document}
 
+\includepdf[pages=-]{assets/Portada-externa.pdf}
+\shipout\null
+
+\includepdf[pages=-]{assets/Primera-interna.pdf}
+\includepdf[pages=-]{assets/Segunda-interna.pdf}
+
+\shipout\null
 
 \begin{abstract}
   \input{_abstract.tex}
@@ -139,7 +148,10 @@
 \end{titlepage}
 
 
-
+% c) Un trabajo de carácter investigador que incluya, al menos, los siguientes apartados:
+% objetivos, estudio del estado del arte, hipótesis,
+% metodología, resultados, discusión, conclusiones y
+% bibliografía.
 
 \input{_introduction.tex}
 
