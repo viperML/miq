@@ -1133,7 +1133,8 @@ script = '''
 source /miq/store/stage0-stdenv-cbfc1da815062410/stdenv.sh
 set -x
 set -e
-export MIQ_CFLAGS="$MIQ_CFLAGS -isystem /miq/store/m4-a132d7d257844060/include -L/miq/store/m4-a132d7d257844060/lib"
+export MIQ_CFLAGS="$MIQ_CFLAGS -isystem /miq/store/m4-a132d7d257844060/include"
+export MIQ_CFLAGS="$MIQ_CFLAG -L/miq/store/m4-a132d7d257844060/lib"
 export MIQ_LDFLAGS="$MIQ_LDFLAGS -L/miq/store/m4-a132d7d257844060/lib"
 export PATH="/miq/store/m4-a132d7d257844060/bin:$PATH"
 
