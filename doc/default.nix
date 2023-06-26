@@ -23,8 +23,8 @@
           minted
           placeins
           tabularray
-ninecolors
-xurl
+          ninecolors
+          xurl
           ;
       })
     ];

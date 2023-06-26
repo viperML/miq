@@ -778,6 +778,7 @@ contents. The hash can be manually calculated by \acl{TOFU}
 and written in the package definition. This is currently not
 implemented into miq, but it is a planned feature.
 
+\FloatBarrier
 \subsection{Concurrency}
 
 As the source-based package managers NixOS's nix and
@@ -804,16 +805,135 @@ Unit finalizes the transaction, which involves downloading
 the file from the internet and saving it to the disk, can
 the next Fetch Unit start its process.
 
-\begin{figure}[hbt]
+\begin{figure}[hbtp]
     \centerfloat
     \includesvg[width=280pt]{assets/toposort.svg}
-    \caption{Topological sort of a dependency graph.}
+    \caption{Topological sort of a \ac{DAG} with 2 Fetch Units.}
     \label{fig:toposort}
 \end{figure}
 
-More convoluted examples can be constructed to show that
-topological sorting is not appropriate to perform the build process.
+A more complex example of how a topological sort is not
+desired is shown in figure \ref{fig:toposort2} . As can be
+seen, Package B must wait until Fetch B has finished, while
+all its dependencies (just Fetch A) has already been built.
+Similarly, Package C must wait until Package B has been
+built. As a result of the definition of a topological sort
+being a sequence of nodes where ordering is respected, all
+the edges in the topological sort point ``upwards'' into the
+root unit. Cyclic graphs cannot be topologically sorted, as
+the ordering cannot be preserved, and we would need to build
+a package as a dependency of itself, as displayed on figure
+\ref{fig:toposort3} .
 
+\begin{figure}[hbtp]
+    \centerfloat
+    \includesvg[width=300pt]{assets/toposort2.svg}
+    \caption{Topological sort of a \ac{DAG} with 2 Fetch and
+    2 Package Units.}
+    \label{fig:toposort2}
+\end{figure}
+
+\begin{figure}[hbtp]
+    \centerfloat
+    \includesvg[width=300pt]{assets/toposort3.svg}
+    \caption{Impossible topological sort of a directed cyclic graph.}
+    \label{fig:toposort3}
+\end{figure}
+
+\FloatBarrier
+
+A builder that uses topological sort can be easily
+implemented, as the library that provides the \ac{DAG}
+structures also provides the method in
+|daggy::petgraph::algo::toposort|. While miq used this
+sequential approach initially, it was developed a new
+algorithm to perform the builds concurrently. To properly
+track the Units that have been built or not, the following
+|enum| is used:
+
+\begin{minted}{rust}
+enum BuildTask {
+    Waiting,
+    Building,
+    Finished,
+}
+\end{minted}
+
+To begin with, every Unit gets attached a new |BuildTask| by
+creating a simple map of the list of Units to their state.
+Every Unit starts in the |Waiting| state.
+
+\begin{minted}{rust}
+let mut build_tasks: HashMap<&Unit, BuildTask> = HashMap::new();
+\end{minted}
+
+Then, an iterative process is started, following the steps:
+
+\begin{enumerate}
+    \item Scan all the Units in the \ac{DAG}. For every Unit U do:
+    \begin{enumerate}
+        \item Scan all of U's dependencies. If all of them
+        are |BuildTask::Finished|, or if there are no dependencies,
+        then U can be built.
+        \item Spawn a new thread to build U, and mark it as
+        |BuildTask::Building| in the map.
+    \end{enumerate}
+    \item Wait for any thread to finish. If the tasks is OK,
+    mark it as a |BuildTask::Finished|. If any errors occur,
+    return them and stop any other tasks.
+    \item If all tasks are |BuildTask::Finished|, return.
+    Otherwise loop back to the first step.
+\end{enumerate}
+
+Overall, the algorithm scans the \ac{DAG} in a infinite
+loop, spawning ne threads to build the Units, as soon as
+they can be built. This happens when all of a Unit's
+dependencies have finished.
+
+Rust's asynchronous ecosystem is leveraged to be able to
+spawn threads that don't block. The asynchronous runtime
+used for this task is Tokio \cite{TokioRust}, as the Rust
+language only provides the primitives to declare
+asynchronous functions on the type level, but doesn't
+provide any runtime to execute them. Tokio and the async
+Rust ecosystem is based on the concept of green thread. A
+green thread is a thread that is not executed by the
+operating system, but rather by a runtime (in this case,
+Tokio). A green thread runtime uses its available CPU time
+to context-switch between a list of tasks that are waiting.
+Whenever a task is being executed, it is the only task that
+the runtime executes -- without any parallelism -- until the
+task hits an |await| point. Then, the runtime switches the
+context to another tasks that is waiting, until that one
+also hits an await point. The process is repeated until all
+tasks have finished. Thus, the runtime is only executing a
+single task at any instant of time, but the context
+switching between tasks provides the illusion of the tasks
+being executed in parallel, as shown in figure \ref{fig:timeshare} .
+
+\begin{figure}[hbt]
+    \centerfloat
+    \includegraphics[width=350pt]{assets/timeshare.png}
+    \caption{Context switching between tasks in a green thread runtime.}
+    \label{fig:timeshare}
+\end{figure}
+
+Tokio also provides a hybrid approach to threads, as it uses
+a thread pool to execute the tasks. The thread pool is
+mapped into operating system threads, so the tasks can be
+run in parallel if the runtime decides to put them into a
+different backing \ac{OS} thread.
+
+However, a parallel runtime is not needed for miq, as the
+build tasks are spawned as a subprocess for bubblewrap, the
+build sandbox discussed in the previous subsection. Every
+tasks executes bubblewrap, which gets a new \acl{PID} and is
+executed by the OS apart from the thread runtime. Thus, the
+tasks executed by miq only collect the logs generated by the
+bubblewrap subprocesses, which happens concurrently.
+
+
+\FloatBarrier
 \subsection{C flags}
 
 \section{Database}

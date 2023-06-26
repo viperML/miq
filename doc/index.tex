@@ -62,6 +62,17 @@
 
 \usepackage{acronym}
 
+\makeatletter
+\AtBeginDocument{%
+  \renewcommand*{\AC@hyperlink}[2]{%
+    \begingroup
+      \hypersetup{hidelinks}%
+      \hyperlink{#1}{#2}%
+    \endgroup
+  }%
+}
+\makeatother
+
 \usepackage{listings}
 \lstMakeShortInline[columns=fixed]|
 \lstset{
@@ -157,6 +168,7 @@
         \acro{LSB}{Linux Standard Base}
         \acro{CLI}{Command Line Interface}
         \acro{TOFU}{Trust On First Use}
+        \acro{PID}{Process ID}
     \end{acronym}
 
 
