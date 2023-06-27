@@ -1,14 +1,307 @@
 % \chapter{Annexes}
 \chapter{Annexes}
 
+\section{Miq installation}
+
+Miq is an open-source project written in Rust. This allows
+to easily build the project into a single executable that
+bundles all its dependencies. The only C dependencies (libc
+and sqlite3) are statically linked too.
+
+By using GitHub actions, the latest version of the project
+is compiled and pushed into the ``releases'' section of the
+repository. It is only built for |x86_64| Linux machines.
+
+To download the latest version of the project, follow the
+following instructions:
+
+\begin{enumerate}
+    \item Download the release tarball, containing the
+    executable itself, a copy of Bubblewrap and the Lua
+    files that describe the packages, optionally changing to
+    some new directory:
+\begin{minted}{text}
+$ mkdir ~/miq && cd ~/miq
+$ curl -OL https://github.com/viperML/miq/releases/download/latest/release.tar.gz
+\end{minted}
+
+    \item Extract the tarball:
+\begin{minted}{text}
+tar -xvf release.tar.gz
+\end{minted}
+
+    \item Add the current directory to |PATH|, such that
+    |bwrap| can be found (this can be skipped if the host
+    machine has Bubblewrap installed):
+\begin{minted}{text}
+$ export PATH="$PWD:$PATH"
+\end{minted}
+
+    \item Miq is ready to be used
+\begin{minted}{text}
+$ miq --help
+miq 0.1.0
+Fernando Ayats <ayatsfer@gmail.com>
+
+Usage: miq <COMMAND>
+
+Commands:
+    build   Build a package
+    eval    Evaluate packages
+    lua     Reference implementation of the evaluator, in Lua
+    store   Query the file storage
+    schema  Generate the IR schema
+
+Options:
+    -h, --help     Print help
+    -V, --version  Print version
+\end{minted}
+
+\end{enumerate}
+
+
+
+
 \section{Miq usage manual}
 
-\subsection{Installation}
+The following subsections describe the usage of the \ac{CLI}
+of miq. While short descriptions can be accessed through the
+|--help| flags for every subcommand, this document goes into
+more detail about each function.
+Miq should have been installed according to the instructions
+in the previous section.
+
+As discussed in chapter
+\ref{chap:overview}, miq is composed of 4 main components: a
+2-stage evaluator, the builder and the database handler,
+displayed in figure \ref{fig:miq-components}. These
+components can be accessed sequentially, by using the
+appropriate subcommands.
 
 \subsection{Evaluating packages}
+\label{sec:eval}
+
+The most basic function of miq is to only run the package
+evaluator. The packages are described in Lua files, which
+are run and produce a dependency graph in memory. The
+evaluator can be run separately without building any
+package, and performs the two stages:
+
+\begin{enumerate}
+    \item Run the Lua code, which produces intermediate
+    representation Unit files in |/miq/eval/*.toml| .
+    \item Parse the Unit files and calculate the
+    dependencies between them to produce a dependency \ac{DAG}.
+\end{enumerate}
+
+Step 1 can be skipped, if the user decides to use a
+pre-evaluated toml file.
+
+The entrypoint in the \ac{CLI} is the subcommand |miq eval|.
+
+\begin{minted}{text}
+$ miq eval --help
+Evaluate packages
+
+Usage: miq eval [OPTIONS] <UNIT_REF>
+
+Arguments:
+    <UNIT_REF>  Unitref to evaluate
+
+Options:
+    -o, --output-file <OUTPUT_FILE>  Write the resulting graph to this file
+    -n, --no-dag
+        --eval-paths                 Print eval paths instead of names
+    -h, --help                       Print help
+\end{minted}
+
+|miq eval| takes a Unit reference. Currently there two types
+of Unit references:
+
+\begin{itemize}
+    \item Serialized Unit reference. This is a direct
+    reference to a Unit file |/miq/eval/*.toml|, which skips
+    the Lua evaluator.
+    \item Lua Unit reference. This reference has two parts
+    separated by a hash symbol: |file.lua#item| .
+\end{itemize}
+
+Within the miq release tarball, it is distributed a set of
+Lua files written for this project that can build some
+applications. The main entry point of these files is
+|init.lua| . The Lua file pointed by the \ac{CLI} must
+return a table, of which it can be selected the key to
+build (nested tables are supported, by using the syntax
+|file.lua#parent.child|).
+
+After evaluating a Lua file, miq would print any errors
+encountered, or otherwise a |dot| language representation of
+the \ac{DAG}, as the following example shows:
+
+\begin{minted}{text}
+$ miq eval ./init.lua#stage0.bootstrap
+digraph {
+    0 [ label = "bootstrap" ]
+    1 [ label = "bootstrap-tools.tar.xz", shape=box, color=gray70 ]
+    2 [ label = "busybox", shape=box, color=gray70 ]
+    3 [ label = "toybox-x86_64", shape=box, color=gray70 ]
+    4 [ label = "unpack-bootstrap-tools.sh", shape=box, color=gray70 ]
+    0 -> 1 [ ]
+    0 -> 2 [ ]
+    0 -> 3 [ ]
+    0 -> 4 [ ]
+}
+\end{minted}
+
+This graph can be manually inspected to check if the result
+matches the desired output. With the |dot| tool from the
+|graphviz| package, this graph can be rendered into an
+image, as shown by the following example:
+
+\begin{minted}{text}
+$ miq eval ./init.lua#stage0.bootstrap | dot -Tsvg > graph.svg
+\end{minted}
+
+\begin{figure}[hbt]
+    \centerfloat
+    \includesvg[width=300pt]{assets/example.svg}
+    \caption{Example of a dependency graph produce by miq eval.}
+    \label{fig:miq-eval-graph}
+\end{figure}
+
+Nodes with a dim boxed outlines are Fetch Units, while round
+default nodes represent Package Units.
+
+
+\FloatBarrier
+\subsection{Lua API}
+
+As mentioned in this project, miq uses Lua as a scripting
+language to describe packages, instead of using |bash| like
+some Linux distributions like Gentoo or Arch Linux, for their
+ebuilds or PKGBUILDs respectively.
+
+The Lua runtime is completely embedded into the miq
+executable, and allows for a very ergonomic and powerful
+interface between the scripting language and the Rust native
+code.
+
+The Lua evaluator takes a top-level Lua file, which must
+return a Lua table. This table may contain any number of
+key-value pairs of package names to its Units, but nested
+tables are also allowed, as well as any other data type that
+can be ignored. The Rust runtime inserts a library into the
+available functions, so no Lua code is required to import
+the standard library:
+
+\begin{minted}{lua}
+local miq = require("miq")
+\end{minted}
+
+The available functions are:
+
+\begin{itemize}
+    \item |miq.fetch|: Function that creates a Unit of kind
+    Fetch. The input must be a table with the following
+    keys:
+    \begin{minted}{text}
+url = <string> -- URL to fetch
+executable = <bool> -- Wether to set the file as
+ executable. Optional, default is false.
+    \end{minted}
+
+    \item |miq.package|: Function that creates a Unit of
+    Package. The table input must contain the following
+    keys:
+    \begin{minted}{text}
+name = <string> -- Name of the package
+version = <string> -- Version of the package. Optional default is empty.
+script = <string|MetaText> -- Bash script to execute during
+build. May be the output of the f function.
+env = <table> -- Environment variables to set during build. Optional.
+\end{minted}
+
+    \item |miq.f|: Function that takes a single string as
+    input. The string is parsed looking for the characters
+    |{{ }}|, and for every match, it substitutes the name of
+    the variable, similar to how f-strings work in Python.
+    |f| can substitute strings into strings, but also Units
+    into strings. When a Unit is substituted into a string,
+    a different value is returned: a MetaText. A MetaText is
+    just a table containing the string with a list of
+    dependencies.
+    \begin{itemize}
+        \item The string is the result of substituting the
+        store path of the Unit .
+        \item The list of dependencies gets appended the
+        Unit that was substituted.
+    \end{itemize}
+    |f| also supports interpolating strings or Units into a
+    MetaText.
+
+    \item |miq.trace|: Function that takes any Lua value and
+    logs it into console, by printing a pretty
+    representation. Lua tables are usually printed by just
+    the numeric representation of pointer into the heap,
+    while |miq.trace| prints the table as a list of
+    key-value pairs.
+\end{itemize}
+
+While Units are serialized into plain Lua tables that can be
+manipulated by hand, it is advised to only use Units that
+are produced by the API functions, as the Rust runtime
+relies on the exact keys being present in the table.
+
+On the other hand, a set of functions are implemented in
+native Lua, that wrap the API functions, as short hands to
+easily represent the packages. The functions are organized
+into different files, which can be ``required'' by each
+other or in the top level |init.lua|.
+
+\begin{minted}{lua}
+local utils = require("utils")
+local stage0 = require("stage0")
+local stage1 = require("stage1")
+\end{minted}
+
+Moreover, the list of packages is organized into different
+``stages'', with the purpose of trying to build a C compiler
+cleanly, by progressively building the tools required to do
+so and using them into the next stage. These stages contain
+examples of how packages may be implemented.
+
 
 \subsection{Building packages}
 
-\subsection{Writing package definitions}
+To build a package, the command used is |miq build| :
+\begin{minted}[breaklines]{text}
+$ miq build --help
+Build a package
 
-\subsection{Developing miq}
+Usage: miq build [OPTIONS] <UNIT_REF>
+
+Arguments:
+  <UNIT_REF>  Unitref to build
+
+Options:
+  -q, --quiet            Don't show build output
+  -r, --rebuild          Rebuild the selected element, but don't rebuild its dependency tree
+  -R, --rebuild-all      Rebuild all packages in the dependency tree
+  -j, --jobs <MAX_JOBS>  Maximum number of concurrent build jobs. Fetch jobs are parallelized automatically [default: 1]
+  -h, --help             Print help
+\end{minted}
+
+As discussed in the previous section \ref{sec:eval}, the
+\ac{CLI} uses the concept of Unit references to either use a
+raw toml Unit from |/miq/eval|, or to run a Lua script that
+evaluates the necessary packages. With the same syntax as
+|miq eval|, one can perform a build for a selected package:
+
+
+\subsection{Querying the store}
+
+\subsection{Changing the log level}
+
+
+
+\section{Miq development}

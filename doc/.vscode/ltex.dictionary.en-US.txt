@@ -66,3 +66,7 @@ ld-musl
 idirafter
 isystem
 Spack
+Miq
+subcommand
+subcommands
+MetaText
