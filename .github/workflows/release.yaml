@@ -57,7 +57,7 @@ jobs:
       - name: Build doc
         run: |
           pushd doc
-          nix develop .#doc --command bash -c "just build"
+          nix develop .#doc --command just build
           popd
 
       - uses: ncipollo/release-action@v1

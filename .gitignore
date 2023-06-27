@@ -11,6 +11,7 @@ devel
 *.pdf
 !/doc/**/*.svg
 !/doc/assets/*.pdf
+!/doc/*.tex
 build*
 .obsidian
 *.aux
