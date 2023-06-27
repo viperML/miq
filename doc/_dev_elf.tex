@@ -5,7 +5,7 @@
 Once decided to use this technique for tagging packages, by
 using the hash of the package's build script and
 dependencies, they key aspect to understand is how this
-translate into the underlying file format using by Linux:
+translates into the underlying file format using by Linux:
 ELF. It stands for \textit{Executable and Linkable Format}.
 This file format is used both in Linux and the BSD family of
 operating systems, and consists of header and symbol tables,
@@ -18,8 +18,7 @@ to be executed.
 \begin{figure}[hbt]
     \centerfloat
     \includegraphics[width=300pt]{assets/typical_elf.jpg}
-    \caption{Typical ELF file layout \cite{HW3238POperating}
-    .}
+    \caption{Typical ELF file layout \cite{HW3238POperating}.}
     \label{fig:elf-layout}
 \end{figure}
 
@@ -34,7 +33,7 @@ to be executed.
     \end{minted}
 
 
-An ELF file composed of a headers, which contains some
+An ELF file composed of headers, which contains some
 metadata about the file itself, segments containing the
 actual code and some more metadata at the end. For the scope
 of a package manager, it is of interest the study of this
@@ -47,7 +46,7 @@ that there are two types of executable ELF's:
 \end{itemize}
 
 Statically linked executable are usually not distributed by
-Linux operating systems. A static executable bundles every
+Linux operating systems. Static executables bundle every
 link-time dependency, such that everything is contained in a
 single file. So from a distributor's point of view, it
 doesn't make sense to make every file bundle every single
@@ -57,7 +56,7 @@ statically link, sometimes making it impossible in practice.
 
 Dynamically linked executables and libraries, on the other
 hand, rely on parts of the ELF metadata to be able to
-discover other dependencies. When a executable is loaded,
+discover other dependencies. When an executable is loaded,
 via the |exec| system call, the following (non-exhaustive) steps are
 performed by the kernel:
 
@@ -72,7 +71,7 @@ Program Headers:
         [Requesting program interpreter: /lib64/ld-linux-x86-64.so.2]
   ...
     \end{minted}
-    \item Control is transfered to the loader, in this case
+    \item Control is transferred to the loader, in this case
     |ld-linux-x86-64.so.2| .
     \item The loader then looks into a different section:
     the |.dynamic|
@@ -149,7 +148,7 @@ section, which is searched for libaries contained in the
 |NEEDED| sections. This |RUNPATH| is very useful, as it
 allows every single binary file, to know where to look for
 its own hashed dependencies. The link loader can also be
-changed to a specific version, instead of relying in a
+changed to a specific version, instead of relying on a
 global |ld-linux.so|. This is done by changing the
 |INTERP| in the \ac{PHT}.
 
@@ -180,7 +179,7 @@ this modification of the ELF metadata is performed.
 \FloatBarrier
 \section{Other file types}
 
-Not every file in a Linux system is an binary (ELF) file
+Not every file in a Linux system is a binary (ELF) file
 however. A common Linux system is composed of many ``glue''
 shell scripts, or any other text-based file. These files,
 also perform the same ``dependency resolving'' that is done
@@ -196,10 +195,10 @@ for file in /srv/backup/*; do
 done
 \end{minted}
 
-A shell script like this also performes another type of
+A shell script like this also performs another type of
 dependency resolution at run-time: loading any existing
 program from |PATH|. In this case, both the |cp| and |chmod|
-programs are external to the script, and also implicitely
+programs are external to the script, and also implicitly
 dependencies of itself. For a toy script, it is easy to
 underestimate this type of dependency resolution (as |cp|
 and |chmod| are included in every Linux distribution), but
@@ -207,7 +206,7 @@ as scripts grow bigger, with more and more dependencies, it
 becomes hard to keep track of every package.
 
 The first line contains the |#!| sequence, which is called a
-``shebang''. Analgous to the ELF format and |ld-linux|, the
+``shebang''. Analogous to the ELF format and |ld-linux|, the
 shebang instruct Linux to load the program in this path, and
 pass the rest of the file into it for execution. In turn
 ``sh'', interprets the rest of the file as a shell script,
@@ -260,4 +259,4 @@ example |PYTHONPATH| for Python packages -- but for the sake
 of simplicity, only shell scripts and binary ELF files are
 considered in this project. Usually each language ecosystem
 has each own method of dependency resolution that can be
-overriden to not use a ``global'' search path.
+overridden to not use a ``global'' search path.

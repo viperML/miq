@@ -38,29 +38,5 @@
                 "just-watch"
             ]
         },
-    ],
-    "cSpell.words": [
-        "bootloader",
-        "bubblewrap",
-        "fetchable",
-        "Guix",
-        "INTERP",
-        "libc",
-        "libcrypto",
-        "miku",
-        "MINIX",
-        "mlua",
-        "nginx",
-        "nproc",
-        "openssl",
-        "pkgs",
-        "POSIX",
-        "Ritchie",
-        "sandboxed",
-        "serde",
-        "stdenv",
-        "structs",
-        "toybox",
-        "userland"
     ]
 }
