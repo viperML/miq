@@ -297,11 +297,102 @@ raw toml Unit from |/miq/eval|, or to run a Lua script that
 evaluates the necessary packages. With the same syntax as
 |miq eval|, one can perform a build for a selected package:
 
+\begin{minted}[breaklines]{text}
+/miq/store/unpack-bootstrap-tools.sh-6949dd1f64cfe7b6 <- (Fetch { name: "unpack-bootstrap-tools.sh" },)
+/miq/store/busybox-33a90b67a497c4d6 <- (Fetch { name: "busybox" },)
+/miq/store/toybox-x86_64-69a4327d80d88104 <- (Fetch { name: "toybox-x86_64" },)
+/miq/store/bootstrap-tools.tar.xz-9d678d0fc5041f17 <- (Fetch { name: "bootstrap-tools.tar.xz" },)
+bootstrap>>+ /miq/store/toybox-x86_64-69a4327d80d88104 mkdir -p /build/bin
+bootstrap>>+ export PATH=/build/bin:/no-such-path
+bootstrap>>+ PATH=/build/bin:/no-such-path
+bootstrap>>+ /miq/store/toybox-x86_64-69a4327d80d88104 ln -vs /miq/store/toybox-x86_64-69a4327d80d88104 /build/bin/ln
+bootstrap>>'/build/bin/ln' ->
+'/miq/store/toybox-x86_64-69a4327d80d88104'
 
-\subsection{Querying the store}
+...
+\end{minted}
+
+As builds are performed concurrently, the output shows a
+prefix for the package that is outputting the log message,
+displayed with |package>>|. After a Unit is built, its store
+path is printed into the console, so that the output
+contents can be manually inspected.
+
+While Fetch jobs are automatically fetched in parallel,
+Package Units are not by default, to be able to inspect the
+logging messages properly. The user may want to increase
+this limit with the |--jobs| option.
+
+The flags |--rebuild| and |--rebuild-all| can also be used
+to rebuild either the package that is selected, or all the
+packages in the dependency graph, respectively. This may be
+useful is some change in the miq source code is made that
+doesn't reflect in a store path change, thus the package
+being recognized as already built.
+
+\subsection{Querying the store database}
+
+The store is the directory containing all the built Units at
+|/miq/store|. Miq uses a sqlite database to keep track of
+what files have been written, such that it avoid having to
+recompile every file. While the database can be manually
+inspected with the \ac{CLI} for |sqlite3|, miq provides a
+shorthand for the most common queries via the |miq store|
+command:
+
+\begin{minted}[breaklines]{text}
+$ miq store --help
+Query the file storage
+
+Usage: miq store <COMMAND>
+
+Commands:
+    list     List all paths registered [aliases: ls]
+    add      Manually register a path
+    is-path  Check if a path is registered
+    remove   Manually remove a path [aliases: rm]
+
+Options:
+    -h, --help  Print help
+\end{minted}
+
+The commands are self-explanatory, and should cover basic
+operations to check if the store is registering the packages
+properly.
+
+One of the most common commands during development is |miq store rm --all|, which can be used to wipe the entire
+storage of miq, forcing a rebuild of all packages. A very
+useful command when a change in the source code is made such
+that it completely changes how the packages are built.
 
 \subsection{Changing the log level}
 
+The log messages are sent to the console by the |tracing|
+Rust crate, which can be adjusted to output different log
+level with the |tracing_subscriber| crate. By default, only messages of severity |info| or
+higher as sent to the console.
 
+This can be changed by using the |RUST_LOG| environment
+variable, which uses a custom syntax to declared what should
+be logged. The syntax is the following:
 
-\section{Miq development}
+\begin{minted}[breaklines]{text}
+target[span{field=value}]=level
+\end{minted}
+
+For example, to show all tracing messages from miq:
+
+\begin{minted}[breaklines]{text}
+$ RUST_LOG=miq=trace miq ...
+\end{minted}
+
+More examples of the syntax are the following:
+
+\begin{minted}[breaklines]{text}
+RUST_LOG=[luatrace]=trace # Show all tracing messages from the miq.trace Lua function.
+RUST_LOG=miq::eval=trace # Only show tracing messages from
+the eval module.
+RUST_LOG=trace # Show all tracing messages from the
+dependencies of miq.
+\end{minted}
+
