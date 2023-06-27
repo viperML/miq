@@ -1,0 +1,232 @@
+\section{Units: the basic building blocks}
+\label{sec:unit}
+
+The main purpose of the package manager, is to build
+packages according to a dependency tree. Therefore, it is
+important to properly define what a ``package'' is and is
+not. In miq, the concept of a package has been abstracted by
+the concept of a ``unit''. A unit is something that can be
+built, and put into the miq store (|/miq/store|). This
+abstraction has been chosen, because it makes it easy to
+have different entities that can be built. This
+differentiation serves the purpose of being able to declare
+2 types of units: package units, and fetchable units.
+As discussed in section \ref{sec:builder}, package units are
+built in a network sandbox, to avoid impurities resulting of
+a connection to the network. The main aspect of miq is being
+able to hash packages depending on its dependencies and
+build script. The ``result'' of building the package is not
+considered in the hashing algorithm. This can be described
+as packages being input-addressed, instead of
+content-addressed. As such, it is important to have a proper
+build sandbox to isolate the build process and produce a
+reproducible result, for the same input parameters. The
+purpose of fetchable units (|Fetch|) is to be able to split
+the network connection from the build process. The
+implementation for |Unit| is an enumeration with 2 cases:
+
+\begin{minted}{rust}
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+enum Unit {
+    PackageUnit(Package),
+    FetchUnit(Fetch),
+}
+\end{minted}
+
+This example already shows one of the features of Rust that
+made the development of miq ergonomic: |derive| macros.
+|derive| is a keyword that allows for automatic code
+generation given some |struct| or |enum|. In this case the
+|Hash| trait is derived. What this means is that Rust
+automatically generates an implementation for the |Hash|
+trait, given that the fields of the enum are also |Hash|.
+
+Very importantly too, the traits |Serialize| and
+|Deserialize| are derived for Unit. These traits are
+provided by the |serde| crate (serialization and
+deserialization) \cite{Serde} . Similarly to the |Hash|
+derive macro, serde allows to automatically generate
+serialize and deserialize a Unit from any crate that
+provides an interface for it. This comes into play for the
+usage of the intermediate representation objects that are
+store into disk, in |toml| format. As discussed in the next
+section, miq loads the units from disk in |toml| format, and
+automatically parses them into the data structure, without
+any need of parsing code.
+
+The Unit enum has two members, which wrap the inner values:
+|Package| and |Fetch|. These are structs that contain all
+the information that miq uses to build the Unit. The
+implementation of the Fetch unit is trivial, as the
+following code snippet shows:
+
+\begin{minted}{rust}
+#[derive(Deserialize, Serialize, Hash)]
+struct Fetch {
+    result: MiqResult,
+    name: String,
+    url: String,
+    executable: bool,
+}
+\end{minted}
+
+The toml format is a human-readable serialization format,
+that can be compared to JSON. As the latter is not
+considered ergonomic to manually write, it was decided to
+use the toml format instead, although this doesn't have any
+impact on the functioning of the package manager. The
+following snippet of code shows a serialization of the musl
+Fetch Unit.
+
+\begin{minted}{toml}
+# /miq/eval/musl-1.2.3.tar.gz-828bf8f78328fb26.toml
+type = "FetchUnit"
+result = "musl-1.2.3.tar.gz-828bf8f78328fb26"
+name = "musl-1.2.3.tar.gz"
+url = "https://musl.libc.org/releases/musl-1.2.3.tar.gz"
+executable = false
+\end{minted}
+
+The example above already shows the hashing of the Unit
+itself: the |result| field. This field is computed as a
+function of the |url| and the |executable| fields, and
+determines the hashing of the Unit itself. This is stored
+attached to the Unit itself. The example is trivial, but
+any other Fetch unit with the same |name|
+(|musl-1.2.3.tar.gz|) but different |url|, would trigger a
+change in the hashing that ends up in |result|, as shown in
+figure \ref{fig:fetch_hash} .
+
+\begin{figure}[hbt]
+    \centerfloat
+    \includesvg[width=350pt]{assets/fetch_hash.svg}
+    \caption{Hashing process of a Fetch Unit.}
+    \label{fig:fetch_hash}
+\end{figure}
+
+Similarly, a Package Unit is written as a struct with the
+instructions required to build it. The following simplified
+snippet shows the implementation in Rust:
+
+\begin{minted}{rust}
+#[derive(Serialize, Deserialize, Hash)]
+pub struct Package {
+    result: MiqResult,
+    name: String,
+    version: Option<String>,
+    deps: BTreeSet<MiqResult>,
+    script: String,
+    env: BTreeMap<String, String>,
+}
+\end{minted}
+
+An example serialization of a Package Unit for musl is the
+following:
+
+\begin{minted}{toml}
+# /miq/eval/musl-f0dd14ee1ca91c64.toml
+type = "PackageUnit"
+result = "musl-f0dd14ee1ca91c64"
+name = "musl"
+version = "1.2.3"
+deps = [
+    "musl-1.2.3.tar.gz-unpack-5f9d5116c4c83592",
+    "stage0-stdenv-d2ecc89c54b1b316",
+]
+script = '''
+source /miq/store/stage0-stdenv-d2ecc89c54b1b316/stdenv.sh
+set -ex
+/miq/store/musl-1.2.3.tar.gz-unpack-5f9d5116c4c83592/configure \
+    --prefix=$PREFIX \
+    --disable-static \
+    --enable-wrapper=all \
+    --syslibdir=$PREFIX/lib
+make -j$(nproc)
+make -j$(nproc) install
+ln -vs $PREFIX/lib/libc.so $PREFIX/bin/ldd
+'''
+\end{minted}
+
+A Package Unit is more complex than a Fetch Unit, because of
+the following:
+\begin{itemize}
+    \item Package units have a |deps| field. |deps| are the
+    |result| strings of any other Unit. This means Package
+    Units can depend on other Package or Fetch Units, while
+    Fetch Units don't depend on anything.
+    \item The |build| field is a literal bash script that is
+    used during the build process to produce the output.
+\end{itemize}
+
+In contrast to other package managers and similarly to nix,
+miq doesn't provide multiple stages for the build process.
+In Gentoo, the definition of package, usually contains some
+unpack, build and install phases. However, everything in
+miq is done through the script section. This is because, by
+using a language to generate this |toml| representation, the
+user is free to include any custom functionality as needed.
+This is important, as the Package Unit tries to be as
+minimal as possible, by just providing the |script| phase,
+and letting the user construct any abstraction on top of it.
+In the example, musl depends on |stdenv| (standard environment), which is a script
+that sets some environment variables required for the build
+process, effectively implementing the concept of build
+stages in other package managers.
+
+\begin{figure}[hbt]
+    \centerfloat
+    \includesvg[width=350pt]{assets/phash.svg}
+    \caption{Hashing process of a Package Unit.}
+    \label{fig:pkg_hash}
+\end{figure}
+
+The hashing algorithm used for the process is the
+\textit{Fowler Noll Vo} hash function \cite{FnvRust}. While
+this algorithm is not cryptographically secure, and doesn't
+provide protection against collision attacks, the algorithm
+could be considered as sufficient for this application. This
+could be considered as an implementation detail, and could
+be swapped for any algorithm such as |SHA256| if deemed
+necessary.
+
+The implementation of miq uses a 2-stage evaluator, that
+first converts the Lua code into a serialization of Units,
+and then serializes them again to sort the dependency
+algorithm. Unit files are stored in the |/miq/eval|
+directory, generated and consumed by miq in sequence, as
+shown in figure \ref{fig:2stage} .
+
+\begin{figure}[hbt]
+    \centerfloat
+    \includesvg[width=400pt]{assets/22stage.svg}\
+    \caption{Two-staged evaluation process.}
+    \label{fig:2stage}
+\end{figure}
+
+The purpose of this 2-stage evaluator process, is be able to
+extend miq as needed. Because the |unit.toml| format is
+well-known, a user or contributor should be able to
+implement a different evaluator in any other language than
+Lua. This is one of the main shortcomings of nix, as it
+only allows the usage of the nix language. The Guix package
+manager \cite{courtesFunctionalPackageManagement2013}
+studied the usage of Scheme as the language for the
+evaluation process, by patching into the nix builder. By
+explicitly allowing for an intermediate format, the
+ergonomics of the package manager could be improved.
+
+As a side effect of this design, some characteristics
+emerge:
+
+\begin{itemize}
+    \item Units toml files can be manually written by hand.
+    During the development process of miq, the Lua evaluator
+    was the last piece implemented, because Unit files could
+    be manually written as a proof of concept.
+    \item Units can be copied and pasted from one machine to
+    another. If the reproducibility of the evaluator cannot
+    be assured, unit files can be checked out into version
+    control. A user could then use the locally downloaded
+    unit tree to build the resulting packages. This could be
+    useful as an alternative distribution method to the Lua files.
+\end{itemize}
