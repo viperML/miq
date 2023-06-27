@@ -54,7 +54,7 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@main
       - name: Install Magic Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@main
-      - name: Build miq
+      - name: Build doc
         run: |
           pushd doc
           nix develop .#doc --command bash -c "just build"
