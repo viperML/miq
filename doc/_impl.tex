@@ -32,7 +32,7 @@ X, and the program would then:
 \end{itemize}
 
 
-miq is heavily inspired by nix, the functional package
+Miq is heavily inspired by nix, the functional package
 manager, a work of \Citeauthor{dolstraNixOS2008}
 \cite{dolstraNixOS2008}. The work of nix of using a
 hash-based path system instead of the \ac{FHS} was the idea
@@ -53,9 +53,9 @@ can be easily ordered by package name.
 Miq differs from nix in the usage of the language used for
 the evaluation of the packages. On of the powerful features
 of both miq and nix is the ability to declare packages as
-code, using a turing-complete programming language. This is
+code, using a Turing complete programming language. This is
 in contrast to apt or rpm, which use a markup language to
-define the packages. By using a turing-complete language,
+define the packages. By using a Turing complete language,
 the user is able to create any kind of abstraction around
 the package primitives. This not only allows for code
 deduplication, but also to easily create new ``helper''
@@ -67,7 +67,7 @@ invented with the same name, nix. This is a purely
 functional language inspired by the semantics of Haskell, and
 often referred to as ``JSON with functions''. As this
 language is sometimes alien to users, with miq the decision
-was to use Lua, an easily emendable language. This is
+was to use Lua, an easily embeddable language. This is
 discussed in more depth in section \ref{sec:lua} .
 
 Miq is implemented in the Rust programming language
@@ -110,7 +110,7 @@ build sandbox to isolate the build process and produce a
 reproducible result, for the same input parameters. The
 purpose of fetchable units (|Fetch|) is to be able to split
 the network connection from the build process. The
-implementation for |Unit| is a enumeration with 2 cases:
+implementation for |Unit| is an enumeration with 2 cases:
 
 \begin{minted}{rust}
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -157,7 +157,7 @@ struct Fetch {
 }
 \end{minted}
 
-The toml format is an human-readable serialization format,
+The toml format is a human-readable serialization format,
 that can be compared to JSON. As the latter is not
 considered ergonomic to manually write, it was decided to
 use the toml format instead, although this doesn't have any
@@ -178,7 +178,7 @@ The example above already shows the hashing of the Unit
 itself: the |result| field. This field is computed as a
 function of the |url| and the |executable| fields, and
 determines the hashing of the Unit itself. This is stored
-attached to the Unit itself. This example is trivial, but
+attached to the Unit itself. The example is trivial, but
 any other Fetch unit with the same |name|
 (|musl-1.2.3.tar.gz|) but different |url|, would trigger a
 change in the hashing that ends up in |result|, as shown in
@@ -248,7 +248,7 @@ the following:
 In contrast to other package managers and similarly to nix,
 miq doesn't provide multiple stages for the build process.
 In Gentoo, the definition of package, usually contains some
-unpack, build and install phases. In contrast, everything in
+unpack, build and install phases. However, everything in
 miq is done through the script section. This is because, by
 using a language to generate this |toml| representation, the
 user is free to include any custom functionality as needed.
@@ -302,7 +302,7 @@ evaluation process, by patching into the nix builder. By
 explicitly allowing for an intermediate format, the
 ergonomics of the package manager could be improved.
 
-As a side-effect of this design, some characteristics
+As a side effect of this design, some characteristics
 emerge:
 
 \begin{itemize}
@@ -379,8 +379,8 @@ performs the following computations:
 \end{enumerate}
 
 The \ac{DAG} is stored in memory by creating a mapping of
-Node ids to Units. To store the edges, it is used a mapping Node ids to
-Node ids 1-to-1, such that direction is preserved. The Rust
+Node IDs to Units. To store the edges, it is used a mapping Node IDs to
+Node IDs 1-to-1, such that direction is preserved. The Rust
 crate ``daggy'' \cite{DaggyRust} is used to provide this
 data structure, and the required methods to manipulate the
 graph, such as reading or writing nodes and edges. On the
@@ -405,11 +405,11 @@ from the distribution's servers.
 
 Miq's deployment model, similarly to Nix's, is to have each
 definition of a package reference the exact paths of its
-dependencies. A Unit, the intermediate representation of a
+dependencies. A Unit, the intermediate representation of
 package definitions, contains a |deps| field, which lists the
 packages by its hashed name, and the |script| field may
-contain hardcoded paths to these packages. The following
-example shows these hardcoded paths:
+contain hard-coded paths to these packages. The following
+example shows these hard-coded paths:
 
 \begin{minted}{toml}
 # /miq/eval/musl-f0dd14ee1ca91c64.toml
@@ -438,7 +438,7 @@ ln -vs $PREFIX/lib/libc.so $PREFIX/bin/ldd
 The purpose of the package evaluator is to resolve these
 paths in a step before the build process. A user does not
 use the paths directly, as they are calculated by miq. By
-using an scripting language, the user would be able to
+using a scripting language, the user would be able to
 declare the dependencies in a programmatic way.
 
 To do so, miq uses the Lua programming language. The
@@ -471,7 +471,7 @@ end
 By using a scripting language to build the intermediate
 representation, the absolute paths used by miq are
 abstracted away from the user, while still allowing for this
-filesystem model.
+file system model.
 
 The previous Lua example shows the usage of some functions
 built specifically for miq. To begin with, the |f| function
@@ -604,7 +604,7 @@ primitives, and extension of the functionality.
 For example,
 the primitive |miq.fetch| creates a Fetch Unit from its
 input. A Fetch Unit is simply fetched from the internet, and
-stored into the filesystem. Very commonly, this Fetch is a
+stored into the file system. Very commonly, this Fetch is a
 tarball that the package script unpacks to build it. So, a
 wrapper around |miq.fetch| can be created, such that it
 creates an intermediate package that unpacks the tarball.
@@ -688,7 +688,7 @@ fetching the necessary files of Fetch Units.
 \subsection{Sandbox}
 
 Fetch Units are trivially built, as it is only needed to do
-an http request to the selected |url|, and store the
+an HTTP request to the selected |url|, and store the
 resulting file into the store path. Optionally, the user
 might select to change the permissions of the file to be executable.
 
@@ -696,8 +696,8 @@ Package Units use a more involved process. To begin with,
 they are built in a build sandbox. The purpose of the
 sandbox is to isolate the execution of the script from the
 outside world. This means that the process only sees a
-limited view of the filesystem and network connection is
-limited. The sandbox isolates the filesystem by only giving
+limited view of the file system and network connection is
+limited. The sandbox isolates the file system by only giving
 the process views on essential paths, like |/dev|, |/proc|
 or |/tmp|. A view on |/miq/store| is also allowed, and the
 build scripts contain absolute paths into it. For this
@@ -711,7 +711,7 @@ this sandbox, miq relies on Linux namespaces
 \cite{NamespacesLinuxManualb} . Linux namespaces are an
 interface provided by the kernel itself, to change
 resources of a process. The resources that can be changed
-include: mount points, user ids, network, etc. While
+include: mount points, user IDs, network, etc. While
 initially miq leveraged directly the namespaces interface
 via the |libc| crate, it was later changed to run the
 program bubblewrap as a subprocess . Bubblewrap \cite{Bubblewrap2023} is a C
@@ -728,12 +728,12 @@ turn is derived from its inputs (build script and
 dependencies). If the package produces a result that is not
 reproducible, this means that a same hash potentially points
 to different results -- from one computer to another or
-rebuilds in the same computer. Some of the sources of
+rebuilds in the same computer. Some sources of
 ``impurity'' are:
 
 \begin{enumerate}
     \item Environment variables
-    \item User id, name and groups
+    \item User ID, name and groups
     \item Files that are not part of the miq store, like
     |/etc|, |/home|, |/var|, etc.
     \item Network connection (e.g. fetching from the
@@ -746,15 +746,15 @@ environment variables, like |\$miq_out|, which points into
 the output directory or |\$HOME| pointing to the build
 directory.
 
-To isolate the user id, user namespaces are used. User
-namespaces allow to create a mapping of user ids outside the
-sandbox into user ids in the sandbox. In practice, the user
+To isolate the user ID, user namespaces are used. User
+namespaces allow to create a mapping of user IDs outside the
+sandbox into user IDs in the sandbox. In practice, the user
 running miq is mapped into the root user. The child process
 ``sees'' that it is running as root, while it is being
 executed on behalf of the user (with all the limitations and
 permissions of the user, not of root).
 
-The filesystem can be isolated by using a mount namespace.
+The file system can be isolated by using a mount namespace.
 It allows to mount a new root |/|,
 and then selectively mount the necessary paths into this
 blank slate. Some core paths are required, such as |/dev| or
@@ -782,7 +782,7 @@ implemented into miq, but it is a planned feature.
 \subsection{Concurrency}
 \label{sec:concurrency}
 
-As the source-based package managers NixOS's nix and
+As the source-based package managers NixOS' nix and
 Gentoo's emerge, miq is able to build package in parallel. A
 parallel build process implies that there the build is not
 sequential. In a sequential (or 1-job build), every package
@@ -883,11 +883,11 @@ Then, an iterative process is started, following the steps:
     mark it as a |BuildTask::Finished|. If any errors occur,
     return them and stop any other tasks.
     \item If all tasks are |BuildTask::Finished|, return.
-    Otherwise loop back to the first step.
+    Otherwise, loop back to the first step.
 \end{enumerate}
 
-Overall, the algorithm scans the \ac{DAG} in a infinite
-loop, spawning ne threads to build the Units, as soon as
+Overall, the algorithm scans the \ac{DAG} in an infinite
+loop, spawning threads to build the Units, as soon as
 they can be built. This happens when all of a Unit's
 dependencies have finished.
 
@@ -928,7 +928,7 @@ different backing \ac{OS} thread.
 However, a parallel runtime is not needed for miq, as the
 build tasks are spawned as a subprocess for bubblewrap, the
 build sandbox discussed in the previous subsection. Every
-tasks executes bubblewrap, which gets a new \acl{PID} and is
+task executes bubblewrap, which gets a new \acl{PID} and is
 executed by the OS apart from the thread runtime. Thus, the
 tasks executed by miq only collect the logs generated by the
 bubblewrap subprocesses, which happens concurrently.
@@ -967,7 +967,7 @@ The process is as follows:
 \subsection{C flags and package configuration}
 
 The deployment model of miq is based on not using the
-\acl{FHS} as a basis of the install locations, but rather
+\acl{FHS} as a basis of the installation locations, but rather
 using unique prefixes for every package. These prefixes are
 calculated at evaluation-time, and are based on the package
 (Unit) definition and dependencies, such that a unique
@@ -991,7 +991,7 @@ paths are used:
     \caption{Mapping of \ac{FHS} paths to miq store paths.}
 \end{figure}
 
-To properly produce C binaries that use this paths, it is
+To properly produce C binaries that use these paths, it is
 imperative to use a correct set of flags for the compiler
 and linker. As mentioned in the previous chapter in section
 \ref{sec:elf-format}, Linux uses the \acl{ELF} format for
@@ -1032,12 +1032,12 @@ f [[ gcc -Wl,-dynamic-linker={{libc}}/lib/ld-musl-x86_64.so ]]
     \item The name of the link loader depends on:
     \begin{itemize}
         \item The implementation of the C standard library
-        used. In miq, musl is used to implement some of the
+        used. In miq, musl is used to implement some
         packages, so the prefix is |ld-musl|. For glibc, the
         prefix would be |ld-linux| instead.
 
         \item The architecture of the system. In this
-        project, only |x86_64| CPU's are supported, but the
+        project, only |x86_64| CPUs are supported, but the
         name of the link loader may change for other
         architectures, like |aarch64| .
     \end{itemize}
@@ -1097,7 +1097,7 @@ ld -rpath /miq/store/name-hash/lib ...
 
 While this covers the run-time lifecycle of the produce
 binary, the compiler must also be configured to look in the
-appropiate directories to look for the headers and
+appropriate directories to look for the headers and
 libraries. The following flags can be passed to gcc to
 configure them:
 
@@ -1118,14 +1118,14 @@ for the linker.
 While manually configuring these flags is error-prone, this
 is implemented at the Lua evaluation phase. By using a
 custom function that wraps |miq.package|, it is possible to
-crate a custom |gcc| and |ld| executables. This executables
+crate a custom |gcc| and |ld| executables. These executables
 are wrappers around the original files, but they add all the
 flags mentioned previously. Moreover, by reading the |deps|
 section of a package, it is possible to automatically add
-the depedencies into the appropiate |-I| or |-L| flags. As
+the dependencies into the appropriate |-I| or |-L| flags. As
 an example, the |gmp| package evaluates to the following
 Unit, which contains the flags to compile and link against
-the appropiate libraries:
+the appropriate libraries:
 
 \begin{minted}{toml}
 # /miq/eval/gmp-4dc253ccbc7d9572.toml

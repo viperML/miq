@@ -11,9 +11,9 @@ environment are the libraries that are installed on the
 system.
 
 On the previous section it was discussed how a different
-approach to tagging the packages on the filesystem can be
+approach to tagging the packages on the file system can be
 used to achieve a consistent environment. What this
-filesystem layout naturally leads into, is a system where
+file system layout naturally leads into, is a system where
 there is no mutation of the existing packages. On a
 classical system, to upgrade a package, the following steps
 are taken:
@@ -33,9 +33,9 @@ involve many operations which can fail -- and always
 eventually fail. This is discussed on section
 \ref{sec:atomicity} .
 
-This modification of the global environment poses a problem
+Modifications of the global environment poses a problem
 to the running processes on the system. Giving names to the
-example packages, lets say that |openssl| is updated to a
+example packages, let's say that |openssl| is updated to a
 new version, which fixes some vulnerabilities. The update
 process on a classical system would involve replacing
 |libcrypto.so| \textbf{in-place} with the new version. But
@@ -80,7 +80,7 @@ vulnerable dependency (|openssl|).
 
 What this naturally leans into, is the solution proposed in this project, of tracking
 every package by hashing its entire dependency tree. This
-simple change allows to know whether an affected |nginx| is
+simple change allows knowing whether an affected |nginx| is
 running against a vulnerable |openssl|, because the
 dependency tree is statically known. Because we don't allow
 for mutability, every process always runs linked against the
@@ -91,7 +91,7 @@ be linked to the exact path of the old |libcrypto.so| --
 re-evaluating the dependency graph, we can know that the
 hash of |nginx| has changed, because it now depends on a
 fixed version. Then, from an administrator's perspective,
-all you need yo know is to compare the hashes of the old and
+all you need to know is to compare the hashes of the old and
 new nginx versions, and restart the service such that it
 points into the newly-built version.
 
@@ -115,7 +115,7 @@ mutation is the failure of a transaction, that is that a
 transaction is ``not atomic''.
 
 Atomicity in software development is a concept usually
-associated with memory management. In a multi-threaded
+associated with memory management. In a multithreaded
 environment, it is important that shared memory is not
 written to by two threads at the same time, but
 sequentially. For this purpose, the concept of an ``atomic''
@@ -130,7 +130,7 @@ transaction (for example, updating or installing a package)
 is either completed or not, without any intermediate state.
 
 With the analogy of memory for a program, leaving the
-filesystem in a intermediate, inconsistent state is not
+file system in an intermediate, inconsistent state is not
 acceptable for reliable systems. The most basic example is a
 package that is being updated, and some error occurs during
 the transaction, such that some files have been written, and
@@ -150,7 +150,7 @@ By having the package manager not rely on the mutation for
 upgrades, then the problem of incomplete upgrades is solved
 by the root. If mutation is not used, then the way to
 upgrade a package is by using a different path on the
-filesystem. The upgrade can operate on this different path
+file system. The upgrade can operate on this different path
 completely safely. Any interruption of the process will not
 leave the original package in this inconsistent state.
 Meanwhile, once the new package is in place, the update

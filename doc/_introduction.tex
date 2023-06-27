@@ -55,7 +55,7 @@ from using an imperative way of managing the dependencies, that is, the usage of
 a \ac{CLI} to install or remove packages one after the
 other. After requesting some operation on the dependency graph, the result could have
 loops in it, as illustrated on figure \ref{fig:graph3}. This causes problems in
-the ordering of the operations, and many others. Coloquially, this is known refered to as
+the ordering of the operations, and many others. Colloquially, this is known referred to as
 ``dependency hell'' \cite{abateDependencySolvingStill2020}, denoting the difficulty of managing the dependencies of a system.
 
 \begin{figure}
@@ -77,7 +77,8 @@ In miq (pronounced [miku]), the packages are evaluated into a \ac{DAG}, in which
 each node represents a package, and each edge represents a dependency. Then,
 each node gets a unique identifier, which depends on its own definition, and the
 identifier of its dependencies. This ``identifier'' is represented as a
-cryptographic hash. Finally, each package receives a directory in the filesystem
+cryptographic hash. Finally, each package receives a
+directory in the file system
 unique to its identifier, as shown on figure \ref{fig:graph4}.
 
 
@@ -95,7 +96,7 @@ any change in the transitive dependency graph. For example, if package |A|
 depends on |C| through |B|, a change on |C| triggers a change of its hash. Which
 in turns, triggers a change on |B|, and then on |A|. With this system, the full
 dependency graph is known. A common problem in Linux is "my application works on
-my machine" \cite{mukherjeeFixingDependencyErrors2021}. Even even the application itself is the same, we still rely on
+my machine" \cite{mukherjeeFixingDependencyErrors2021}. Even when the application itself is the same, we still rely on
 files provided from the system via the \ac{FHS} and the package manager.
 
 Finally, this enables a deployment model where updates don't require modifying
@@ -109,10 +110,10 @@ just swapping a symlink into the current version.
 The main solution to this problem currently is the usage of containers. A
 container is a collection of files, which can be thought as Linux distribution
 itself \cite{DockerAcceleratedContainerized2022} \cite{merkelDockerLightweightLinux2014}. This container is then run by a ``runtime'', that isolates it from the
-host's filesystem, as shown in figure \ref{fig:graph5} . As a result, the files in the container don't conflict with
+host's file system, as shown in figure \ref{fig:graph5} . As a result, the files in the container don't conflict with
 the hosts, or other containers. The main way to deploy applications is then
 using one container per application, which bundles its entire dependency tree.
-Because the underlying filesystem of each container has the same problems as any
+Because the underlying file system of each container has the same problems as any
 other, the containers solution moves the problem into a singular image, which
 contains a single application, and as a result a smaller dependency footprint.
 

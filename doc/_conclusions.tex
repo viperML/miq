@@ -19,7 +19,7 @@ any other package management system.
 This document could serve as the basis for any future project
 that wants to explore the same ideas as miq. The
 development of miq itself turned out to take some work
-and planification, but the ideas behind it are simple enough
+and planning, but the ideas behind it are simple enough
 such that the implementation was straightforward. The
 process also served as an exploration of the Rust
 programming language, which proved to be a very good fit for
@@ -30,18 +30,18 @@ the implementation.
 
 \section{Future work}
 
-As mentioned previously, miq is was developed as proof of
+As mentioned previously, miq was developed as proof of
 concept, without sacrificing much quality of the
 implementation or of the user experience. Still, many fields
 were left unexplored, and could lead to more research in the
-topic. The following list describes some of the possible
+topic. The following list describes some possible
 future work that could be done in the area of miq:
 
 \begin{enumerate}
     \item \textbf{Evaluator language}: Lua is the language
     used to evaluate the packages defined by the user. Lua
     turns the |.lua| input files into an intermediate
-    representation in |.toml| which follows an
+    representation in |.toml| which follows a
     specification. The usage of Lua was chosen because of
     how easy is to embed, but the language doesn't provide
     the best ergonomics and error messages. The
@@ -55,9 +55,9 @@ future work that could be done in the area of miq:
     |deno_core| \cite{DenoCoreCrates2023}) or Dhall \cite{DhallConfigurationLanguage}.
 
     \item \textbf{Builder language}: the POSIX shell is the
-    de-facto standard for building packages, as it is used
-    to define a list of sequential steps to be perfomed,
-    while interacting with other programs, the filesystem or
+    de facto standard for building packages, as it is used
+    to define a list of sequential steps to be performed,
+    while interacting with other programs, the file system or
     environment variables. However, any other program
     capable of this task could be used. The usage of bash is
     the norm, because it is often a dependency of the core

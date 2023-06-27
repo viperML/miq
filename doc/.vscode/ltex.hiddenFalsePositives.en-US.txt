@@ -1,2 +1,3 @@
 {"rule":"POSSESSIVE_APOSTROPHE","sentence":"^\\QStatic executables bundle every link-time dependency, such that everything is contained in a single file.\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QUsually for a conventional Linux distribution, the last option is the most transversed.\\E$"}
+{"rule":"UPPERCASE_SENTENCE_START","sentence":"^\\Qlibc C standard library (glibc, musl)\\E$"}

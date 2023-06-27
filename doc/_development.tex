@@ -3,8 +3,8 @@
 The result of this research was the development of |miq|, a package manager and
 build system for Linux.
 
-miq is a single-file executable that handles the full lifecycle of the build
-process of the packages it manages. This stages include:
+Miq is a single-file executable that handles the full lifecycle of the build
+process of the packages it manages. These stages include:
 
 \begin{enumerate}
     \item Evaluating the expressions that describe packages
@@ -23,7 +23,7 @@ The development of miq aimed for a modular design, such that
 each component didn't have much coupling with the others.
 This allows for easy refactoring of parts of the source
 code, while leaving the rest of the system untouched. As
-such the components of miq can be layed out in figure
+such the components of miq can be laid out in figure
 \ref{fig:miq-components} .
 
 \begin{figure}[hbtp]
@@ -35,17 +35,16 @@ such the components of miq can be layed out in figure
 \end{figure}
 
 Miq is presented as a pipeline of stages, where each
-subsystem transform the input data to achieve a desired
+subsystem transforms the input data to achieve a desired
 state. This design is inspired by other package managers,
 which present a similar structure of stages. The main
-difference, is that miq works on static package definitions
-layed out in a file, which describe the desired state of the
+difference, is that miq works on static package laid out in a file, which describe the desired state of the
 system. In contrast to other package managers, like |apt|,
 where the final state of the system is a succession of
 commands executed in the shell.
 
 On of the main differences of miq to other package managers,
-is how the files are layed out in the filesystem. This is
+is how the files are laid out in the file system. This is
 because each package is given a unique identifier, which in
 turns is used for the directory where the package will be
 located. This identifier is also unique between different
@@ -53,7 +52,7 @@ versions of the same package. And not only that, but it also
 encodes the recipe used to build the package itself, and all
 of its parents.
 
-To accomplish the tagging of each package with an unique
+To accomplish the tagging of each package with a unique
 identifier, a flow of data from package input to package is
 visualized on figure \ref{fig:hash}. From a |PackageInput|,
 a unique hash is generated, that is the result from hashing
@@ -88,13 +87,13 @@ struct PackageInput {
 \end{figure}
 
 The implications of this design is that any package gets a
-different place on the filesystem, which is derived from
+different place on the file system, which is derived from
 everything that defines the package itself - its build
 script and its dependencies, which in turn are also hashed
 by the same rules. The advantage of this design, is that
 every package has its dependencies perfectly defined,
 instead of relying on automatic detection. Let's say that
-package |foo| depends of package |bar|. On a conventional
+package |foo| depends on package |bar|. On a conventional
 package manager, if |bar| is changed in any form (for
 example, updated), then |foo| is usually not modified. But
 in essence, now |foo|, if we consider it as a whole, that is

@@ -26,8 +26,8 @@ around 1991 as a research project to provide a substitute to
 the MINIX kernel, and finally the GNU components replaced
 any leftovers of MINIX \cite{OverviewGNUSystem}.
 
-The Linux kernel and all of the GNU components were written
-in C, so it became the de-facto language for system
+The Linux kernel and all the GNU components were written
+in C, so it became the de facto language for system
 software. Therefore, the C language is intertwined with how
 a Linux operating system works, and all the packages that
 compose it from the kernel to userland. From the packager's
@@ -38,7 +38,7 @@ headers and library objects that provide interfaces to the
 operating system for programs written in C. Libc was
 standardized in 1999 by the ISO C committee under the C99
 language specification, and further revisions were made to
-update it. Some of the headers from libc include:
+update it. Some headers from libc include:
 
 \begin{figure}[hbt]
     \centerfloat
@@ -53,7 +53,7 @@ update it. Some of the headers from libc include:
         ... & ... \\
 
     \end{tblr}
-    \caption{Some of the headers from libc.}
+    \caption{Some headers from libc.}
 \end{figure}
 
 For Linux, there are various implementations of libc, such
@@ -69,7 +69,7 @@ execution takes over.
 
 Apart from libc, many programs and libraries are implemented
 on top of it, to provide what is called as the \acl{LSB}
-\cite{LinuxStandardBase} . This specification outlines some
+\cite{LinuxStandardBase}. This specification outlines some
 of the most important programs that compose a Linux system,
 such as ``coreutils'', which contains the most basic
 terminal utilities, like |ls|, |cat|, |cp|, etc. To be able
@@ -80,7 +80,7 @@ be able to support the compilation and configuration of
 programs, some other tools are required like |make| or
 |sed|, and also a POSIX shell to interact with the system,
 in the form of |bash|. The table \ref{tab:lsb} outlines some
-of these componentes and their functionality.
+of these components and their functionality.
 
 \begin{figure}[hbt]
     \centerfloat
@@ -104,12 +104,12 @@ of these componentes and their functionality.
         diff \\
          systemd & System and service manager \\
     \end{tblr}
-    \caption{Some of the basic components of a Linux system.}
+    \caption{Basic components of a Linux system.}
     \label{tab:lsb}
 \end{figure}
 
 As a Linux distribution grows in scope, more and more
-components are needed to build something that an end-user is
+components are needed to build something that an end user is
 able to use. Starting from graphical toolkits, like GTK or
 QT, to the X11 display server and desktop environments, like
 Gnome or KDE Plasma. And every component in-between, like
@@ -126,7 +126,7 @@ usage of Linux packages, so the focus won't be on building
 complex software, but rather building basic components to
 prove the viability of the deployment model. It is also
 important to note, that while packages can be put together
-to form a fully function independent operating system, a
+to form a fully functional operating system, a
 package manager of Linux packages can work as a ``guest'' on
 a different distribution. This is, running Linux packages
 that are not part of the distribution itself. For a
@@ -146,7 +146,7 @@ with it.
 
 As discussed in the previous section, the scope of this work
 is to be able to demonstrate the viability of the deployment
-model of hashed paths instead of relying in the \ac{FHS}.
+model of hashed paths instead of relying on the \ac{FHS}.
 So, as one of the core libraries, libc is the one to be
 compiled the first. As mentioned previously, libc is the C
 standard library, that in practice is used by every program
@@ -171,11 +171,11 @@ These GCC dependency in this graph is assumed to already
 source of impurity, as we don't know what C compiler was
 used, we can't hash the input to produce a hash for the musl
 output. This C compiler is ``external'' to the system.
-Therefore one of the objectives of any package manager is to
+Therefore, one of the objectives of any package manager is to
 be able to ``support'' itself, to be able to produce
 packages without any external interference. Then, this GCC
 must come from the package manager itself as well, and we
-can draw its dependency graph in figure \ref{fig:libc-deps2} .
+can draw its dependency graph in figure \ref{fig:libc-deps2}.
 
 \begin{figure}[hbt]
     \centerfloat
@@ -188,12 +188,12 @@ As can be seen, to be able to build libc, we need a C
 compiler, and to build a C compiler we need libc. This is a
 problem of a circular dependency, in particular the
 bootstrapping problem, because we need to ``base'' to be
-able to lift the entire system system from the ground.
+able to lift the entire system from the ground.
 Moreover, if we try to draw a dependency from cyclically as
 in figure \ref{fig:libc-deps3}, we can see that graph is now
 \emph{cyclic}, this means that it is no longer a \ac{DAG} as
 discussed in the previous section, and we can no longer hash
-the nodes, as it would result in a infinite recursion. For
+the nodes, as it would result in an infinite recursion. For
 this reason, cyclic dependencies are not allowed in miq, and
 using and checking for a proper \ac{DAG} is important.
 
@@ -227,9 +227,9 @@ created, where libc and the C compiler (along any extra
 tools) are compiled in succession, using the result of the
 previous step to compile the next one. These are called
 ``stages'', and the process ``distills'' the programs until
-an stable result is obtained. The final stage (from 0 to 1,
+a stable result is obtained. The final stage (from 0 to 1,
 2 , etc) is then used to build the system, instead of the
-zero-th stage.
+zeroth stage.
 
 \begin{figure}[hbt]
     \centerfloat
