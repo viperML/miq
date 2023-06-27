@@ -10,16 +10,16 @@ permissions:
 concurrency: build
 
 jobs:
-  main:
+  miq:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@main
-
       - name: Checkout
         uses: actions/checkout@v3
-
-      - name: Build
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+      - name: Install Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Build miq
         run: |
           mkdir release
           nix build .#pkgsCross.musl64.miq -L
@@ -44,3 +44,28 @@ jobs:
           allowUpdates: true
           replacesArtifacts: true
           artifacts: "release/release.tar.gz,release/miq"
+
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+      - name: Install Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Build miq
+        run: |
+          pushd doc
+          nix develop .#doc --command bash -c "just build"
+          popd
+
+      - uses: ncipollo/release-action@v1
+        name: Release
+        with:
+          tag: latest
+          omitBody: true
+          omitName: true
+          allowUpdates: true
+          replacesArtifacts: true
+          artifacts: "doc/out/index.pdf"
