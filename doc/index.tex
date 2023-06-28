@@ -121,6 +121,13 @@
 
 \usepackage{pdfpages}
 
+\providecommand{\keywords}[1]
+{
+  % \large
+  \textbf{Keywords ---}
+  \normalsize
+  #1
+}
 \begin{document}
 
 \includepdf[pages=-]{assets/Portada-externa.pdf}
@@ -133,7 +140,17 @@
 
 \begin{abstract}
   \input{_abstract.tex}
+
+  \vspace{10pt}
+
+  \begin{center}
+    \keywords{Linux, package, immutable, declarative, graph}
+
+    \textbf{Palabras clave ---} Linux, paquetes, inmutable, declarativo, grafo
+  \end{center}
 \end{abstract}
+
+
 \newpage
 
 % \renewcommand{\abstractname}{Acknowledgements}

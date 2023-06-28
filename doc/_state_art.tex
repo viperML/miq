@@ -1,2 +1,96 @@
 \chapter{State of the art}
-\lipsum[20]
+
+The landscape of Linux is separated by what is called as
+``Linux distribution''. A Linux distribution (or distro for
+short) is a collection of packages that are distributed
+together as a part of the project. A package is a software
+project that is distributed as a single unit, and contains
+multiple files in the disk. The packages vary from the most
+basic libraries and programs, like libc or bash, to any
+complex software, like Google Chrome -- and also the Linux
+kernel itself along with its kernel modules.
+
+Linux packages are not meant to be shared between different
+distribution. When a package is distributed for a specific
+distro -- for example, Ubuntu -- it relies on libraries
+provided by other Ubuntu packages. If we try to install this
+package into a different distribution, for example Fedora,
+it may or may not work. This problem is aggravated by the
+fact that Linux libraries are very ``split'', as following
+the UNIX philosophy of ``do one thing and do it well'', the
+state of Linux distributions is that there are many
+libraries that combine. This is in contrast to
+other operating systems like Windows, where a package author
+can rely on a ``base'' system that doesn't change, and can
+bundle its own dependencies as part of the package, without
+intermediate links.
+
+Because each distribution has its own organization of
+packages versions and customization, that are not
+interoperable between different distributions, the Linux
+ecosystem is very fragmented. The projects use their own
+package manager to install every package, as installing a
+different package manager is not guaranteed to work. For
+this reason, each distribution is only associated with its
+reference package manager, being two sides of the same coin.
+Some examples are:
+
+\begin{itemize}
+    \item Debian --- apt
+    \item Fedora --- dnf
+    \item Gentoo --- portage
+    \item Arch --- pacman
+\end{itemize}
+
+With the increasing usage of internet services, Linux has
+placed itself as the de facto operating system for servers.
+As the online infrastructure of the world runs on Linux,
+there is an increasing amount of developers that need to
+deploy their applications into cloud services. One problem
+that developers face is that applications are not portable
+enough between different Linux distributions. This is partly
+a result of this fragmentation that was mentioned earlier.
+Updates of the same distribution can also cause
+incompatibilities from one version to another.
+
+As a result, an alternative software deployment solution to
+just building and running packages in the host operating
+system was developed by the company \textit{Docker}, and
+later established in 2015 under the Linux Foundation as the
+\textit{Open Container Initiative}. This solution uses the
+concept of ``containers'', which are a collection of files
+that run in a sandboxed environment from the host operating
+system. This environment is usually based on some Linux
+distribution such as Debian, but with the advantage that a
+container may be built from any host \ac{OS} and deployed
+into any host \ac{OS} .
+
+Containers serve as a ``compatibility layer'' for classical
+Linux distributions, as it doesn't change the underlying
+functionality of packages themselves. But it is effective
+enough to provide a good developer experience.
+
+Earlier on the timeline, \citeauthor{dolstraNixOS2008}
+researched this same problem of the classical software
+deployment, and proposed a solution based on the concept of
+a functional package manager \cite{dolstraNixOS2008} . After
+years of development, this project has evolved into the Nix
+package manager and the NixOS Linux distribution. Nix tries
+an alternative approach to the classical package managers,
+by prefixing each package with a unique path based on a hash
+of its definition and dependencies. This allows multiple
+packages to coexist in the same host operating system, and
+also to use Nix on different host systems that are not
+NixOS. While this solves the problem of reproducible
+software deployments that Docker / OCI solves, the latter
+also provides an application runtime which is used to
+isolate the application from the host operating system. In
+this regard, Nix is just a system to build packages. One of
+the problem that Nix faces is the usage of its own
+language Nix (with the same name), that is based on the
+concept of functional programming and pure function
+application, with the inspiration of Haskell. As this
+language is not very user-friendly, the GNU Guix project
+investigated in the usage of the Scheme language as an
+alternative to Nix
+\cite{courtesFunctionalPackageManagement2013} .
