@@ -26,16 +26,16 @@
     ],
     "latex-workshop.latex.recipes": [
         {
-            "name": "build",
+            "name": "sync-build",
             "tools": [
                 "just-sync",
                 "just-build"
             ]
         },
         {
-            "name": "watch",
+            "name": "build",
             "tools": [
-                "just-watch"
+                "just-build"
             ]
         },
     ],

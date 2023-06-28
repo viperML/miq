@@ -26,6 +26,7 @@
           ninecolors
           xurl
           pdfpages
+          setspace
           ;
       })
     ];
