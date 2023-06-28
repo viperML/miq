@@ -15,6 +15,13 @@ explored, but iterations over the idea of representing
 packages as a structure of independent hashed
 nodes, could lead to advantages in both Linux or
 any other package management system.
+The implementation of miq is not trivial but also not hard
+to perform, and given the timespan and resources of this
+project it should be considered as a proof of concept which
+could be improved upon. One of the main difficulties is the
+configuring of packages for nix-styled hashed paths, but the
+nixpkgs repository has been clearing the path for more than
+a decade now.
 
 This document could serve as the basis for any future project
 that wants to explore the same ideas as miq. The
