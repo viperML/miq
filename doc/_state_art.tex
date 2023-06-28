@@ -19,7 +19,11 @@ it may or may not work. This problem is aggravated by the
 fact that Linux libraries are very ``split'', as following
 the UNIX philosophy of ``do one thing and do it well'', the
 state of Linux distributions is that there are many
-libraries that combine. This is in contrast to
+libraries that combine. The vast majority of these library
+are written in C and C++, making Linux package managers the
+de facto package manager for these languages
+\cite{amor-iglesiasMeasuringLibreSoftware2005} . This is in
+contrast to
 other operating systems like Windows, where a package author
 can rely on a ``base'' system that doesn't change, and can
 bundle its own dependencies as part of the package, without
@@ -28,7 +32,11 @@ intermediate links.
 Because each distribution has its own organization of
 packages versions and customization, that are not
 interoperable between different distributions, the Linux
-ecosystem is very fragmented. The projects use their own
+ecosystem is very fragmented
+\cite{espePerformanceEvaluationContainer2020}, even existing
+distributions for specific applications
+\cite{nemotoLin4NeuroCustomizedLinux2011} . The projects
+use their own
 package manager to install every package, as installing a
 different package manager is not guaranteed to work. For
 this reason, each distribution is only associated with its
@@ -84,7 +92,7 @@ also to use Nix on different host systems that are not
 NixOS. While this solves the problem of reproducible
 software deployments that Docker / OCI solves, the latter
 also provides an application runtime which is used to
-isolate the application from the host operating system. In
+isolate the application from the host operating system \cite{espePerformanceEvaluationContainer2020}. In
 this regard, Nix is just a system to build packages. One of
 the problem that Nix faces is the usage of its own
 language Nix (with the same name), that is based on the
@@ -94,3 +102,29 @@ language is not very user-friendly, the GNU Guix project
 investigated in the usage of the Scheme language as an
 alternative to Nix
 \cite{courtesFunctionalPackageManagement2013} .
+
+A different approach to the problem of mutating packages in
+the operating system has been taken by OSTree. This project
+aims to develop a package-centric installation model based
+on git \cite{waltersFutureContinuousIntegration2013} . In
+the OSTree-backed distributions, like Fedora Silverblue, the
+operating system is stored in a ostree, such that changes
+updates are done by pulling a new ``commit'' from the
+internet. This change is done automatically without user
+intervention, such that the files in the operating system
+are not swapped while the system is online. As ostree
+organizes the file in a git-like structure, the \ac{FHS} is
+kept (|/usr/bin|, |/usr/lib|, etc), but the files are stored
+in a content address storage. The file system is also kept
+as read-only, as the changes are performed on boot, thus
+having an immutable system.
+
+While package managers for Linux operating systems are on
+the spotlight of this project, any software project grows
+big enough such that it needs to implement its own package
+manager. This is the case for every programming language,
+that supports any kind of concept of libraries, such as the
+languages used for this project: Rust (crates) and Lua
+(luarocks). The reproducibility of packages is of serious
+concern \cite{goswamiInvestigatingReproducibilityNPM2020}, as the world relies more heavily on online
+services.
