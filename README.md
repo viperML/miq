@@ -17,7 +17,7 @@ Each package, which is built from source, receives a unique ID based on its depe
 /miq/store/bootstrap-tools.tar.xz-9d678d0fc5041f17
 ```
 
-The package manager implements a "recipe" evaluator implemented in Lua, which is used to describe how packages are built (similarly to rpmspec or ebuilds). This evaluator also calculates the hashes of the packages, and lets the user define the packages without having to hardcode these values.
+The package manager implements a "recipe" evaluator implemented in Lua, which is used to describe how packages are built (similarly to ebuilds or rpmspec). This evaluator also calculates the hashes of the packages, and lets the user define the packages without having to hardcode these values.
 
 
 <!-- <p align="center">
@@ -30,19 +30,16 @@ The package manager implements a "recipe" evaluator implemented in Lua, which is
 
 Miq is distributed as a statically linked ELF with no dependencies, meaning it should work on any host Linux distribution with no dependencies.
 
-- Make a new working directory:
+- (Optional) Make a new working directory:
   ```sh
-  mkdir miq && cd miq
+  mkdir ~/miq && cd ~/miq
   ```
-- Download the release tarball:
+- Download and unpack the release tarball:
   ```sh
   curl -OL https://github.com/viperML/miq/releases/download/latest/release.tar.gz
-  ```
-- Unpack the tarball:
-  ```sh
   tar -xvf release.tar.gz
   ```
-- If bubblewrap is not installed in the host system, add it to PATH:
+- If bubblewrap is not installed in the host system, add it to `PATH`:
   ```sh
   export PATH="$PWD:$PATH"
   ```
@@ -55,7 +52,7 @@ The usage manual is rendered on the thesis document available for download.
 
 ## Development
 
-Nix is used to provide the Rust toolchain and the required development dependencies, like rust-analyzer and sqlite3. Once nix is properl installed, getting a devshell for development is as simple as running:
+Nix is used to provide the Rust toolchain and the required development dependencies, like rust-analyzer and sqlite3. Once nix is properly installed, getting a devshell for development is as simple as running:
 
 ```sh
 nix develop
