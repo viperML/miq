@@ -228,4 +228,22 @@ end
 --disable-bootstrap \
 --disable-nls \
 --enable-languages=c,c++ \
+
+do
+	local version = "0.5.12"
+	local src = x.fetchTar {
+		url = f "http://gondor.apana.org.au/~herbert/dash/files/dash-{{version}}.tar.gz",
+	}
+	x.dash = x.stdenv {
+		name = "dash",
+    version = version,
+		script = f [[
+      {{src}}/configure --prefix=$PREFIX
+
+      make -j$(nproc)
+      make install -j$(nproc)
+    ]],
+	}
+end
+
 return x

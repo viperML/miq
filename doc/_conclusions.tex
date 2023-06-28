@@ -81,5 +81,14 @@ future work that could be done in the area of miq:
     miq compile a package in a system A -- for example
     |x86_64| and have it run in a |aarch64| system.
 
+    \item \textbf{Garbage collection}: as miq is based on
+    the design of nix, the same problems that nix has with
+    garbage collection appear on miq. The issue is that as
+    the user builds packages, there is no mechanism to tell
+    how to remove unused paths. The solution used by nix is
+    to save in the store database the relationship between
+    the packages, such that everything can be removed except
+    a root package and all its dependencies.
+
 
 \end{enumerate}
