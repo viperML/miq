@@ -95,6 +95,7 @@ impl Args {
     async fn _main(&self) -> Result<()> {
         let root_node = self.unit_ref.ref_to_unit()?;
         let (dag, _) = eval::dag(root_node.clone())?;
+        let dag: &'static mut _ = Box::leak(Box::new(dag));
 
         let db_conn = Arc::new(Mutex::new(crate::db::DbConnection::new()?));
 
@@ -155,9 +156,9 @@ impl Args {
 
                 let task_status = if all_deps_built && can_add_to_tasks {
                     let _db_conn = db_conn.clone();
-                    let unit = unit.clone();
+                    // let unit = unit.clone();
                     let rebuild = match (self, &unit) {
-                        (Args { rebuild: true, .. }, _) => unit == root_node,
+                        (Args { rebuild: true, .. }, _) => unit == &root_node,
                         (
                             Args {
                                 rebuild_all: true, ..
