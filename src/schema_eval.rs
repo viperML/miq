@@ -55,7 +55,7 @@ impl crate::Main for Args {
 #[async_trait]
 #[delegatable_trait]
 pub trait Build {
-    async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>) -> Result<MiqStorePath>;
+    async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>) -> Result<()>;
 }
 
 #[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Hash, Delegate, Eq)]

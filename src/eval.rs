@@ -120,20 +120,31 @@ impl crate::Main for Args {
 }
 
 fn graphviz_unit_format(unit: &Unit, use_paths: bool) -> String {
-    if use_paths {
-        let res: MiqResult = unit.clone().into();
-        let eval: MiqEvalPath = (&res).into();
-        format!("label = \"{}\" ", eval.as_ref().to_str().unwrap())
+    let pretty_name = if use_paths {
+        let p = unit.result().store_path();
+        format!("{}", p.to_string_lossy())
     } else {
         match unit {
             Unit::PackageUnit(inner) => {
-                if let Some(ref v) = inner.version {
-                    format!("label = \"{}-{}\" ", inner.name, v)
-                } else {
-                    format!("label = \"{}\" ", inner.name)
-                }
+                format!(
+                    "{}",
+                    inner.name,
+                    // FIXME
+                    // inner.version.unwrap_or(String::new())
+                )
             }
-            Unit::FetchUnit(inner) => format!("label = \"{}\", shape=box, color=gray70 ", inner.name),
+            Unit::FetchUnit(inner) => {
+                format!("{}", inner.name)
+            }
+        }
+    };
+
+    match unit {
+        Unit::PackageUnit(_) => {
+            format!("label = \"{}\" ", pretty_name)
+        }
+        Unit::FetchUnit(_) => {
+            format!("label = \"{}\", shape=box, color=gray70 ", pretty_name)
         }
     }
 }
@@ -183,7 +194,7 @@ fn add_children_recursive(dag: &mut UnitNodeDag, index: NodeIndex) -> Result<()>
         }
         Unit::PackageUnit(package) => {
             for dep in &package.deps {
-                let dep_unit: Unit = dep.try_into()?;
+                let dep_unit = Unit::from_result(dep)?;
 
                 trace!(?dep, "=> adding dep");
 
@@ -243,33 +254,32 @@ impl MiqResult {
     }
 }
 
-impl From<Unit> for MiqResult {
-    fn from(value: Unit) -> Self {
-        match value {
-            Unit::PackageUnit(inner) => inner.result,
-            Unit::FetchUnit(inner) => inner.result,
+impl Unit {
+    pub fn result<'s>(&'s self) -> &'s MiqResult {
+        match self {
+            Unit::PackageUnit(inner) => &inner.result,
+            Unit::FetchUnit(inner) => &inner.result,
         }
     }
 }
 
-impl TryFrom<&MiqResult> for Unit {
-    type Error = Report;
-
-    fn try_from(value: &MiqResult) -> std::result::Result<Self, Self::Error> {
-        let path: MiqEvalPath = value.into();
-        let raw_text =
-            std::fs::read_to_string(&path).wrap_err(format!("Reading eval path {:?}", path))?;
+impl Unit {
+    pub fn from_result(result: &MiqResult) -> Result<Self> {
+        let path = result.eval_path();
+        let raw_text = std::fs::read_to_string(&path.as_path())
+            .wrap_err(format!("Reading eval path {:?}", path))?;
         let result = toml::from_str(&raw_text)?;
         Ok(result)
     }
 }
 
-#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default, Educe)]
+#[educe(Deref)]
 pub struct MiqEvalPath(PathBuf);
 
-impl From<&MiqResult> for MiqEvalPath {
-    fn from(value: &MiqResult) -> Self {
-        let path_str = &["/miq/eval/", &value.0, ".toml"].join("");
+impl MiqResult {
+    pub fn eval_path<'s>(&'s self) -> MiqEvalPath {
+        let path_str = ["/miq/eval/", &self.0, ".toml"].join("");
         MiqEvalPath(PathBuf::from(path_str))
     }
 }
@@ -277,7 +287,7 @@ impl From<&MiqResult> for MiqEvalPath {
 #[test]
 fn test_get_evalpath() {
     let input = MiqResult("hello-world-AAAA".into());
-    let output: MiqEvalPath = (&input).into();
+    let output = input.eval_path();
     let output_expected = MiqEvalPath("/miq/eval/hello-world-AAAA.toml".into());
     assert_eq!(output, output_expected);
 }
@@ -288,19 +298,21 @@ impl AsRef<Path> for MiqEvalPath {
     }
 }
 
-#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, JsonSchema, Default, Educe)]
+#[educe(Deref)]
 pub struct MiqStorePath(PathBuf);
 
-impl From<&MiqResult> for MiqStorePath {
-    fn from(value: &MiqResult) -> Self {
-        let path_str = &["/miq/store/", &value.0].join("");
+impl MiqResult {
+    pub fn store_path<'s>(&'s self) -> MiqStorePath {
+        let path_str = ["/miq/store/", &self.0].join("");
         MiqStorePath(PathBuf::from(path_str))
     }
 }
+
 #[test]
 fn test_get_storepath() {
     let input = MiqResult("hello-world-AAAA".into());
-    let output: MiqStorePath = (&input).into();
+    let output = input.store_path();
     let output_expected = MiqStorePath("/miq/store/hello-world-AAAA".into());
     assert_eq!(output, output_expected);
 }
@@ -311,32 +323,19 @@ impl AsRef<Path> for MiqStorePath {
     }
 }
 
-impl AsRef<OsStr> for MiqStorePath {
-    fn as_ref(&self) -> &OsStr {
-        self.0.as_os_str()
-    }
-}
-
-impl MiqStorePath {
-    pub fn try_exists(&self) -> std::io::Result<bool> {
-        self.0.try_exists()
-    }
-}
-
 impl Unit {
     pub fn write_to_disk(&self) -> Result<()> {
-        let prefix = "#:schema /miq/eval-schema.json";
+        let header = "#:schema /miq/eval-schema.json";
         let serialized = toml::to_string_pretty(self)?;
-        let result: MiqResult = MiqResult::from(self.clone());
-        let eval_path: MiqEvalPath = (&result).into();
+        let eval_path = self.result().eval_path();
 
         let mut file = OpenOptions::new()
             .create(true)
             .write(true)
-            .open(&eval_path)
+            .open(&eval_path.as_path())
             .wrap_err(format!("Opening serialisation file for {:?}", eval_path))?;
 
-        file.write_all(prefix.as_bytes())?;
+        file.write_all(header.as_bytes())?;
         file.write_all("\n".as_bytes())?;
         file.write_all(serialized.as_bytes())?;
 

@@ -189,26 +189,30 @@ impl Args {
                 build_tasks.insert(unit, task_status);
             }
 
-            while let Some((unit, result)) = futs.try_next().await? {
-                let res: MiqResult = unit.clone().into();
-                let eval: MiqEvalPath = (&res).into();
-                let store: MiqStorePath= (&res).into();
-                let store: &Path = store.as_ref();
-                let sugg = format!("Check the unit at {}", eval.as_ref().to_str().unwrap());
-                let res: &str = res.as_ref();
-                let sugg2 = format!("Build logs available at /miq/log/{}.log", res);
-                let sugg3 = format!("Intermetidate results at {}", store.to_str().unwrap());
-                let result = result.suggestion(sugg).suggestion(sugg2).suggestion(sugg3)?;
-                debug!(?unit, ?result, "Task finished");
+            while let Some((unit, output)) = futs.try_next().await? {
+                debug!(?unit, ?output, "Task finished");
+
+                output
+                    .suggestion(format!(
+                        "Check the unit definition at {}",
+                        unit.result().eval_path().to_string_lossy()
+                    ))
+                    .suggestion(format!(
+                        "Build logs available at /miq/log/{}.log",
+                        unit.result().as_str()
+                    ))
+                    .suggestion(format!(
+                        "Intermetidate results at {}",
+                        unit.result().store_path().to_string_lossy()
+                    ))?;
+
                 let t = build_tasks.get_mut(&unit).unwrap();
                 *t = BuildTask::Finished;
 
-                // Pretty log
-                let p: &Path = result.as_ref();
                 let u = format!("{unit:?}");
                 eprintln!(
                     "{} <- {}",
-                    p.to_str().unwrap().bright_blue(),
+                    unit.result().store_path().to_string_lossy().bright_blue(),
                     &u.bright_black()
                 );
             }
@@ -222,14 +226,15 @@ impl Args {
 #[async_trait]
 impl Build for Fetch {
     #[tracing::instrument(skip(conn), ret, err, level = "debug")]
-    async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>) -> Result<MiqStorePath> {
-        let path: MiqStorePath = (&self.result).into();
+    async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>) -> Result<()> {
+        let path = self.result.store_path();
+        let path = path.as_path();
 
         if conn.lock().unwrap().is_db_path(&path)? {
             if rebuild {
                 conn.lock().unwrap().remove(&path)?;
             } else {
-                return Ok(path);
+                return Ok(());
             }
         }
 
@@ -253,27 +258,27 @@ impl Build for Fetch {
         }
 
         conn.lock().unwrap().add(&path)?;
-        Ok(path)
+        Ok(())
     }
 }
 
 #[async_trait]
 impl Build for Package {
     #[tracing::instrument(skip(conn), ret, err, level = "debug")]
-    async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>) -> Result<MiqStorePath> {
-        let store_path: MiqStorePath = (&self.result).into();
-        let p: &Path = store_path.as_ref();
+    async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>) -> Result<()> {
+        let path = self.result.store_path();
+        let path = path.as_path();
 
-        if conn.lock().unwrap().is_db_path(&store_path)? {
+        if conn.lock().unwrap().is_db_path(&path)? {
             if rebuild {
-                conn.lock().unwrap().remove(&store_path)?;
+                conn.lock().unwrap().remove(&path)?;
             } else {
-                return Ok(store_path);
+                return Ok(());
             }
         }
 
-        clean_path(&store_path)?;
-        std::fs::create_dir(&store_path)?;
+        clean_path(&path)?;
+        std::fs::create_dir(&path)?;
         let _builddir = tempfile::tempdir()?;
         let builddir = _builddir.path();
 
@@ -284,7 +289,7 @@ impl Build for Package {
 
         let mut cmd = BubblewrapBuilder::default()
             .builddir(builddir)
-            .resultdir(p)
+            .resultdir(path)
             .cmd(&wrapped_cmd)
             .env(&self.env)
             .extra_bwrap(&[
@@ -331,14 +336,14 @@ impl Build for Package {
             }
         }
 
-        match p.try_exists().wrap_err("Failed to produce an output") {
+        match path.try_exists().wrap_err("Failed to produce an output") {
             Ok(true) => {}
-            Ok(false) => bail!("Output path doesn't exist: {:?}", p),
+            Ok(false) => bail!("Output path doesn't exist: {:?}", path),
             Err(e) => bail!(e),
         }
 
-        conn.lock().unwrap().add(&store_path)?;
-        Ok(store_path)
+        conn.lock().unwrap().add(&path)?;
+        Ok(())
     }
 }
 

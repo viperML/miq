@@ -225,12 +225,9 @@ fn interpolate<'lua>(
     match value {
         table @ Value::Table(_) => {
             if let Ok(unit) = ctx.from_value::<Unit>(table.clone()) {
-                let miq_result: MiqResult = unit.into();
-                let store_path: MiqStorePath = (&miq_result).into();
-                let store_path: &Path = store_path.as_ref();
-                let left = store_path.to_str().unwrap().to_owned();
-                let right = miq_result.deref().clone();
-                Ok((ctx.pack(left)?, ctx.pack(right)?))
+                let left = unit.result().store_path();
+                let right = unit.result().as_str();
+                Ok((ctx.pack(left.to_str().unwrap())?, ctx.pack(right)?))
             } else if let Ok(mt) = ctx.from_value::<MetaText>(table) {
                 let right = mt
                     .deps
