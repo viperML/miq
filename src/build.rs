@@ -267,6 +267,7 @@ impl Build for Package {
     async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>) -> Result<()> {
         let path = self.result.store_path();
         let path = path.as_path();
+        let path_str = path.to_str().unwrap();
 
         if conn.lock().unwrap().is_db_path(&path)? {
             if rebuild {
@@ -284,25 +285,70 @@ impl Build for Package {
         let _tmpdir = tempfile::tempdir()?;
         let tmpdir = _tmpdir.path().to_str().unwrap();
 
-        let wrapped_cmd = ["/bin/sh", "-c", &self.script];
+        let mut cmd = Command::new("bwrap");
+        cmd.env_clear();
+        cmd.args([
+            "--bind", tmpdir, tmpdir, "--setenv", "TMP", tmpdir, "--setenv", "TMPDIR", tmpdir,
+            "--setenv", "TEMP", tmpdir, "--setenv", "TEMPDIR", tmpdir,
+        ]);
+        cmd.args([
+            "--clearenv",
+            // Store and result
+            "--ro-bind",
+            "/miq",
+            "/miq",
+            "--bind",
+            path_str,
+            path_str,
+            "--setenv",
+            "miq_out",
+            path_str,
+            // Build directory
+            "--bind",
+            builddir.to_str().unwrap(),
+            "/build",
+            "--chdir",
+            "/build",
+            "--setenv",
+            "HOME",
+            "/build",
+            // Global environent
+            "--dev-bind",
+            "/dev",
+            "/dev",
+            "--proc",
+            "/proc",
+            "--bind",
+            "/run",
+            "/run",
+            "--bind",
+            "/tmp",
+            "/tmp",
+            "--ro-bind",
+            "/etc",
+            "/etc",
+            "--ro-bind",
+            "/nix",
+            "/nix",
+            "--ro-bind",
+            "/bin",
+            "/bin",
+            // No network
+            "--unshare-net",
+            // Set user/group
+            "--unshare-user",
+            "--uid",
+            "0",
+            "--gid",
+            "0",
+        ]);
+        cmd.args(["/bin/sh", "-c", &self.script]);
+        cmd.envs(&self.env);
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
+        cmd.kill_on_drop(true);
 
-        let mut cmd = BubblewrapBuilder::default()
-            .builddir(builddir)
-            .resultdir(path)
-            .cmd(&wrapped_cmd)
-            .env(&self.env)
-            .extra_bwrap(&[
-                "--bind", tmpdir, tmpdir, "--setenv", "TMP", tmpdir, "--setenv", "TMPDIR", tmpdir,
-                "--setenv", "TEMP", tmpdir, "--setenv", "TEMPDIR", tmpdir,
-            ])
-            .build()?
-            .build_command()?;
-
-        let child = cmd
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true)
-            .spawn()?;
+        let child = cmd.spawn()?;
 
         let log_file_path = format!("/miq/log/{}.log", self.result.deref());
         let err_msg = format!("Creating logfile at {}", log_file_path);
@@ -343,85 +389,5 @@ impl Build for Package {
 
         conn.lock().unwrap().add(&path)?;
         Ok(())
-    }
-}
-
-#[derive(Debug, Builder)]
-struct Bubblewrap<'a> {
-    // args: Vec<String>,
-    builddir: &'a Path,
-    resultdir: &'a Path,
-    cmd: &'a [&'a str],
-    extra_bwrap: &'a [&'a str],
-    env: &'a BTreeMap<String, String>,
-}
-
-impl Bubblewrap<'_> {
-    fn build_command(&self) -> Result<Command> {
-        let resultdir = self.resultdir.to_str().unwrap();
-        let mut args = vec![
-            "--clearenv",
-            // Store and result
-            "--ro-bind",
-            "/miq",
-            "/miq",
-            "--bind",
-            resultdir,
-            resultdir,
-            "--setenv",
-            "miq_out",
-            resultdir,
-            // Build directory
-            "--bind",
-            self.builddir.to_str().unwrap(),
-            "/build",
-            "--chdir",
-            "/build",
-            "--setenv",
-            "HOME",
-            "/build",
-            // Global environent
-            "--dev-bind",
-            "/dev",
-            "/dev",
-            "--proc",
-            "/proc",
-            "--bind",
-            "/run",
-            "/run",
-            "--bind",
-            "/tmp",
-            "/tmp",
-            "--ro-bind",
-            "/etc",
-            "/etc",
-            "--ro-bind",
-            "/nix",
-            "/nix",
-            "--ro-bind",
-            "/bin",
-            "/bin",
-            // No network
-            "--unshare-net",
-            // Set user/group
-            "--unshare-user",
-            "--uid",
-            "0",
-            "--gid",
-            "0",
-        ];
-
-        for (name, value) in self.env {
-            args.push("--setenv");
-            args.push(name);
-            args.push(value);
-        }
-
-        let mut command = Command::new("bwrap");
-        command.args(args);
-        command.args(self.extra_bwrap);
-        command.args(self.cmd);
-        trace!(?command);
-        Ok(command)
     }
 }
