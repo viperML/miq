@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::OsStr;
-use std::fmt::{format, Debug};
+use std::fmt::Debug;
 use std::io::Write;
 use std::ops::Deref;
 use std::path::Path;
@@ -12,8 +12,7 @@ use async_trait::async_trait;
 use bytes::Buf;
 use color_eyre::eyre::{bail, ensure, eyre, Context};
 use color_eyre::Help;
-use daggy::petgraph::graph::Node;
-use daggy::petgraph::visit::{Dfs, IntoNodeReferences};
+
 use daggy::Walker;
 use derive_builder::Builder;
 use futures::stream::futures_unordered;
@@ -22,10 +21,10 @@ use owo_colors::OwoColorize;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio_process_stream::{Item, ProcessLineStream};
-use tracing::{debug, info, span, trace, Level};
+use tracing::{debug, span, trace, Level};
 
 use crate::db::DbConnection;
-use crate::eval::{MiqEvalPath, MiqResult, MiqStorePath, RefToUnit, UnitRef};
+use crate::eval::{RefToUnit, UnitRef};
 use crate::schema_eval::{Build, Fetch, Package, Unit};
 use crate::*;
 

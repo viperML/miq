@@ -11,7 +11,6 @@ mod lua_package;
 mod schema_db;
 mod schema_eval;
 
-use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 
 use ambassador::{delegatable_trait, Delegate};
@@ -20,7 +19,7 @@ use color_eyre::eyre::bail;
 use color_eyre::eyre::ContextCompat;
 use color_eyre::Result;
 use tracing::info;
-use tracing::trace;
+
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
 

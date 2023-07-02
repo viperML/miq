@@ -1,4 +1,3 @@
-use std::ffi::OsStr;
 use std::fs::OpenOptions;
 use std::hash::Hash;
 use std::io::Write;
@@ -8,7 +7,7 @@ use std::str::FromStr;
 use color_eyre::eyre::{bail, ensure, Context};
 use color_eyre::{Report, Result};
 use daggy::petgraph::dot::{Config, Dot};
-use daggy::{petgraph, Dag, NodeIndex, Walker};
+use daggy::{Dag, NodeIndex, Walker};
 use schema_eval::Unit;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

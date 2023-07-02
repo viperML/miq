@@ -100,10 +100,7 @@ impl crate::Main for Args {
                             info!(?elem, "Removing");
                             conn.remove(&elem.store_path)?;
                         }
-                    },
-                    RemoveArgs {all_packages: true, ..} => {
-                        todo!();
-                    },
+                    }
                     _ => {
                         let err = eyre!(clap::error::ErrorKind::TooFewValues)
                             .wrap_err("Read the --help section for usage");
@@ -135,7 +132,8 @@ pub struct DbConnection {
 
 impl DbConnection {
     pub fn new() -> Result<Self> {
-        let database_url = std::env::var("MIQ_DATABASE_URL").unwrap_or_else(|_| String::from("/miq/db.sqlite"));
+        let database_url =
+            std::env::var("MIQ_DATABASE_URL").unwrap_or_else(|_| String::from("/miq/db.sqlite"));
         trace!("DATABASE_URL: {:?}", database_url);
         let mut conn = diesel::SqliteConnection::establish(&database_url)?;
 

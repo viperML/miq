@@ -1,6 +1,6 @@
 use std::hash::Hash;
-use std::ops::Deref;
-use std::path::{Path, PathBuf};
+
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use color_eyre::eyre::{bail, Context, ContextCompat};
@@ -8,9 +8,9 @@ use color_eyre::{Help, Report, Result};
 use mlua::prelude::*;
 use mlua::{chunk, StdLib, Table, Value};
 use serde::{Deserialize, Serialize};
-use tracing::{instrument, span, trace, Level};
+use tracing::{instrument, trace};
 
-use crate::eval::{MiqResult, MiqStorePath, RefToUnit};
+use crate::eval::{MiqResult, RefToUnit};
 use crate::schema_eval::Unit;
 
 // impl LuaUserData for Unit {}

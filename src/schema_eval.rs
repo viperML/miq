@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::db::DbConnection;
-use crate::eval::{MiqResult, MiqStorePath};
+use crate::eval::MiqResult;
 
 #[derive(Debug, clap::Args)]
 /// Generate the IR schema
