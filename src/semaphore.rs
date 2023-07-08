@@ -1,20 +1,25 @@
 use core::mem::MaybeUninit;
-use std::ffi::OsStr;
+use std::ffi::{CStr, CString, OsStr};
 use std::mem::size_of;
 use std::num::NonZeroUsize;
 use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
+use std::os::unix::prelude::OsStrExt;
+use std::ptr::addr_of;
 
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::libc::{self};
+use nix::sys::memfd::MemFdCreateFlag;
 use nix::sys::mman::{MapFlags, ProtFlags};
 use nix::sys::stat::Mode;
-use tracing::warn;
+use nix::unistd::ftruncate;
+use tracing::{instrument, warn, trace};
 
 #[derive(Debug)]
 pub struct SemaphoreHandle<'sem> {
     pub sem: Semaphore,
     shm_name: &'sem OsStr,
+    fd: OwnedFd,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -26,60 +31,49 @@ unsafe impl<'s> Send for Semaphore {}
 
 impl<'sem> SemaphoreHandle<'sem> {
     pub fn new(name: &'sem OsStr) -> nix::Result<Self> {
+        let (sem, fd) = Semaphore::new(name)?;
         Ok(Self {
-            sem: Semaphore::new(name)?,
+            sem,
             shm_name: name,
+            fd
         })
     }
 }
 
 impl Semaphore {
-    pub(crate) fn new(name: &OsStr) -> nix::Result<Self> {
-        let fd: RawFd = nix::sys::mman::shm_open(
-            // "/miq_semaphore",
-            name,
-            OFlag::O_RDWR | OFlag::O_CREAT,
-            Mode::S_IWUSR | Mode::S_IRUSR,
+    pub(crate) fn new(name: &OsStr) -> nix::Result<(Self, OwnedFd)> {
+        let len = size_of::<libc::sem_t>();
+
+        let fd: RawFd = nix::sys::memfd::memfd_create(
+            &CString::new(name.as_bytes()).unwrap(),
+            MemFdCreateFlag::MFD_CLOEXEC,
         )?;
         let fd = unsafe { OwnedFd::from_raw_fd(fd.into_raw_fd()) };
 
-        nix::unistd::ftruncate(fd.as_raw_fd(), size_of::<libc::sem_t>() as _)?;
+        ftruncate(fd.as_raw_fd(), len as _)?;
 
-        let addr = unsafe {
+        let ptr = unsafe {
             nix::sys::mman::mmap(
                 None,
-                NonZeroUsize::new_unchecked(size_of::<libc::sem_t>()),
-                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                NonZeroUsize::new(len).unwrap(),
+                ProtFlags::PROT_WRITE,
                 MapFlags::MAP_SHARED,
                 fd.as_raw_fd(),
                 0,
-            )
-        }? as *mut libc::sem_t;
-
-        unsafe {
-            let err = nix::libc::sem_init(addr, 0, 0);
-            Errno::result(err)?;
+            )? as *mut libc::sem_t
         };
 
-        let sem = unsafe { std::mem::transmute(addr) };
-
-        Ok(Semaphore { ptr: sem })
-    }
-
-    pub(crate) fn wait(&mut self) -> nix::Result<()> {
-        loop {
-            let ret = unsafe { nix::libc::sem_trywait(self.ptr) };
-            let status = Errno::result(ret);
-            let value = self.read()?;
-            warn!(?value, ?status);
-            match status {
-                Ok(_) => break,
-                Err(Errno::EAGAIN) => warn!("Waiting"),
-                Err(other) => return Err(other),
-            }
-            // std::thread::sleep(Duration::from_millis(100));
+        unsafe {
+            Errno::result(nix::libc::sem_init(ptr, 1, 0))?;
         }
 
+        Ok((Semaphore { ptr }, fd))
+    }
+
+    #[instrument(ret, err, level = "warn")]
+    pub(crate) fn wait(&mut self) -> nix::Result<()> {
+        warn!("Start wait semaphore");
+        Errno::result(unsafe { nix::libc::sem_wait(self.ptr) })?;
         Ok(())
     }
 
@@ -104,9 +98,7 @@ impl Semaphore {
 
 impl<'a> Drop for SemaphoreHandle<'a> {
     fn drop(&mut self) {
-        warn!("Dropping semaphore");
-        let err = unsafe { libc::sem_destroy(self.sem.ptr) };
-        Errno::result(err).map_err(|_| Errno::last()).unwrap();
-        nix::sys::mman::shm_unlink(self.shm_name).unwrap();
+        trace!("Dropping semaphore");
+        nix::unistd::close(self.fd.as_raw_fd()).expect("Dropping memfd");
     }
 }

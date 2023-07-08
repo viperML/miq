@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::ffi::CString;
 use std::fmt::Debug;
 use std::io::Write;
@@ -14,9 +15,9 @@ use nix::mount::{mount, MsFlags};
 use nix::sched::CloneFlags;
 use nix::sys::memfd::MemFdCreateFlag;
 use nix::sys::mman::{MapFlags, ProtFlags};
-use nix::unistd::{ftruncate, Pid, Uid};
+use nix::unistd::{ftruncate, Gid, Pid, Uid};
 use once_cell::sync::Lazy;
-use tracing::{warn, Level};
+use tracing::{warn, Level, error};
 
 use crate::db::DbConnection;
 use crate::schema_eval::{Build, Package};
@@ -36,7 +37,8 @@ static BASH: Lazy<nix::Result<MemApp>> = Lazy::new(|| {
     let len = BASH_BYTES.len();
     let fd: RawFd = nix::sys::memfd::memfd_create(
         &CString::new("bash").unwrap(),
-        MemFdCreateFlag::MFD_CLOEXEC,
+        MemFdCreateFlag::empty()
+        // MemFdCreateFlag::MFD_CLOEXEC,
     )?;
     let fd = unsafe { OwnedFd::from_raw_fd(fd.into_raw_fd()) };
 
@@ -92,6 +94,7 @@ impl Build for Package {
         let shm_path = shm_path.as_os_str();
 
         let mut semaphore = SemaphoreHandle::new(&shm_path)?;
+        warn!("{:?}", semaphore);
 
         let bash = BASH.as_ref()?;
 
@@ -100,46 +103,54 @@ impl Build for Package {
                 let pid = Pid::this();
                 let _span = tracing::span!(Level::WARN, "child", ?pid);
                 let _enter = _span.enter();
-                warn!("Semaphore start: {:?}", semaphore.sem.read());
+
+                warn!("{:?}", semaphore.sem);
                 semaphore.sem.wait().unwrap();
 
-                warn!("Semaphore done: {:?}", semaphore.sem.read());
                 let res = self.build_sandbox(&bash, sandbox_path, build_path);
                 match res {
-                    Ok(_) => 0,
+                    Ok(_) => unreachable!() ,
                     Err(e) => {
-                        tracing::error!(?e);
+                        error!(?e);
                         -1
                     }
                 }
             }),
             child_stack,
-            CloneFlags::empty() | CloneFlags::CLONE_NEWUSER | CloneFlags::CLONE_NEWNS,
+            CloneFlags::empty()
+                | CloneFlags::CLONE_NEWUSER
+                | CloneFlags::CLONE_NEWNS
+                | CloneFlags::CLONE_NEWNET,
             Some(nix::libc::SIGCHLD),
         )?;
 
         // Set UID/GID mappings
         {
             let uid_inside: uid_t = 0;
-            let uid_outside: uid_t = 1000;
+            let uid_outside = Uid::current();
             let uid_count = 1;
-            let contents = format!("{} {} {}", uid_inside, uid_outside, uid_count);
+            let uid_map_contents = format!("{} {} {}", uid_inside, uid_outside, uid_count);
+            let mut uid_map = std::fs::File::create(format!("/proc/{}/uid_map", child_pid))?;
+            uid_map.write_all(&uid_map_contents.as_bytes())?;
 
-            let mut f = std::fs::File::create(format!("/proc/{}/uid_map", child_pid)).unwrap();
-            f.write_all(&contents.as_bytes()).unwrap();
+            let mut f = std::fs::File::create(format!("/proc/{}/setgroups", child_pid))?;
+            f.write_all("deny".as_bytes())?;
 
-            // let mut f = std::fs::File::create(format!("/proc/{}/gid_map", child_pid)).unwrap();
-            // f.write_all(&contents.as_bytes()).unwrap();
+            let gid_inside: uid_t = 0;
+            let gid_outside = Gid::current();
+            let gid_count = 1;
+            let gid_map_contents = format!("{} {} {}", gid_inside, gid_outside, gid_count);
+            let mut gid_map = std::fs::File::create(format!("/proc/{}/gid_map", child_pid))?;
+            gid_map.write_all(&gid_map_contents.as_bytes())?;
 
             semaphore.sem.post()?;
             warn!("Semaphore written!: {:?}", semaphore.sem.read());
         }
 
-        let exit = unsafe { pidfd::PidFd::open(child_pid.as_raw(), 0) }?
-            .into_future()
-            .await?;
-
+        let pidfd = async_pidfd::AsyncPidFd::from_pid(child_pid.as_raw())?;
+        let exit = pidfd.wait().await?.status();
         warn!(?exit);
+
         if !exit.success() {
             bail!(exit);
         } else {
@@ -152,7 +163,7 @@ impl Build for Package {
             Err(e) => bail!(e),
         }
 
-        bail!("TODO");
+        // bail!("TODO");
         conn.lock().unwrap().add(&path)?;
         Ok(())
     }
@@ -167,7 +178,7 @@ impl Package {
         bash: &MemApp,
         sandbox_path: &Path,
         build_path: &Path,
-    ) -> nix::Result<()> {
+    ) -> nix::Result<Infallible> {
         let uid = Uid::effective();
         warn!(?self, ?uid);
 
@@ -203,36 +214,50 @@ impl Package {
             )?;
         }
 
-        let argv = [
-            "bash", //  "-c", "set"
-            "--norc",
-            "--noprofile",
-            // "--version"
-            "-i",
-        ]
-        .into_iter()
-        .map(|e| CString::new(e).unwrap())
-        .collect::<Vec<_>>();
+        // pivot root
+        {
+            nix::unistd::chdir(sandbox_path)?;
+            nix::unistd::pivot_root(sandbox_path, sandbox_path)?;
+            nix::unistd::chdir("/build")?;
+        }
 
-        let envp = [
-            "HOME=/build",
-            &format!("PREFIX={}", &self.result.store_path().to_string_lossy()),
-            "TMP=/tmp",
-            "TEMP=/temp",
-            "TMPDIR=/tmp",
-            "TEMPDIR=/temp",
-            "PS1=$PWD # "
-        ]
-        .into_iter()
-        .map(|e| CString::new(e).unwrap())
-        .collect::<Vec<_>>();
+        std::fs::write("/build-script", &self.script).unwrap();
 
-        nix::unistd::chdir(sandbox_path)?;
-        nix::unistd::pivot_root(sandbox_path, sandbox_path)?;
-        nix::unistd::chdir("/build")?;
+        // exec bash
+        {
+            let argv = [
+                "bash", //  "-c", "set"
+                "--norc",
+                "--noprofile",
+                "/build-script",
+                // "-c",
+                // "set -x && exit 69",
+            ]
+            .into_iter()
+            .map(|e| CString::new(e).unwrap())
+            .collect::<Vec<_>>();
 
-        nix::unistd::fexecve(bash.fd.as_raw_fd(), &argv, &envp)?;
+            let mut envp = [
+                "HOME=/build",
+                &format!("PREFIX={}", &self.result.store_path().to_string_lossy()),
+                &format!("miq_out={}", &self.result.store_path().to_string_lossy()),
+                "TMP=/tmp",
+                "TEMP=/temp",
+                "TMPDIR=/tmp",
+                "TEMPDIR=/temp",
+                "PS1=$PWD # ",
+            ]
+            .into_iter()
+            .map(|e| CString::new(e).unwrap())
+            .collect::<Vec<_>>();
 
-        Ok(())
+            for (key, value) in &self.env {
+                let elem = format!("{}={}", key, value);
+                let elem = CString::new(elem).unwrap();
+                envp.push(elem);
+            }
+
+            nix::unistd::fexecve(bash.fd.as_raw_fd(), &argv, &envp)
+        }
     }
 }

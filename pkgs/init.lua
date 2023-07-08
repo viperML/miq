@@ -23,7 +23,10 @@ pkgs.stage1 = require "stage1"
 
 pkgs.empty0 = miq.package {
 	name = "empty0",
-	script = [[]],
+	script = [[
+    set -x
+    echo $PWD
+  ]],
 }
 
 pkgs.empty1 = miq.package {
