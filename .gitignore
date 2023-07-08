@@ -12,7 +12,6 @@ devel
 !/doc/**/*.svg
 !/doc/assets/*.pdf
 !/doc/*.tex
-build*
 .obsidian
 *.aux
 *latexmk
@@ -25,3 +24,4 @@ _minted*
 *.bkp
 *.dtmp
 .env
+/vendor

@@ -1,8 +1,11 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/github-workflow.json
 name: Build and release
 
 on:
   workflow_dispatch:
   push:
+    branches:
+      - 'master'
 
 permissions:
   contents: write

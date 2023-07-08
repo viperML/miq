@@ -14,6 +14,7 @@
       name = "miq-shell";
       RUST_SRC_PATH = "${toolchain'}/lib/rustlib/src/rust/library";
       packages = with pkgs; [
+        rust-bin.nightly.latest.rustfmt
         toolchain'
         pkg-config
         diesel-cli
@@ -21,7 +22,6 @@
         bubblewrap
 
         rust-analyzer-unwrapped
-        rust-bin.nightly.latest.rustfmt
 
         graph-easy
         lua5_4

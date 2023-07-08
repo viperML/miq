@@ -1,31 +1,18 @@
-use std::collections::{BTreeMap, HashMap};
-use std::ffi::OsStr;
+use std::collections::HashMap;
 use std::fmt::Debug;
-use std::io::Write;
-use std::ops::Deref;
 use std::path::Path;
-use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::{fs, io};
 
-use async_trait::async_trait;
-use bytes::Buf;
-use color_eyre::eyre::{bail, ensure, eyre, Context};
+use color_eyre::eyre::ensure;
 use color_eyre::Help;
-
 use daggy::Walker;
-use derive_builder::Builder;
 use futures::stream::futures_unordered;
 use futures::{StreamExt, TryStreamExt};
-use owo_colors::OwoColorize;
-use tokio::io::AsyncWriteExt;
-use tokio::process::Command;
-use tokio_process_stream::{Item, ProcessLineStream};
 use tracing::{debug, span, trace, Level};
 
-use crate::db::DbConnection;
 use crate::eval::{RefToUnit, UnitRef};
-use crate::schema_eval::{Build, Fetch, Package, Unit};
+use crate::schema_eval::{Build, Unit};
 use crate::*;
 
 #[derive(Debug, clap::Args)]
@@ -210,6 +197,7 @@ impl Args {
                 *t = BuildTask::Finished;
 
                 let u = format!("{unit:?}");
+                use owo_colors::OwoColorize;
                 eprintln!(
                     "{} <- {}",
                     unit.result().store_path().to_string_lossy().bright_blue(),
@@ -219,176 +207,6 @@ impl Args {
 
             trace!(?build_tasks);
         }
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl Build for Fetch {
-    #[tracing::instrument(skip(conn), ret, err, level = "debug")]
-    async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>) -> Result<()> {
-        let path = self.result.store_path();
-        let path = path.as_path();
-
-        if conn.lock().unwrap().is_db_path(&path)? {
-            if rebuild {
-                conn.lock().unwrap().remove(&path)?;
-            } else {
-                return Ok(());
-            }
-        }
-
-        let tempfile = &mut tempfile::NamedTempFile::new()?;
-        debug!(?tempfile);
-
-        let client = reqwest::Client::new();
-        trace!("Fetching file, please wait");
-        let response = client.get(&self.url).send().await?;
-        let content = &mut response.bytes().await?.reader();
-        std::io::copy(content, tempfile)?;
-
-        std::fs::copy(tempfile.path(), &path)?;
-
-        if self.executable {
-            // FIXME
-            debug!("Setting exec bit");
-            std::process::Command::new("chmod")
-                .args([OsStr::new("+x"), path.as_ref()])
-                .output()?;
-        }
-
-        conn.lock().unwrap().add(&path)?;
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl Build for Package {
-    #[tracing::instrument(skip(conn), ret, err, level = "debug")]
-    async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>) -> Result<()> {
-        let path = self.result.store_path();
-        let path = path.as_path();
-        let path_str = path.to_str().unwrap();
-
-        if conn.lock().unwrap().is_db_path(&path)? {
-            if rebuild {
-                conn.lock().unwrap().remove(&path)?;
-            } else {
-                return Ok(());
-            }
-        }
-
-        clean_path(&path)?;
-        std::fs::create_dir(&path)?;
-        let _builddir = tempfile::tempdir()?;
-        let builddir = _builddir.path();
-
-        let _tmpdir = tempfile::tempdir()?;
-        let tmpdir = _tmpdir.path().to_str().unwrap();
-
-        let mut cmd = Command::new("bwrap");
-        cmd.env_clear();
-        cmd.args([
-            "--bind", tmpdir, tmpdir, "--setenv", "TMP", tmpdir, "--setenv", "TMPDIR", tmpdir,
-            "--setenv", "TEMP", tmpdir, "--setenv", "TEMPDIR", tmpdir,
-        ]);
-        cmd.args([
-            "--clearenv",
-            // Store and result
-            "--ro-bind",
-            "/miq",
-            "/miq",
-            "--bind",
-            path_str,
-            path_str,
-            "--setenv",
-            "miq_out",
-            path_str,
-            // Build directory
-            "--bind",
-            builddir.to_str().unwrap(),
-            "/build",
-            "--chdir",
-            "/build",
-            "--setenv",
-            "HOME",
-            "/build",
-            // Global environent
-            "--dev-bind",
-            "/dev",
-            "/dev",
-            "--proc",
-            "/proc",
-            "--bind",
-            "/run",
-            "/run",
-            "--bind",
-            "/tmp",
-            "/tmp",
-            "--ro-bind",
-            "/etc",
-            "/etc",
-            "--ro-bind",
-            "/nix",
-            "/nix",
-            "--ro-bind",
-            "/bin",
-            "/bin",
-            // No network
-            "--unshare-net",
-            // Set user/group
-            "--unshare-user",
-            "--uid",
-            "0",
-            "--gid",
-            "0",
-        ]);
-        cmd.args(["/bin/sh", "-c", &self.script]);
-        cmd.envs(&self.env);
-        cmd.stdout(Stdio::piped());
-        cmd.stderr(Stdio::piped());
-        cmd.kill_on_drop(true);
-
-        let child = cmd.spawn()?;
-
-        let log_file_path = format!("/miq/log/{}.log", self.result.deref());
-        let err_msg = format!("Creating logfile at {}", log_file_path);
-        let mut log_file = std::fs::File::create(log_file_path).wrap_err(err_msg)?;
-
-        let mut procstream = ProcessLineStream::try_from(child)?;
-        while let Some(item) = procstream.next().await {
-            use owo_colors::OwoColorize;
-            match item {
-                Item::Stdout(line) => {
-                    let msg = format!("{}>>{}", self.name.blue(), line.bright_black());
-                    println!("{}", msg);
-                    log_file.write_all(line.as_bytes())?;
-                    log_file.write_all(b"\n")?;
-                }
-                Item::Stderr(line) => {
-                    let msg = format!("{}>>{}", self.name.blue(), line.bright_black());
-                    println!("{}", msg);
-                    log_file.write_all(line.as_bytes())?;
-                    log_file.write_all(b"\n")?;
-                }
-                Item::Done(Ok(exit)) => {
-                    if exit.success() {
-                        debug!("Build OK");
-                    } else {
-                        bail!(eyre!("Exit not successful").wrap_err(exit));
-                    }
-                }
-                Item::Done(Err(exit)) => bail!(exit),
-            }
-        }
-
-        match path.try_exists().wrap_err("Failed to produce an output") {
-            Ok(true) => {}
-            Ok(false) => bail!("Output path doesn't exist: {:?}", path),
-            Err(e) => bail!(e),
-        }
-
-        conn.lock().unwrap().add(&path)?;
         Ok(())
     }
 }
