@@ -17,7 +17,7 @@ use nix::sys::memfd::MemFdCreateFlag;
 use nix::sys::mman::{MapFlags, ProtFlags};
 use nix::unistd::{ftruncate, Gid, Pid, Uid};
 use once_cell::sync::Lazy;
-use tracing::{warn, Level, error};
+use tracing::{error, warn, Level};
 
 use crate::db::DbConnection;
 use crate::schema_eval::{Build, Package};
@@ -37,8 +37,7 @@ static BASH: Lazy<nix::Result<MemApp>> = Lazy::new(|| {
     let len = BASH_BYTES.len();
     let fd: RawFd = nix::sys::memfd::memfd_create(
         &CString::new("bash").unwrap(),
-        MemFdCreateFlag::empty()
-        // MemFdCreateFlag::MFD_CLOEXEC,
+        MemFdCreateFlag::empty(), // MemFdCreateFlag::MFD_CLOEXEC,
     )?;
     let fd = unsafe { OwnedFd::from_raw_fd(fd.into_raw_fd()) };
 
@@ -109,7 +108,7 @@ impl Build for Package {
 
                 let res = self.build_sandbox(&bash, sandbox_path, build_path);
                 match res {
-                    Ok(_) => unreachable!() ,
+                    Ok(_) => unreachable!(),
                     Err(e) => {
                         error!(?e);
                         -1
@@ -180,6 +179,7 @@ impl Package {
         build_path: &Path,
     ) -> nix::Result<Infallible> {
         let uid = Uid::effective();
+        let my_pid = Pid::this();
         warn!(?self, ?uid);
 
         mount(
@@ -212,6 +212,21 @@ impl Package {
                 MsFlags::MS_BIND | MsFlags::MS_REC,
                 NONE_NIX,
             )?;
+        }
+
+        {
+            let bin_path = sandbox_path.join("bin");
+            std::fs::create_dir(&bin_path).unwrap();
+            mount(
+                NONE_NIX,
+                &bin_path,
+                Some("tmpfs"),
+                MsFlags::empty(),
+                NONE_NIX,
+            ).unwrap();
+            let original_bash = format!("/proc/{}/fd/{}", my_pid, bash.fd.as_raw_fd());
+            let symlink_bash = bin_path.join("sh");
+            std::os::unix::fs::symlink(original_bash, symlink_bash).unwrap();
         }
 
         // pivot root
