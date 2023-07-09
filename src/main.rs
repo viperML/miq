@@ -13,6 +13,7 @@ mod lua_package;
 mod schema_db;
 mod schema_eval;
 mod semaphore;
+mod mem_app;
 
 use std::path::PathBuf;
 

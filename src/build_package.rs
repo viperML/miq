@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 use std::ffi::CString;
 use std::fmt::Debug;
+use std::fs::create_dir_all;
 use std::io::Write;
 use std::num::NonZeroUsize;
 use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
@@ -20,44 +21,12 @@ use once_cell::sync::Lazy;
 use tracing::{error, warn, Level};
 
 use crate::db::DbConnection;
+use crate::mem_app::{MemApp, BUSYBOX};
 use crate::schema_eval::{Build, Package};
 use crate::semaphore::SemaphoreHandle;
 use crate::*;
 
 const STACK_SIZE: usize = 1024 * 1024;
-
-const BASH_BYTES: &[u8] = include_bytes!("../vendor/bash");
-
-#[derive(Debug)]
-struct MemApp {
-    fd: OwnedFd,
-}
-
-static BASH: Lazy<nix::Result<MemApp>> = Lazy::new(|| {
-    let len = BASH_BYTES.len();
-    let fd: RawFd = nix::sys::memfd::memfd_create(
-        &CString::new("bash").unwrap(),
-        MemFdCreateFlag::empty(), // MemFdCreateFlag::MFD_CLOEXEC,
-    )?;
-    let fd = unsafe { OwnedFd::from_raw_fd(fd.into_raw_fd()) };
-
-    ftruncate(fd.as_raw_fd(), len as _)?;
-
-    unsafe {
-        let dst = nix::sys::mman::mmap(
-            None,
-            NonZeroUsize::new(len).unwrap(),
-            ProtFlags::PROT_WRITE,
-            MapFlags::MAP_SHARED,
-            fd.as_raw_fd(),
-            0,
-        )?;
-        info!(?dst);
-        let src = addr_of!(*BASH_BYTES) as _;
-        std::ptr::copy_nonoverlapping(src, dst, len);
-    }
-    Ok(MemApp { fd })
-});
 
 #[async_trait]
 impl Build for Package {
@@ -95,7 +64,8 @@ impl Build for Package {
         let mut semaphore = SemaphoreHandle::new(&shm_path)?;
         warn!("{:?}", semaphore);
 
-        let bash = BASH.as_ref()?;
+        let bash = mem_app::BASH.as_ref()?;
+        let busybox = mem_app::BUSYBOX.as_ref()?;
 
         let child_pid = nix::sched::clone(
             Box::new(move || {
@@ -106,7 +76,7 @@ impl Build for Package {
                 warn!("{:?}", semaphore.sem);
                 semaphore.sem.wait().unwrap();
 
-                let res = self.build_sandbox(&bash, sandbox_path, build_path);
+                let res = self.build_sandbox(&bash, &busybox, sandbox_path, build_path);
                 match res {
                     Ok(_) => unreachable!(),
                     Err(e) => {
@@ -175,6 +145,7 @@ impl Package {
     fn build_sandbox(
         &self,
         bash: &MemApp,
+        busybox: &MemApp,
         sandbox_path: &Path,
         build_path: &Path,
     ) -> nix::Result<Infallible> {
@@ -223,10 +194,30 @@ impl Package {
                 Some("tmpfs"),
                 MsFlags::empty(),
                 NONE_NIX,
-            ).unwrap();
+            )
+            .unwrap();
             let original_bash = format!("/proc/{}/fd/{}", my_pid, bash.fd.as_raw_fd());
             let symlink_bash = bin_path.join("sh");
             std::os::unix::fs::symlink(original_bash, symlink_bash).unwrap();
+        }
+
+        {
+            let usr_path = sandbox_path.join("usr").join("bin");
+            std::fs::create_dir_all(&usr_path).unwrap();
+            mount(
+                NONE_NIX,
+                &usr_path,
+                Some("tmpfs"),
+                MsFlags::empty(),
+                NONE_NIX,
+            )
+            .unwrap();
+            std::os::unix::fs::symlink(
+                format!("/proc/{}/fd/{}", my_pid, busybox.fd.as_raw_fd()),
+                usr_path.join("busybox"),
+            )
+            .unwrap();
+            std::os::unix::fs::symlink(format!("/usr/bin/busybox"), usr_path.join("env")).unwrap();
         }
 
         // pivot root
@@ -244,7 +235,8 @@ impl Package {
                 "bash", //  "-c", "set"
                 "--norc",
                 "--noprofile",
-                "/build-script",
+                "-i",
+                // "/build-script",
                 // "-c",
                 // "set -x && exit 69",
             ]
