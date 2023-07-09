@@ -7,7 +7,7 @@ use std::num::NonZeroUsize;
 use std::ops::Deref;
 use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 use std::path::Path;
-use std::process::Stdio;
+use std::process::{ExitStatus, Stdio};
 use std::ptr::addr_of;
 use std::sync::Mutex;
 
@@ -32,6 +32,7 @@ use crate::semaphore::SemaphoreHandle;
 use crate::*;
 
 const STACK_SIZE: usize = 1024 * 1024;
+const BUILD_SCRIPT_LOC: &str = "/build-script";
 
 #[async_trait]
 impl Build for Package {
@@ -61,8 +62,11 @@ impl Build for Package {
         let ppid = Pid::this();
 
         let mut cmd = tokio::process::Command::new("/bin/bash");
-        cmd.args(["--norc", "--noprofile", "/build-script"]);
-        cmd.kill_on_drop(true);
+        cmd.args(["--norc", "--noprofile"]);
+        cmd.arg(BUILD_SCRIPT_LOC);
+        // cmd.arg("-i");
+
+        cmd.env_clear();
         cmd.envs([
             ("HOME", "/build"),
             ("PREFIX", path.to_str().unwrap()),
@@ -75,13 +79,14 @@ impl Build for Package {
             ("PATH", "/usr/bin:/bin"),
         ]);
         cmd.envs(&self.env);
+
+        cmd.kill_on_drop(true);
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
         let _self = self.clone();
         unsafe {
             cmd.pre_exec(move || {
-                // let sandbox_path = sandbox_path.clone();
                 let pid = Pid::this();
                 let _span = span!(Level::WARN, "child", ?pid, ?ppid);
                 let _enter = _span.enter();
@@ -114,7 +119,8 @@ impl Build for Package {
                 let bash = mem_app::BASH
                     .as_ref()
                     .map_err(|e| Into::<io::Error>::into(*e))?;
-                let busybox = mem_app::BASH
+
+                let busybox = mem_app::BUSYBOX
                     .as_ref()
                     .map_err(|e| Into::<io::Error>::into(*e))?;
 

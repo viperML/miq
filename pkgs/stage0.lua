@@ -9,19 +9,6 @@ x.bootstrap_tools = miq.fetch {
 	url = "https://wdtz.org/files/gywxhjgl70sxippa0pxs0vj5qcgz1wi8-stdenv-bootstrap-tools/on-server/bootstrap-tools.tar.xz",
 }
 
-x.busybox = miq.fetch {
-	url = "https://wdtz.org/files/gywxhjgl70sxippa0pxs0vj5qcgz1wi8-stdenv-bootstrap-tools/on-server/busybox",
-	executable = true,
-}
-
-x.toybox = miq.fetch {
-	url = "http://landley.net/toybox/bin/toybox-x86_64",
-	executable = true,
-}
-miq.trace(x.toybox)
-
-local t = f "ls -la {{x.toybox}}"
-miq.trace(t)
 
 x.unpack_bootstrap_tools = miq.fetch {
 	url = "https://raw.githubusercontent.com/NixOS/nixpkgs/d6b863fd9b7bb962e6f9fdf292419a775e772891/pkgs/stdenv/linux/bootstrap-tools-musl/scripts/unpack-bootstrap-tools.sh",
@@ -32,17 +19,10 @@ x.bootstrap = miq.package {
 	name = "bootstrap",
 	script = f [[
     set -exu
-    {{x.toybox}} mkdir -p $HOME/bin
-    export PATH="$HOME/bin:${PATH}"
-    {{x.toybox}} ln -vs {{x.toybox}} $HOME/bin/ln
-    {{x.toybox}} ln -vs {{x.toybox}} $HOME/bin/cp
-    {{x.toybox}} ln -vs {{x.toybox}} $HOME/bin/tar
-    {{x.toybox}} ln -vs {{x.toybox}} $HOME/bin/mkdir
-    {{x.toybox}} ln -vs {{x.toybox}} $HOME/bin/chmod
 
-    export out=$miq_out
+    export out="$miq_out"
     export tarball={{x.bootstrap_tools}}
-    export builder={{x.busybox}}
+    export builder=/usr/bin/busybox
     {{x.unpack_bootstrap_tools}}
   ]],
 }

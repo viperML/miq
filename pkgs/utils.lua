@@ -67,6 +67,7 @@ x.stdenvBuilder = function(input)
 		},
 		script = f [[
       set -x
+      mkdir -p $miq_out
       tee $miq_out/stdenv.sh <<EOF
       echo "stdenv setup" >&2
       export PATH="{{input.cc}}/bin:{{input.ld}}/bin:{{input.coreutils}}/bin"
@@ -79,6 +80,8 @@ x.stdenvBuilder = function(input)
       export LD="ld"
 
       export NIX_DEBUG=1
+
+      mkdir -p \$miq_out
 
       {{input.extra}}
       EOF
@@ -153,7 +156,8 @@ x.fetchTarBuilder = function(input)
 			script = f [[
         set -ex
         export PATH="{{input.PATH}}"
-        cd $miq_out
+        mkdir -p $PREFIX
+        cd $PREFIX
         tar -xvf {{fetch}} --strip-components=1 --no-same-permissions --no-same-owner
 
         {{post}}

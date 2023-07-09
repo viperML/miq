@@ -44,7 +44,7 @@ impl MemApp {
             let dst = nix::sys::mman::mmap(
                 None,
                 NonZeroUsize::new(len).unwrap(),
-                ProtFlags::PROT_WRITE,
+                ProtFlags::PROT_WRITE | ProtFlags::PROT_READ,
                 MapFlags::MAP_SHARED,
                 fd.as_raw_fd(),
                 0,
