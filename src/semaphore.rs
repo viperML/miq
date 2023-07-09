@@ -1,15 +1,12 @@
 use core::mem::MaybeUninit;
-use std::ffi::{CStr, CString, OsStr};
+use std::ffi::OsStr;
 use std::mem::size_of;
 use std::num::NonZeroUsize;
-use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
-use std::os::unix::prelude::OsStrExt;
-use std::ptr::addr_of;
+use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd};
 
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::libc::{self};
-use nix::sys::memfd::MemFdCreateFlag;
 use nix::sys::mman::{shm_open, MapFlags, ProtFlags};
 use nix::sys::stat::Mode;
 use nix::unistd::ftruncate;

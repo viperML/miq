@@ -18,7 +18,6 @@ mod semaphore;
 
 use std::io;
 use std::path::PathBuf;
-use std::time::Duration;
 
 use ambassador::{delegatable_trait, Delegate};
 use clap::Parser;

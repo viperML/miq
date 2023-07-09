@@ -1,14 +1,8 @@
-use std::convert::Infallible;
-use std::ffi::{CString, OsString};
-use std::fmt::Debug;
-use std::fs::create_dir_all;
 use std::io::Write;
-use std::num::NonZeroUsize;
 use std::ops::Deref;
-use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
+use std::os::fd::AsRawFd;
 use std::path::Path;
-use std::process::{ExitStatus, Stdio};
-use std::ptr::addr_of;
+use std::process::Stdio;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
@@ -17,18 +11,13 @@ use futures::StreamExt;
 use nix::libc::uid_t;
 use nix::mount::{mount, MsFlags};
 use nix::sched::CloneFlags;
-use nix::sys::memfd::MemFdCreateFlag;
-use nix::sys::mman::{MapFlags, ProtFlags};
-use nix::unistd::{ftruncate, Gid, Pid, Uid};
-use once_cell::sync::Lazy;
+use nix::unistd::{Gid, Pid, Uid};
 use tokio_process_stream::ProcessLineStream;
-use tracing::{debug, error, instrument, span, warn, Level};
+use tracing::{debug, span, warn, Level};
 
-use crate::build::check_path;
 use crate::db::DbConnection;
-use crate::mem_app::{MemApp, BUSYBOX};
+use crate::mem_app::MemApp;
 use crate::schema_eval::{Build, Package};
-use crate::semaphore::SemaphoreHandle;
 use crate::*;
 
 const STACK_SIZE: usize = 1024 * 1024;
