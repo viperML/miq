@@ -39,13 +39,9 @@ Miq is distributed as a statically linked ELF with no dependencies, meaning it s
   curl -OL https://github.com/viperML/miq/releases/download/latest/release.tar.gz
   tar -xvf release.tar.gz
   ```
-- If bubblewrap is not installed in the host system, add it to `PATH`:
-  ```sh
-  export PATH="$PWD:$PATH"
-  ```
 - Run miq:
   ```sh
-  miq --help
+  ./miq --help
   ```
 
 The usage manual is rendered on the thesis document available for download.
