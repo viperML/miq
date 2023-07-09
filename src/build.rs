@@ -9,7 +9,8 @@ use color_eyre::Help;
 use daggy::Walker;
 use futures::stream::futures_unordered;
 use futures::{StreamExt, TryStreamExt};
-use tracing::{debug, span, trace, Level};
+use owo_colors::OwoColorize;
+use tracing::{debug, instrument, span, trace, Level};
 
 use crate::eval::{RefToUnit, UnitRef};
 use crate::schema_eval::{Build, Unit};
@@ -36,31 +37,6 @@ pub struct Args {
     /// Maximum number of concurrent build jobs. Fetch jobs are parallelized automatically.
     #[arg(long = "jobs", short = 'j', default_value = "1")]
     max_jobs: usize,
-}
-
-pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> io::Result<()> {
-    trace!("Requesting clean path on {:?}", path);
-
-    match fs::metadata(&path) {
-        Ok(meta) => {
-            trace!("Elem exists, removing");
-            if meta.is_file() {
-                fs::remove_file(&path)?;
-            } else if meta.is_dir() {
-                fs::remove_dir_all(&path)?;
-            } else {
-                panic!("{:?} Wasn't either a dir or a file", path);
-            }
-            Ok(())
-        }
-        Err(err) => match err.kind() {
-            io::ErrorKind::NotFound => {
-                trace!("Doesn't exist, skipping");
-                Ok(())
-            }
-            _ => Err(err),
-        },
-    }
 }
 
 impl crate::Main for Args {
@@ -208,5 +184,40 @@ impl Args {
             trace!(?build_tasks);
         }
         Ok(())
+    }
+}
+
+#[instrument(ret, err, level = "trace")]
+pub fn clean_path<P: AsRef<Path> + Debug>(path: P) -> Result<()> {
+    match fs::metadata(&path) {
+        Ok(meta) => {
+            trace!("Path exists, removing");
+            if meta.is_file() {
+                fs::remove_file(&path)?;
+            } else if meta.is_dir() {
+                fs::remove_dir_all(&path)?;
+            } else {
+                bail!("{:?} Wasn't either a dir or a file", path);
+            }
+            Ok(())
+        }
+        Err(err) => match err.kind() {
+            io::ErrorKind::NotFound => {
+                trace!("Doesn't exist, skipping");
+                Ok(())
+            }
+            _ => bail!(err),
+        },
+    }
+}
+
+#[instrument(ret, err, level = "trace")]
+pub fn check_path<P: AsRef<Path> + Debug>(path: P) -> Result<()> {
+    let path = path.as_ref();
+
+    match path.try_exists() {
+        Ok(true) => Ok(()),
+        Ok(false) => bail!("Path doesn't exist: {:?}", path),
+        Err(e) => bail!(e),
     }
 }

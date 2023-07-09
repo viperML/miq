@@ -5,22 +5,26 @@ extern crate educe;
 mod build;
 mod build_fetch;
 mod build_package;
+mod busybox;
 mod db;
 mod eval;
 mod lua;
 mod lua_fetch;
 mod lua_package;
+mod mem_app;
 mod schema_db;
 mod schema_eval;
 mod semaphore;
-mod mem_app;
 
+use std::io;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use ambassador::{delegatable_trait, Delegate};
 use clap::Parser;
-use color_eyre::eyre::{bail, ContextCompat};
+use color_eyre::eyre::{bail, eyre, Context, ContextCompat};
 use color_eyre::Result;
+use file_lock::{FileLock, FileOptions};
 use tracing::info;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
@@ -51,7 +55,23 @@ fn setup_logging() -> Result<()> {
 
 fn main() -> Result<()> {
     setup_logging()?;
+
     check_dirs()?;
+
+    let _lock = match FileLock::lock(
+        "/miq/lock",
+        false,
+        FileOptions::new().write(true).append(true).create(true),
+    ) {
+        Ok(inner) => inner,
+        Err(err) => match err.kind() {
+            io::ErrorKind::WouldBlock => {
+                bail!("Another miq process is holding /miq/lock, aborting!")
+            }
+            _ => bail!(eyre!(err).wrap_err("Checking if another process holds /miq/lock")),
+        },
+    };
+
     let parsed = CliParser::parse();
     parsed.command.main()
 }
