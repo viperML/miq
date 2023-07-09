@@ -7,6 +7,7 @@
   sqlite,
   lib,
   targetPlatform,
+  pkgsStatic,
 }:
 rustPlatform.buildRustPackage {
   doCheck = false;
@@ -26,7 +27,15 @@ rustPlatform.buildRustPackage {
   nativeBuildInputs = [
     pkg-config
   ];
+
   buildInputs = [
     sqlite
   ];
+
+  preConfigure = ''
+    ls -la
+    mkdir -p vendor
+    ln -vs ${pkgsStatic.bash}/bin/bash vendor/bash
+    ln -vs ${pkgsStatic.busybox}/bin/busybox vendor/busybox
+  '';
 }

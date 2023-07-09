@@ -24,4 +24,5 @@ _minted*
 *.bkp
 *.dtmp
 .env
-/vendor
+/vendor/*
+!/vendor/*.sh
