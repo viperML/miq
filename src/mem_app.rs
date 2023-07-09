@@ -9,8 +9,6 @@ use nix::sys::mman::{MapFlags, ProtFlags};
 use nix::unistd::ftruncate;
 use once_cell::sync::Lazy;
 
-use crate::*;
-
 #[derive(Debug)]
 pub struct MemApp {
     pub fd: OwnedFd,
@@ -36,10 +34,10 @@ impl MemApp {
                 fd.as_raw_fd(),
                 0,
             )?;
-            info!(?dst);
             let src = addr_of!(*bytes) as _;
             std::ptr::copy_nonoverlapping(src, dst, len);
         }
+
         Ok(MemApp { fd })
     }
 }

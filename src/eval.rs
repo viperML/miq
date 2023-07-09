@@ -7,7 +7,7 @@ use std::str::FromStr;
 use color_eyre::eyre::{bail, ensure, Context};
 use color_eyre::{Report, Result};
 use daggy::petgraph::dot::{Config, Dot};
-use daggy::{Dag, NodeIndex, Walker};
+use daggy::{Dag, NodeIndex};
 use schema_eval::Unit;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

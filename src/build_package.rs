@@ -14,7 +14,7 @@ use nix::mount::{mount, MsFlags};
 use nix::sched::CloneFlags;
 use nix::unistd::{Gid, Pid, Uid};
 use tokio_process_stream::ProcessLineStream;
-use tracing::{debug, span, warn, Level};
+use tracing::{debug, span, trace, Level};
 
 use crate::db::DbConnection;
 use crate::mem_app::MemApp;
@@ -30,7 +30,7 @@ impl Build for Package {
         &self,
         rebuild: bool,
         conn: &Mutex<DbConnection>,
-        pb: Option<ProgressBar>,
+        _pb: Option<ProgressBar>,
     ) -> Result<()> {
         let path = self.result.store_path();
         let path = path.as_path();
@@ -51,7 +51,7 @@ impl Build for Package {
         let _sandbox_dir = tempfile::tempdir()?;
         let sandbox_path = _sandbox_dir.path().to_owned();
 
-        warn!(?sandbox_path, ?build_path);
+        trace!(?sandbox_path, ?build_path);
 
         let ppid = Pid::this();
 
@@ -82,7 +82,7 @@ impl Build for Package {
         unsafe {
             cmd.pre_exec(move || {
                 let pid = Pid::this();
-                let _span = span!(Level::WARN, "child", ?pid, ?ppid);
+                let _span = span!(Level::DEBUG, "child", ?pid, ?ppid);
                 let _enter = _span.enter();
                 let uid_outside = Uid::current();
                 let uid_inside: uid_t = 0;
@@ -120,8 +120,7 @@ impl Build for Package {
 
                 _self.sandbox_setup(bash, busybox, &sandbox_path, &build_path)?;
 
-                warn!("DONE");
-
+                debug!("pre_exec done");
                 Ok(())
             })
         };
@@ -184,7 +183,7 @@ impl Package {
         let uid = Uid::effective();
         let gid = Gid::effective();
         let my_pid = Pid::this();
-        warn!(?self, ?uid, ?gid);
+        trace!(?self, ?uid, ?gid);
 
         mount(
             Some(sandbox_path),

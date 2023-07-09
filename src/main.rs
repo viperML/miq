@@ -14,6 +14,7 @@ mod lua_package;
 mod mem_app;
 mod schema_db;
 mod schema_eval;
+#[cfg(no)]
 mod semaphore;
 
 use std::io;
@@ -21,7 +22,7 @@ use std::path::PathBuf;
 
 use ambassador::{delegatable_trait, Delegate};
 use clap::Parser;
-use color_eyre::eyre::{bail, eyre, Context, ContextCompat};
+use color_eyre::eyre::{bail, eyre, ContextCompat};
 use color_eyre::Result;
 use file_lock::{FileLock, FileOptions};
 use tracing::info;

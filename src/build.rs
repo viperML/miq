@@ -8,8 +8,8 @@ use color_eyre::eyre::ensure;
 use color_eyre::Help;
 use daggy::Walker;
 use futures::stream::futures_unordered;
-use futures::{StreamExt, TryStreamExt};
-use indicatif::{MultiProgress, ProgressBar, MultiProgressAlignment};
+use futures::TryStreamExt;
+use indicatif::{MultiProgress, ProgressBar};
 use owo_colors::OwoColorize;
 use tracing::{debug, instrument, span, trace, Level};
 
@@ -187,8 +187,7 @@ impl Args {
                 *t = BuildTask::Finished;
 
                 let u = format!("{unit:?}");
-                let msg =
-                format!(
+                let msg = format!(
                     "{} <- {}",
                     unit.result().store_path().to_string_lossy().bright_blue(),
                     &u.bright_black()

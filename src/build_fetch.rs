@@ -3,9 +3,9 @@ use std::os::unix::prelude::PermissionsExt;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
-use futures_util::{Stream, StreamExt};
+use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
-use tracing::{debug, trace, warn};
+use tracing::debug;
 
 use crate::db::DbConnection;
 use crate::schema_eval::{Build, Fetch};
@@ -69,7 +69,7 @@ impl Build for Fetch {
 
         tokio::fs::set_permissions(path, perm).await?;
 
-        pb.finish();
+        pb.finish_and_clear();
 
         conn.lock().unwrap().add(&path)?;
         Ok(())
