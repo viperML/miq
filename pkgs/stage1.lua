@@ -76,13 +76,13 @@ x.test = x.stdenv {
   ]],
 }
 
-x.fetchTar = utils.fetchTarBuilder {
+utils.fetchTar = utils.fetchTarBuilder {
 	PATH = f "{{stage0.bootstrap}}/bin",
 }
 
 do
 	local version = "1.4.19"
-	local src = x.fetchTar {
+	local src = utils.fetchTar {
 		url = f "https://ftp.gnu.org/gnu/m4/m4-{{version}}.tar.bz2",
 	}
 	x.m4 = x.stdenv {
@@ -101,7 +101,7 @@ end
 
 do
 	local version = "6.2.1"
-	local src = x.fetchTar {
+	local src = utils.fetchTar {
 		url = f "https://ftp.gnu.org/gnu/gmp/gmp-{{version}}.tar.bz2",
 	}
 	x.gmp = x.stdenv {
@@ -123,7 +123,7 @@ end
 
 do
 	local version = "4.2.0"
-	local src = x.fetchTar {
+	local src = utils.fetchTar {
 		url = f "https://ftp.gnu.org/gnu/mpfr/mpfr-{{version}}.tar.bz2",
 	}
 	x.mpfr = x.stdenv {
@@ -145,7 +145,7 @@ end
 
 do
 	local version = "1.3.1"
-	local src = x.fetchTar {
+	local src = utils.fetchTar {
 		url = f "https://ftp.gnu.org/gnu/mpc/mpc-{{version}}.tar.gz",
 	}
 	x.libmpc = x.stdenv {
@@ -174,7 +174,7 @@ do
 			url = "https://raw.githubusercontent.com/NixOS/nixpkgs/ddf4688dc7aeb14e8a3c549cb6aa6337f187a884/pkgs/development/compilers/gcc/gcc-12-no-sys-dirs.patch",
 		},
 	}
-	local src = x.fetchTar {
+	local src = utils.fetchTar {
 		url = f "https://ftp.gnu.org/gnu/gcc/gcc-{{version}}/gcc-{{version}}.tar.gz",
 		post = f [[
       set -ex
@@ -231,12 +231,12 @@ end
 
 do
 	local version = "0.5.12"
-	local src = x.fetchTar {
+	local src = utils.fetchTar {
 		url = f "http://gondor.apana.org.au/~herbert/dash/files/dash-{{version}}.tar.gz",
 	}
 	x.dash = x.stdenv {
 		name = "dash",
-    version = version,
+		version = version,
 		script = f [[
       {{src}}/configure --prefix=$PREFIX
 

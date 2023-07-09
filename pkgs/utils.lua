@@ -155,7 +155,6 @@ x.fetchTarBuilder = function(input)
 			name = f "{{fetch.name}}-unpack",
 			script = f [[
         set -ex
-        export PATH="{{input.PATH}}"
         mkdir -p $PREFIX
         cd $PREFIX
         tar -xvf {{fetch}} --strip-components=1 --no-same-permissions --no-same-owner
@@ -168,5 +167,7 @@ x.fetchTarBuilder = function(input)
 
 	return fn_result
 end
+
+x.fetchTar = x.fetchTarBuilder {}
 
 return x

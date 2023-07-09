@@ -9,7 +9,6 @@ x.bootstrap_tools = miq.fetch {
 	url = "https://wdtz.org/files/gywxhjgl70sxippa0pxs0vj5qcgz1wi8-stdenv-bootstrap-tools/on-server/bootstrap-tools.tar.xz",
 }
 
-
 x.unpack_bootstrap_tools = miq.fetch {
 	url = "https://raw.githubusercontent.com/NixOS/nixpkgs/d6b863fd9b7bb962e6f9fdf292419a775e772891/pkgs/stdenv/linux/bootstrap-tools-musl/scripts/unpack-bootstrap-tools.sh",
 	executable = true,
@@ -113,10 +112,6 @@ x.stdenv = utils.stdenvBuilder {
 -- -lgcc_s \
 -- --pop-state \
 
-x.fetchTar = utils.fetchTarBuilder {
-	PATH = f "{{x.bootstrap}}/bin",
-}
-
 x.test = x.stdenv {
 	name = "test",
 	script = f [[
@@ -129,7 +124,7 @@ x.test = x.stdenv {
 
 do
 	local version = "1.2.3"
-	local src = x.fetchTar {
+	local src = utils.fetchTar {
 		url = f "https://musl.libc.org/releases/musl-{{version}}.tar.gz",
 	}
 	x.libc = x.stdenv {
