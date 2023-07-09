@@ -10,10 +10,10 @@ use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::libc::{self};
 use nix::sys::memfd::MemFdCreateFlag;
-use nix::sys::mman::{MapFlags, ProtFlags};
+use nix::sys::mman::{shm_open, MapFlags, ProtFlags};
 use nix::sys::stat::Mode;
 use nix::unistd::ftruncate;
-use tracing::{instrument, warn, trace};
+use tracing::{instrument, trace, warn};
 
 #[derive(Debug)]
 pub struct SemaphoreHandle<'sem> {
@@ -28,6 +28,7 @@ pub struct Semaphore {
 }
 
 unsafe impl<'s> Send for Semaphore {}
+unsafe impl<'s> Sync for Semaphore {}
 
 impl<'sem> SemaphoreHandle<'sem> {
     pub fn new(name: &'sem OsStr) -> nix::Result<Self> {
@@ -35,7 +36,7 @@ impl<'sem> SemaphoreHandle<'sem> {
         Ok(Self {
             sem,
             shm_name: name,
-            fd
+            fd,
         })
     }
 }
@@ -44,10 +45,17 @@ impl Semaphore {
     pub(crate) fn new(name: &OsStr) -> nix::Result<(Self, OwnedFd)> {
         let len = size_of::<libc::sem_t>();
 
-        let fd: RawFd = nix::sys::memfd::memfd_create(
-            &CString::new(name.as_bytes()).unwrap(),
-            MemFdCreateFlag::MFD_CLOEXEC,
+        // let fd: RawFd = nix::sys::memfd::memfd_create(
+        //     &CString::new(name.as_bytes()).unwrap(),
+        //     MemFdCreateFlag::MFD_CLOEXEC,
+        // )?;
+
+        let fd = shm_open(
+            name,
+            OFlag::O_CREAT | OFlag::O_TRUNC | OFlag::O_RDWR,
+            Mode::S_IRUSR | Mode::S_IWUSR,
         )?;
+
         let fd = unsafe { OwnedFd::from_raw_fd(fd.into_raw_fd()) };
 
         ftruncate(fd.as_raw_fd(), len as _)?;

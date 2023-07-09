@@ -1,16 +1,19 @@
 use std::convert::Infallible;
-use std::ffi::CString;
+use std::ffi::{CString, OsString};
 use std::fmt::Debug;
 use std::fs::create_dir_all;
 use std::io::Write;
 use std::num::NonZeroUsize;
+use std::ops::Deref;
 use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 use std::path::Path;
+use std::process::Stdio;
 use std::ptr::addr_of;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
 use color_eyre::eyre::{bail, Context};
+use futures::StreamExt;
 use nix::libc::uid_t;
 use nix::mount::{mount, MsFlags};
 use nix::sched::CloneFlags;
@@ -18,7 +21,8 @@ use nix::sys::memfd::MemFdCreateFlag;
 use nix::sys::mman::{MapFlags, ProtFlags};
 use nix::unistd::{ftruncate, Gid, Pid, Uid};
 use once_cell::sync::Lazy;
-use tracing::{error, warn, Level};
+use tokio_process_stream::ProcessLineStream;
+use tracing::{debug, error, instrument, span, warn, Level};
 
 use crate::build::check_path;
 use crate::db::DbConnection;
@@ -47,88 +51,120 @@ impl Build for Package {
 
         crate::build::clean_path(&path)?;
         let _build_dir = tempfile::tempdir()?;
-        let build_path = _build_dir.path();
+        let build_path = _build_dir.path().to_owned();
 
         let _sandbox_dir = tempfile::tempdir()?;
-        let sandbox_path = _sandbox_dir.path();
+        let sandbox_path = _sandbox_dir.path().to_owned();
 
         warn!(?sandbox_path, ?build_path);
 
-        let mut child_stack = Vec::with_capacity(STACK_SIZE);
-        unsafe { child_stack.set_len(STACK_SIZE) };
-        let ref mut child_stack = child_stack.into_boxed_slice();
+        let ppid = Pid::this();
 
-        let shm_path = PathBuf::from(format!("/miq-semaphore-{}", &self.name));
-        let shm_path = shm_path.as_os_str();
+        let mut cmd = tokio::process::Command::new("/bin/bash");
+        cmd.args(["--norc", "--noprofile", "/build-script"]);
+        cmd.kill_on_drop(true);
+        cmd.envs([
+            ("HOME", "/build"),
+            ("PREFIX", path.to_str().unwrap()),
+            ("miq_out", path.to_str().unwrap()),
+            ("TMP", "/tmp"),
+            ("TEMP", "/temp"),
+            ("TMPDIR", "/tmp"),
+            ("TEMPDIR", "/temp"),
+            ("PS1", "$PWD # "),
+            ("PATH", "/usr/bin:/bin"),
+        ]);
+        cmd.envs(&self.env);
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
 
-        let mut semaphore = SemaphoreHandle::new(&shm_path)?;
-        warn!("{:?}", semaphore);
-
-        let bash = mem_app::BASH.as_ref()?;
-        let busybox = mem_app::BUSYBOX.as_ref()?;
-
-        let child_pid = nix::sched::clone(
-            Box::new(move || {
+        let _self = self.clone();
+        unsafe {
+            cmd.pre_exec(move || {
+                // let sandbox_path = sandbox_path.clone();
                 let pid = Pid::this();
-                let _span = tracing::span!(Level::WARN, "child", ?pid);
+                let _span = span!(Level::WARN, "child", ?pid, ?ppid);
                 let _enter = _span.enter();
+                let uid_outside = Uid::current();
+                let uid_inside: uid_t = 0;
+                let uid_count = 1;
+                let uid_map_contents = format!("{} {} {}", uid_inside, uid_outside, uid_count);
 
-                warn!("{:?}", semaphore.sem);
-                semaphore.sem.wait().unwrap();
+                let gid_inside: uid_t = 0;
+                let gid_outside = Gid::current();
+                let gid_count = 1;
+                let gid_map_contents = format!("{} {} {}", gid_inside, gid_outside, gid_count);
 
-                let res = self.build_sandbox(&bash, &busybox, sandbox_path, build_path);
-                match res {
-                    Ok(_) => unreachable!(),
-                    Err(e) => {
-                        error!(?e);
-                        -1
+                nix::sched::unshare(
+                    CloneFlags::CLONE_NEWUSER
+                        | CloneFlags::CLONE_NEWNET
+                        | CloneFlags::CLONE_FS
+                        | CloneFlags::CLONE_NEWNS,
+                )?;
+
+                let mut uid_map = std::fs::File::create(format!("/proc/{}/uid_map", pid))?;
+                uid_map.write_all(&uid_map_contents.as_bytes())?;
+
+                let mut setgroups = std::fs::File::create(format!("/proc/{}/setgroups", pid))?;
+                setgroups.write_all("deny".as_bytes())?;
+
+                let mut gid_map = std::fs::File::create(format!("/proc/{}/gid_map", pid))?;
+                gid_map.write_all(&gid_map_contents.as_bytes())?;
+
+                let bash = mem_app::BASH
+                    .as_ref()
+                    .map_err(|e| Into::<io::Error>::into(*e))?;
+                let busybox = mem_app::BASH
+                    .as_ref()
+                    .map_err(|e| Into::<io::Error>::into(*e))?;
+
+                _self.sandbox_setup(bash, busybox, &sandbox_path, &build_path)?;
+
+                warn!("DONE");
+
+                Ok(())
+            })
+        };
+
+        let child = cmd.spawn()?;
+
+        let log_file_path = format!("/miq/log/{}.log", self.result.deref());
+        let err_msg = format!("Creating logfile at {}", log_file_path);
+        let mut log_file = std::fs::File::create(log_file_path).wrap_err(err_msg)?;
+
+        let mut procstream = ProcessLineStream::try_from(child)?;
+        while let Some(item) = procstream.next().await {
+            use owo_colors::OwoColorize;
+            match item {
+                tokio_process_stream::Item::Stdout(line) => {
+                    let msg = format!("{}>>{}", self.name.blue(), line.bright_black());
+                    println!("{}", msg);
+                    log_file.write_all(line.as_bytes())?;
+                    log_file.write_all(b"\n")?;
+                }
+                tokio_process_stream::Item::Stderr(line) => {
+                    let msg = format!("{}>>{}", self.name.blue(), line.bright_black());
+                    println!("{}", msg);
+                    log_file.write_all(line.as_bytes())?;
+                    log_file.write_all(b"\n")?;
+                }
+                tokio_process_stream::Item::Done(Ok(exit)) => {
+                    if exit.success() {
+                        debug!("Build OK");
+                    } else {
+                        bail!(eyre!("Exit not successful").wrap_err(exit));
                     }
                 }
-            }),
-            child_stack,
-            CloneFlags::empty()
-                | CloneFlags::CLONE_NEWUSER
-                | CloneFlags::CLONE_NEWNS
-                | CloneFlags::CLONE_NEWNET,
-            Some(nix::libc::SIGCHLD),
-        )?;
-
-        // Set UID/GID mappings
-        {
-            let uid_inside: uid_t = 0;
-            let uid_outside = Uid::current();
-            let uid_count = 1;
-            let uid_map_contents = format!("{} {} {}", uid_inside, uid_outside, uid_count);
-            let mut uid_map = std::fs::File::create(format!("/proc/{}/uid_map", child_pid))?;
-            uid_map.write_all(&uid_map_contents.as_bytes())?;
-
-            let mut f = std::fs::File::create(format!("/proc/{}/setgroups", child_pid))?;
-            f.write_all("deny".as_bytes())?;
-
-            let gid_inside: uid_t = 0;
-            let gid_outside = Gid::current();
-            let gid_count = 1;
-            let gid_map_contents = format!("{} {} {}", gid_inside, gid_outside, gid_count);
-            let mut gid_map = std::fs::File::create(format!("/proc/{}/gid_map", child_pid))?;
-            gid_map.write_all(&gid_map_contents.as_bytes())?;
-
-            semaphore.sem.post()?;
-            warn!("Semaphore written!: {:?}", semaphore.sem.read());
+                tokio_process_stream::Item::Done(Err(exit)) => bail!(exit),
+            }
         }
 
-        let pidfd = async_pidfd::AsyncPidFd::from_pid(child_pid.as_raw())?;
-        let exit = pidfd.wait().await?.status();
-        warn!(?exit);
-
-        if !exit.success() {
-            bail!(exit);
-        } else {
-            info!("Return OK");
+        match path.try_exists().wrap_err("Failed to produce an output") {
+            Ok(true) => {}
+            Ok(false) => bail!("Output path doesn't exist: {:?}", path),
+            Err(e) => bail!(e),
         }
 
-        crate::build::check_path(&path).wrap_err("Checking if package produced a result")?;
-
-        // bail!("TODO");
         conn.lock().unwrap().add(&path)?;
         Ok(())
     }
@@ -138,16 +174,17 @@ const NONE_NIX: Option<&str> = None;
 
 impl Package {
     #[tracing::instrument(ret, err, level = "debug")]
-    fn build_sandbox(
+    fn sandbox_setup(
         &self,
         bash: &MemApp,
         busybox: &MemApp,
         sandbox_path: &Path,
         build_path: &Path,
-    ) -> nix::Result<Infallible> {
+    ) -> nix::Result<()> {
         let uid = Uid::effective();
+        let gid = Gid::effective();
         let my_pid = Pid::this();
-        warn!(?self, ?uid);
+        warn!(?self, ?uid, ?gid);
 
         mount(
             Some(sandbox_path),
@@ -155,7 +192,8 @@ impl Package {
             NONE_NIX,
             MsFlags::MS_BIND | MsFlags::MS_REC,
             NONE_NIX,
-        )?;
+        )
+        .unwrap();
 
         for element in ["dev", "etc", "run", "tmp", "var", "sys", "miq", "proc"] {
             let new_path = sandbox_path.join(element);
@@ -190,11 +228,7 @@ impl Package {
                 Some("tmpfs"),
                 MsFlags::empty(),
                 NONE_NIX,
-            )
-            .unwrap();
-            // let original_bash = ;
-            // let symlink_bash = bin_path.join("sh");
-            // let symlink_bash = bin_path.join("");
+            )?;
             std::os::unix::fs::symlink(
                 format!("/proc/{}/fd/{}", my_pid, bash.fd.as_raw_fd()),
                 bin_path.join("bash"),
@@ -235,40 +269,6 @@ impl Package {
 
         std::fs::write("/build-script", &self.script).unwrap();
 
-        // exec bash
-        {
-            let argv = [
-                "bash", //  "-c", "set"
-                "--norc",
-                "--noprofile",
-                "/build-script",
-            ]
-            .into_iter()
-            .map(|e| CString::new(e).unwrap())
-            .collect::<Vec<_>>();
-
-            let mut envp = [
-                "HOME=/build",
-                &format!("PREFIX={}", &self.result.store_path().to_string_lossy()),
-                &format!("miq_out={}", &self.result.store_path().to_string_lossy()),
-                "TMP=/tmp",
-                "TEMP=/temp",
-                "TMPDIR=/tmp",
-                "TEMPDIR=/temp",
-                "PS1=$PWD # ",
-                "PATH=/usr/bin:/bin",
-            ]
-            .into_iter()
-            .map(|e| CString::new(e).unwrap())
-            .collect::<Vec<_>>();
-
-            for (key, value) in &self.env {
-                let elem = format!("{}={}", key, value);
-                let elem = CString::new(elem).unwrap();
-                envp.push(elem);
-            }
-
-            nix::unistd::fexecve(bash.fd.as_raw_fd(), &argv, &envp)
-        }
+        Ok(())
     }
 }
