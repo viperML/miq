@@ -26,7 +26,12 @@ const BUILD_SCRIPT_LOC: &str = "/build-script";
 #[async_trait]
 impl Build for Package {
     #[tracing::instrument(skip(conn), ret, err, level = "debug")]
-    async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>, pb: Option<ProgressBar>) -> Result<()> {
+    async fn build(
+        &self,
+        rebuild: bool,
+        conn: &Mutex<DbConnection>,
+        pb: Option<ProgressBar>,
+    ) -> Result<()> {
         let path = self.result.store_path();
         let path = path.as_path();
         let _path_str = path.to_str().unwrap();

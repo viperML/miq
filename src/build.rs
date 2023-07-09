@@ -9,7 +9,7 @@ use color_eyre::Help;
 use daggy::Walker;
 use futures::stream::futures_unordered;
 use futures::{StreamExt, TryStreamExt};
-use indicatif::{MultiProgress, ProgressBar};
+use indicatif::{MultiProgress, ProgressBar, MultiProgressAlignment};
 use owo_colors::OwoColorize;
 use tracing::{debug, instrument, span, trace, Level};
 
@@ -71,6 +71,8 @@ impl Args {
         build_tasks.insert(&root_node, BuildTask::Waiting);
 
         let bars = MultiProgress::new();
+        // bars.set_alignment(MultiProgressAlignment::Top);
+        // bars.set_move_cursor(false);
 
         while !build_tasks.iter().all(|(_, task)| match task {
             BuildTask::Finished => true,
@@ -140,8 +142,7 @@ impl Args {
                             Unit::PackageUnit(_) => unit.build(rebuild, &_db_conn, None),
                             Unit::FetchUnit(_) => {
                                 let pb = ProgressBar::hidden();
-                                bars.add(pb);
-                                unit.build(rebuild, &_db_conn, None)
+                                unit.build(rebuild, &_db_conn, Some(bars.add(pb)))
                             }
                         }
                         .await;
@@ -186,12 +187,13 @@ impl Args {
                 *t = BuildTask::Finished;
 
                 let u = format!("{unit:?}");
-                use owo_colors::OwoColorize;
-                eprintln!(
+                let msg =
+                format!(
                     "{} <- {}",
                     unit.result().store_path().to_string_lossy().bright_blue(),
                     &u.bright_black()
                 );
+                bars.println(msg)?;
             }
 
             trace!(?build_tasks);
