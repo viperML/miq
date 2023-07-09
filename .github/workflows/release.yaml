@@ -28,9 +28,6 @@ jobs:
           nix build .#pkgsCross.musl64.miq -L
           cp -vL ./result/bin/miq release
 
-          nix build .#pkgsStatic.bubblewrap
-          cp -vL ./result/bin/bwrap release
-
           for file in pkgs/*.lua; do
             cp -v "$file" release
           done
