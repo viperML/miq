@@ -10,6 +10,7 @@ use std::sync::Mutex;
 use ambassador::{delegatable_trait, Delegate};
 use async_trait::async_trait;
 use color_eyre::Result;
+use indicatif::ProgressBar;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -55,7 +56,7 @@ impl crate::Main for Args {
 #[async_trait]
 #[delegatable_trait]
 pub trait Build {
-    async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>) -> Result<()>;
+    async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>, pb: Option<ProgressBar>) -> Result<()>;
 }
 
 #[derive(Educe, PartialEq, Clone, Serialize, Deserialize, JsonSchema, Hash, Delegate, Eq)]

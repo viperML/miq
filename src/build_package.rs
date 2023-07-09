@@ -8,6 +8,7 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use color_eyre::eyre::{bail, Context};
 use futures::StreamExt;
+use indicatif::ProgressBar;
 use nix::libc::uid_t;
 use nix::mount::{mount, MsFlags};
 use nix::sched::CloneFlags;
@@ -20,13 +21,12 @@ use crate::mem_app::MemApp;
 use crate::schema_eval::{Build, Package};
 use crate::*;
 
-const STACK_SIZE: usize = 1024 * 1024;
 const BUILD_SCRIPT_LOC: &str = "/build-script";
 
 #[async_trait]
 impl Build for Package {
     #[tracing::instrument(skip(conn), ret, err, level = "debug")]
-    async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>) -> Result<()> {
+    async fn build(&self, rebuild: bool, conn: &Mutex<DbConnection>, pb: Option<ProgressBar>) -> Result<()> {
         let path = self.result.store_path();
         let path = path.as_path();
         let _path_str = path.to_str().unwrap();
@@ -124,8 +124,8 @@ impl Build for Package {
         let child = cmd.spawn()?;
 
         let log_file_path = format!("/miq/log/{}.log", self.result.deref());
-        let err_msg = format!("Creating logfile at {}", log_file_path);
-        let mut log_file = std::fs::File::create(log_file_path).wrap_err(err_msg)?;
+        let mut log_file = std::fs::File::create(&log_file_path)
+            .wrap_err(format!("Creating logfile at {}", &log_file_path))?;
 
         let mut procstream = ProcessLineStream::try_from(child)?;
         while let Some(item) = procstream.next().await {

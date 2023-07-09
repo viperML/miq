@@ -9,6 +9,7 @@ use color_eyre::Help;
 use daggy::Walker;
 use futures::stream::futures_unordered;
 use futures::{StreamExt, TryStreamExt};
+use indicatif::{MultiProgress, ProgressBar};
 use owo_colors::OwoColorize;
 use tracing::{debug, instrument, span, trace, Level};
 
@@ -68,6 +69,8 @@ impl Args {
         let mut sentry = 0;
 
         build_tasks.insert(&root_node, BuildTask::Waiting);
+
+        let bars = MultiProgress::new();
 
         while !build_tasks.iter().all(|(_, task)| match task {
             BuildTask::Finished => true,
@@ -130,10 +133,20 @@ impl Args {
                         ) => true,
                         _ => false,
                     };
+                    let bars = bars.clone();
                     let fut = tokio::spawn(async move {
                         trace!("Starting build task");
-                        let res = unit.build(rebuild, &_db_conn).await;
-                        (unit, res)
+                        let build_result = match unit {
+                            Unit::PackageUnit(_) => unit.build(rebuild, &_db_conn, None),
+                            Unit::FetchUnit(_) => {
+                                let pb = ProgressBar::hidden();
+                                bars.add(pb);
+                                unit.build(rebuild, &_db_conn, None)
+                            }
+                        }
+                        .await;
+                        // let res = unit.build(rebuild, &_db_conn).await;
+                        (unit, build_result)
                     });
                     futs.push(fut);
                     BuildTask::Building
