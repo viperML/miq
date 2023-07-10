@@ -57,9 +57,8 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Build doc
         run: |
-          pushd doc
-          nix develop .#doc --command just build
-          popd
+          nix build .#doc -L
+          cp -vL ./result/*.pdf .
 
       - uses: ncipollo/release-action@v1
         name: Release
@@ -70,7 +69,7 @@ jobs:
           omitName: true
           allowUpdates: true
           replacesArtifacts: true
-          artifacts: "doc/out/index.pdf"
+          artifacts: "*.pdf"
 
   tag:
     runs-on: ubuntu-latest
