@@ -30,16 +30,10 @@ $ curl -OL https://github.com/viperML/miq/releases/download/latest/release.tar.g
 tar -xvf release.tar.gz
 \end{minted}
 
-    \item Add the current directory to |PATH|, such that
-    |bwrap| can be found (this can be skipped if the host
-    machine has Bubblewrap installed):
-\begin{minted}{text}
-$ export PATH="$PWD:$PATH"
-\end{minted}
 
     \item Miq is ready to be used
 \begin{minted}{text}
-$ miq --help
+$ ./miq --help
 miq 0.1.0
 Fernando Ayats <ayatsfer@gmail.com>
 
