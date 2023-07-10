@@ -39,6 +39,7 @@ jobs:
         name: Release
         with:
           tag: latest
+          makeLatest: true
           omitBody: true
           omitName: true
           allowUpdates: true
@@ -64,6 +65,7 @@ jobs:
         name: Release
         with:
           tag: latest
+          makeLatest: true
           omitBody: true
           omitName: true
           allowUpdates: true
