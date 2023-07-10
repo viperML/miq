@@ -134,14 +134,11 @@ impl Build for Package {
 
         let log_file_path = format!("/miq/log/{}.log", self.result.deref());
         let log_file = tokio::fs::File::create(&log_file_path).await?;
-        let log_writer = tokio::io::BufWriter::new(log_file);
-
-        let mut pb_writer = pb.wrap_async_write(log_writer);
+        let mut log_writer = tokio::io::BufWriter::new(log_file);
 
         let mut procstream = ProcessLineStream::try_from(child)?;
         while let Some(item) = procstream.next().await {
             use owo_colors::OwoColorize;
-            pb.tick();
             let msg = match item {
                 Item::Stdout(line) | Item::Stderr(line) => line,
                 Item::Done(Ok(exit)) => {
@@ -154,9 +151,10 @@ impl Build for Package {
                 Item::Done(Err(exit)) => bail!(exit),
             };
             let pretty = format!("{}>>{}", self.name.blue(), msg.bright_black());
+            copy(&mut msg.as_bytes(), &mut log_writer).await?;
+            copy(&mut "\n".as_bytes(), &mut log_writer).await?;
             pb.println(&pretty);
-            copy(&mut msg.as_bytes(), &mut pb_writer).await?;
-            copy(&mut "\n".as_bytes(), &mut pb_writer).await?;
+            pb.tick();
         }
 
         match path.try_exists().wrap_err("Failed to produce an output") {
