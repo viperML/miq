@@ -12,12 +12,7 @@
 rustPlatform.buildRustPackage {
   doCheck = false;
   inherit pname src version;
-  cargoLock = {
-    lockFile = src + "/Cargo.lock";
-    outputHashes = {
-      "mlua-0.9.0-beta.2" = "sha256-DmIBCyhDHuRjn6XL/2PYsaLCfR09davsysN7oq2aD9M=";
-    };
-  };
+  cargoLock.lockFile = src + "/Cargo.lock";
 
   CARGO_BUILD_TARGET = targetPlatform.config;
   target = targetPlatform.config;
@@ -33,7 +28,6 @@ rustPlatform.buildRustPackage {
   ];
 
   preConfigure = ''
-    ls -la
     mkdir -p vendor
     ln -vs ${pkgsStatic.bash}/bin/bash vendor/bash
     ln -vs ${pkgsStatic.busybox}/bin/busybox vendor/busybox
