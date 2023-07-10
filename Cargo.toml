@@ -82,3 +82,4 @@ futures-util = "0.3.28"
 indicatif = { version = "0.17.5", features = [
     "tokio",
 ] }
+num_cpus = "1.16.0"

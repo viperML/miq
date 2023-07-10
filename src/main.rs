@@ -22,7 +22,7 @@ use std::path::PathBuf;
 
 use ambassador::{delegatable_trait, Delegate};
 use clap::Parser;
-use color_eyre::eyre::{bail, eyre, ContextCompat};
+use color_eyre::eyre::{bail, eyre};
 use color_eyre::Result;
 use file_lock::{FileLock, FileOptions};
 use tracing::info;

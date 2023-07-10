@@ -35,9 +35,9 @@ pub struct Args {
     #[arg(long, short = 'R')]
     rebuild_all: bool,
 
-    /// Maximum number of concurrent build jobs. Fetch jobs are parallelized automatically.
-    #[arg(long = "jobs", short = 'j', default_value = "1")]
-    max_jobs: usize,
+    /// Maximum number of concurrent Package build jobs. Default: nproc
+    #[arg(long = "jobs", short = 'j')]
+    max_jobs: Option<usize>,
 }
 
 impl crate::Main for Args {
@@ -71,8 +71,9 @@ impl Args {
         build_tasks.insert(&root_node, BuildTask::Waiting);
 
         let bars = MultiProgress::new();
-        // bars.set_alignment(MultiProgressAlignment::Top);
-        // bars.set_move_cursor(false);
+
+        let max_jobs = self.max_jobs.unwrap_or_else(|| num_cpus::get());
+        trace!(?max_jobs);
 
         while !build_tasks.iter().all(|(_, task)| match task {
             BuildTask::Finished => true,
@@ -107,19 +108,13 @@ impl Args {
 
                 let number_packages_building = build_tasks
                     .iter()
-                    .filter(|(unit, _)| match unit {
-                        Unit::PackageUnit(_) => true,
-                        _ => false,
-                    })
-                    .filter(|(_, task)| match task {
-                        BuildTask::Building => true,
-                        _ => false,
-                    })
+                    .filter(|(unit, _)| matches!(unit, Unit::PackageUnit(_)))
+                    .filter(|(_, task)| matches!(task, BuildTask::Building))
                     .count();
 
                 let can_add_to_tasks = match unit {
-                    Unit::PackageUnit(_) => number_packages_building < self.max_jobs,
-                    _ => true,
+                    Unit::PackageUnit(_) => number_packages_building < max_jobs,
+                    Unit::FetchUnit(_) => true,
                 };
 
                 let task_status = if all_deps_built && can_add_to_tasks {
