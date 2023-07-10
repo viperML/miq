@@ -5,6 +5,7 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
+use tokio::io::AsyncWriteExt;
 use tracing::debug;
 
 use crate::db::DbConnection;
@@ -18,7 +19,7 @@ impl Build for Fetch {
         &self,
         rebuild: bool,
         conn: &Mutex<DbConnection>,
-        pb: Option<ProgressBar>,
+        pb: ProgressBar,
     ) -> Result<()> {
         let path = self.result.store_path();
         let path = path.as_path();
@@ -41,24 +42,26 @@ impl Build for Fetch {
             bail!(status);
         }
 
-        let pb = pb.wrap_err("Didn't receive a progress bar!")?;
-
         if let Some(total_length) = response.content_length() {
             pb.set_length(total_length);
+            pb.set_message(self.name.clone());
             pb.set_style(ProgressStyle::with_template(
                 "{msg:.blue}>> {percent}% {wide_bar}",
             )?);
-            pb.set_message(self.name.clone());
         };
 
         let out_file = tokio::fs::File::create(path).await?;
 
-        let mut out_writer = pb.wrap_async_write(out_file);
+        let pb_writer = pb.wrap_async_write(out_file);
+        let mut buf_writer = tokio::io::BufWriter::new(pb_writer);
         let mut stream = response.bytes_stream();
+
         while let Some(item) = stream.next().await {
             let item = item?;
-            tokio::io::copy(&mut item.as_ref(), &mut out_writer).await?;
+            tokio::io::copy(&mut item.as_ref(), &mut buf_writer).await?;
         }
+
+        buf_writer.flush().await?;
 
         let perm = if self.executable {
             debug!("Setting as executable exec bit");
@@ -69,9 +72,9 @@ impl Build for Fetch {
 
         tokio::fs::set_permissions(path, perm).await?;
 
-        pb.finish_and_clear();
 
         conn.lock().unwrap().add(&path)?;
+        pb.finish_and_clear();
         Ok(())
     }
 }

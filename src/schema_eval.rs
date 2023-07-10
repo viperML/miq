@@ -60,7 +60,7 @@ pub trait Build {
         &self,
         rebuild: bool,
         conn: &Mutex<DbConnection>,
-        pb: Option<ProgressBar>,
+        pb: ProgressBar,
     ) -> Result<()>;
 }
 

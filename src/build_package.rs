@@ -4,16 +4,18 @@ use std::os::fd::AsRawFd;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use color_eyre::eyre::{bail, Context};
 use futures::StreamExt;
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, ProgressStyle};
 use nix::libc::uid_t;
 use nix::mount::{mount, MsFlags};
 use nix::sched::CloneFlags;
 use nix::unistd::{Gid, Pid, Uid};
-use tokio_process_stream::ProcessLineStream;
+use tokio::io::copy;
+use tokio_process_stream::{Item, ProcessLineStream};
 use tracing::{debug, span, trace, Level};
 
 use crate::db::DbConnection;
@@ -30,7 +32,7 @@ impl Build for Package {
         &self,
         rebuild: bool,
         conn: &Mutex<DbConnection>,
-        _pb: Option<ProgressBar>,
+        pb: ProgressBar,
     ) -> Result<()> {
         let path = self.result.store_path();
         let path = path.as_path();
@@ -43,6 +45,10 @@ impl Build for Package {
                 return Ok(());
             }
         }
+
+        pb.set_message(self.name.clone());
+        pb.set_style(ProgressStyle::with_template("{msg:.blue}>> {spinner}")?);
+        pb.enable_steady_tick(Duration::from_millis(500));
 
         crate::build::clean_path(&path)?;
         let _build_dir = tempfile::tempdir()?;
@@ -58,7 +64,6 @@ impl Build for Package {
         let mut cmd = tokio::process::Command::new("/bin/bash");
         cmd.args(["--norc", "--noprofile"]);
         cmd.arg(BUILD_SCRIPT_LOC);
-        // cmd.arg("-i");
 
         cmd.env_clear();
         cmd.envs([
@@ -128,34 +133,30 @@ impl Build for Package {
         let child = cmd.spawn()?;
 
         let log_file_path = format!("/miq/log/{}.log", self.result.deref());
-        let mut log_file = std::fs::File::create(&log_file_path)
-            .wrap_err(format!("Creating logfile at {}", &log_file_path))?;
+        let log_file = tokio::fs::File::create(&log_file_path).await?;
+        let log_writer = tokio::io::BufWriter::new(log_file);
+
+        let mut pb_writer = pb.wrap_async_write(log_writer);
 
         let mut procstream = ProcessLineStream::try_from(child)?;
         while let Some(item) = procstream.next().await {
             use owo_colors::OwoColorize;
-            match item {
-                tokio_process_stream::Item::Stdout(line) => {
-                    let msg = format!("{}>>{}", self.name.blue(), line.bright_black());
-                    println!("{}", msg);
-                    log_file.write_all(line.as_bytes())?;
-                    log_file.write_all(b"\n")?;
-                }
-                tokio_process_stream::Item::Stderr(line) => {
-                    let msg = format!("{}>>{}", self.name.blue(), line.bright_black());
-                    println!("{}", msg);
-                    log_file.write_all(line.as_bytes())?;
-                    log_file.write_all(b"\n")?;
-                }
-                tokio_process_stream::Item::Done(Ok(exit)) => {
+            pb.tick();
+            let msg = match item {
+                Item::Stdout(line) | Item::Stderr(line) => line,
+                Item::Done(Ok(exit)) => {
                     if exit.success() {
-                        debug!("Build OK");
+                        format!("miq: exit ok")
                     } else {
                         bail!(eyre!("Exit not successful").wrap_err(exit));
                     }
                 }
-                tokio_process_stream::Item::Done(Err(exit)) => bail!(exit),
-            }
+                Item::Done(Err(exit)) => bail!(exit),
+            };
+            let pretty = format!("{}>>{}", self.name.blue(), msg.bright_black());
+            pb.println(&pretty);
+            copy(&mut msg.as_bytes(), &mut pb_writer).await?;
+            copy(&mut "\n".as_bytes(), &mut pb_writer).await?;
         }
 
         match path.try_exists().wrap_err("Failed to produce an output") {
@@ -165,6 +166,7 @@ impl Build for Package {
         }
 
         conn.lock().unwrap().add(&path)?;
+        pb.finish_and_clear();
         Ok(())
     }
 }

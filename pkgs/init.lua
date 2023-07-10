@@ -10,8 +10,8 @@ pkgs.empty0 = miq.package {
 	script = [[
     set -x
     pwd
-    sleep
-    pwd
+    ls -la
+    sleep 10
   ]],
 }
 

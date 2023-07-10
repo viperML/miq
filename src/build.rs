@@ -138,15 +138,8 @@ impl Args {
                     let bars = bars.clone();
                     let fut = tokio::spawn(async move {
                         trace!("Starting build task");
-                        let build_result = match unit {
-                            Unit::PackageUnit(_) => unit.build(rebuild, &_db_conn, None),
-                            Unit::FetchUnit(_) => {
-                                let pb = ProgressBar::hidden();
-                                unit.build(rebuild, &_db_conn, Some(bars.add(pb)))
-                            }
-                        }
-                        .await;
-                        // let res = unit.build(rebuild, &_db_conn).await;
+                        let pb = ProgressBar::hidden();
+                        let build_result = unit.build(rebuild, &_db_conn, bars.add(pb)).await;
                         (unit, build_result)
                     });
                     futs.push(fut);
@@ -189,7 +182,7 @@ impl Args {
                 let u = format!("{unit:?}");
                 let msg = format!(
                     "{} <- {}",
-                    unit.result().store_path().to_string_lossy().bright_blue(),
+                    unit.result().store_path().to_string_lossy().bright_green(),
                     &u.bright_black()
                 );
                 bars.println(msg)?;
