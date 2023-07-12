@@ -40,7 +40,11 @@ impl TryFrom<PackageInput> for Unit {
     type Error = LuaError;
 
     fn try_from(value: PackageInput) -> std::result::Result<Self, Self::Error> {
-        let result = MiqResult::create(&value.name, &value);
+        let human_readable = match value.version {
+            None => value.name.clone(),
+            Some(ref version) => format!("{}-{}", &value.name, version),
+        };
+        let result = MiqResult::create(&human_readable, &value);
 
         // Collect into Set to remove dupes
         let mut deps = value

@@ -246,4 +246,21 @@ do
 	}
 end
 
+do
+	local version = "0.5.11"
+	local src = utils.fetchTar {
+		url = f "http://gondor.apana.org.au/~herbert/dash/files/dash-{{version}}.tar.gz",
+	}
+	x.dash_mod = x.stdenv {
+		name = "dash",
+		version = version,
+		script = f [[
+      {{src}}/configure --prefix=$PREFIX
+
+      make -j$(nproc)
+      make install -j$(nproc)
+    ]],
+	}
+end
+
 return x

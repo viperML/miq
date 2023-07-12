@@ -62,6 +62,7 @@ x.stdenvBuilder = function(input)
 	local input = input
 	local pkg = miq.package {
 		name = input.name,
+		version = input.version,
 		env = {
 			PATH = f "{{input.coreutils}}/bin",
 		},
